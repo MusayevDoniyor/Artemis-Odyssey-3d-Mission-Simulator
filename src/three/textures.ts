@@ -316,29 +316,42 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   nCtx.textAlign = 'center';
   nCtx.fillText('NASA', 128, 146);
 
-  // 9. KSC Ground Coastal Plain & Tarmac Apron
+  // 9. KSC Ground Coastal Plain, Palmetto Scrub & Dune Silt (no flat square CAD grid)
   const kscCanvas = document.createElement('canvas');
   kscCanvas.width = 512;
   kscCanvas.height = 512;
   const kCtx = kscCanvas.getContext('2d')!;
-  kCtx.fillStyle = '#182b27';
+  kCtx.fillStyle = '#172923';
   kCtx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 160; i++) {
+    const gx = Math.random() * 512;
+    const gy = Math.random() * 512;
+    const gr = 18 + Math.random() * 68;
+    const tone =
+      i % 3 === 0
+        ? 'rgba(38, 66, 52, 0.24)'
+        : i % 3 === 1
+          ? 'rgba(20, 36, 30, 0.26)'
+          : 'rgba(84, 92, 68, 0.14)';
+    for (const ox of [-512, 0, 512]) {
+      for (const oy of [-512, 0, 512]) {
+        const px = gx + ox;
+        const py = gy + oy;
+        if (px + gr < 0 || px - gr > 512 || py + gr < 0 || py - gr > 512) continue;
+        const g = kCtx.createRadialGradient(px, py, 2, px, py, gr);
+        g.addColorStop(0, tone);
+        g.addColorStop(1, 'rgba(23, 41, 35, 0)');
+        kCtx.fillStyle = g;
+        kCtx.beginPath();
+        kCtx.arc(px, py, gr, 0, Math.PI * 2);
+        kCtx.fill();
+      }
+    }
+  }
   for (let i = 0; i < 14000; i++) {
     const shade = 24 + Math.floor(Math.random() * 34);
-    kCtx.fillStyle = `rgba(${shade}, ${shade + 22}, ${shade + 10}, 0.32)`;
-    kCtx.fillRect(Math.random() * 512, Math.random() * 512, 2.5, 2.5);
-  }
-  kCtx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
-  kCtx.lineWidth = 2;
-  for (let g = 0; g < 512; g += 64) {
-    kCtx.beginPath();
-    kCtx.moveTo(g, 0);
-    kCtx.lineTo(g, 512);
-    kCtx.stroke();
-    kCtx.beginPath();
-    kCtx.moveTo(0, g);
-    kCtx.lineTo(512, g);
-    kCtx.stroke();
+    kCtx.fillStyle = `rgba(${shade}, ${shade + 20}, ${shade + 10}, 0.28)`;
+    kCtx.fillRect(Math.random() * 512, Math.random() * 512, 2.2, 2.2);
   }
 
   // 10. Florida Space Coast Sunset-to-Twilight Atmospheric Sky Dome
@@ -403,7 +416,7 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     stCtx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
   }
 
-  // 13. Mars Jezero Iron-Oxide & Sedimentary Clay Regolith Albedo & Bump
+  // 13. Mars Jezero Iron-Oxide & Sedimentary Clay Regolith Albedo & Bump (seamlessly edge-wrapped)
   const marsCanvas = document.createElement('canvas');
   marsCanvas.width = 512;
   marsCanvas.height = 512;
@@ -415,14 +428,26 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     const gx = Math.random() * 512;
     const gy = Math.random() * 512;
     const gr = 20 + Math.random() * 82;
-    const g = maCtx.createRadialGradient(gx, gy, 2, gx, gy, gr);
-    const tone = i % 3 === 0 ? 'rgba(217, 119, 68, 0.14)' : i % 3 === 1 ? 'rgba(92, 42, 28, 0.16)' : 'rgba(180, 92, 52, 0.12)';
-    g.addColorStop(0, tone);
-    g.addColorStop(1, 'rgba(164, 74, 42, 0)');
-    maCtx.fillStyle = g;
-    maCtx.beginPath();
-    maCtx.arc(gx, gy, gr, 0, Math.PI * 2);
-    maCtx.fill();
+    const tone =
+      i % 3 === 0
+        ? 'rgba(217, 119, 68, 0.14)'
+        : i % 3 === 1
+          ? 'rgba(92, 42, 28, 0.16)'
+          : 'rgba(180, 92, 52, 0.12)';
+    for (const ox of [-512, 0, 512]) {
+      for (const oy of [-512, 0, 512]) {
+        const px = gx + ox;
+        const py = gy + oy;
+        if (px + gr < 0 || px - gr > 512 || py + gr < 0 || py - gr > 512) continue;
+        const g = maCtx.createRadialGradient(px, py, 2, px, py, gr);
+        g.addColorStop(0, tone);
+        g.addColorStop(1, 'rgba(164, 74, 42, 0)');
+        maCtx.fillStyle = g;
+        maCtx.beginPath();
+        maCtx.arc(px, py, gr, 0, Math.PI * 2);
+        maCtx.fill();
+      }
+    }
   }
   for (let i = 0; i < 14000; i++) {
     const r = 135 + Math.floor(Math.random() * 68);
@@ -435,14 +460,22 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     const cx = Math.random() * 512;
     const cy = Math.random() * 512;
     const r = 4 + Math.random() * 12;
-    const rimGrad = maCtx.createRadialGradient(cx - r * 0.15, cy - r * 0.15, r * 0.35, cx, cy, r * 1.15);
-    rimGrad.addColorStop(0, 'rgba(72, 28, 18, 0.38)');
-    rimGrad.addColorStop(0.7, 'rgba(224, 142, 92, 0.18)');
-    rimGrad.addColorStop(1, 'rgba(164, 74, 42, 0)');
-    maCtx.fillStyle = rimGrad;
-    maCtx.beginPath();
-    maCtx.arc(cx, cy, r * 1.15, 0, Math.PI * 2);
-    maCtx.fill();
+    for (const ox of [-512, 0, 512]) {
+      for (const oy of [-512, 0, 512]) {
+        const px = cx + ox;
+        const py = cy + oy;
+        const rr = r * 1.15;
+        if (px + rr < 0 || px - rr > 512 || py + rr < 0 || py - rr > 512) continue;
+        const rimGrad = maCtx.createRadialGradient(px - r * 0.15, py - r * 0.15, r * 0.35, px, py, rr);
+        rimGrad.addColorStop(0, 'rgba(72, 28, 18, 0.38)');
+        rimGrad.addColorStop(0.7, 'rgba(224, 142, 92, 0.18)');
+        rimGrad.addColorStop(1, 'rgba(164, 74, 42, 0)');
+        maCtx.fillStyle = rimGrad;
+        maCtx.beginPath();
+        maCtx.arc(px, py, rr, 0, Math.PI * 2);
+        maCtx.fill();
+      }
+    }
   }
 
   // 14. Solar Granulation & Sunspot Corona Albedo

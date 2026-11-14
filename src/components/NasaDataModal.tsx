@@ -64,9 +64,9 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/75 p-4">
-      <div className="hud-panel tactical-frame animate-modal-enter max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-2xl p-6">
-        <div className="mb-4 flex items-center justify-between border-b border-cyan-500/20 pb-3">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-md">
+      <div className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-6">
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-cyan-500/20 pb-3">
           <div>
             <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
               DONKI · OSDR · Grounded Search &amp; Maps
@@ -83,6 +83,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
             <X className="h-4 w-4" />
           </button>
         </div>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
 
         {/* 1. NASA DONKI Live Space Weather */}
         <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4">
@@ -235,12 +236,13 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
           {OSDR_FACTS.map((f) => (
             <div
               key={f.code}
-              className="rounded-lg border border-cyan-500/20 bg-slate-950/75 p-3"
+              className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-3"
             >
               <div className="mb-1 font-mono-tech text-xs font-bold text-cyan-300">{f.code}</div>
               <p className="text-[11px] leading-relaxed text-slate-300">{f.summary}</p>
             </div>
           ))}
+        </div>
         </div>
       </div>
     </div>

@@ -106,7 +106,7 @@ export function OutcomeModal({
 }: OutcomeModalProps) {
   if (mode === 'discovery' && discoveryObjective) {
     return (
-      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/68 p-4">
+      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/86 p-4 backdrop-blur-md">
         <div className="hud-panel tactical-frame animate-modal-enter w-full max-w-lg rounded-2xl p-6">
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-2.5">
             <span className="font-hud text-[11px] font-bold tracking-[0.16em] text-emerald-300 uppercase">
@@ -157,7 +157,7 @@ export function OutcomeModal({
           : 'ERR // LUNAR-EDL-IMPACT';
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/60 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/86 p-4 backdrop-blur-md">
       <div className={`${panelClass} animate-modal-enter w-full max-w-xl rounded-2xl p-6`}>
         {mode === 'pause' && (
           <div className="text-center">

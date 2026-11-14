@@ -14,6 +14,7 @@ import {
   CAMPAIGN_ANOMALIES,
   CAMPAIGN_MISSIONS,
   CAMPAIGN_ORDER,
+  LAUNCH_PART_DETAILS,
   PAYLOADS,
   VEHICLE_CATALOG,
   getLandingZones,
@@ -83,6 +84,8 @@ const EMPTY_INPUT: InputState = {
   boost: false,
   tiltForward: false,
   stabilize: false,
+  throttleDown: false,
+  cutoff: false,
 };
 
 function clonePlanetObjectives(planet: SurfacePlanet): RoverObjective[] {
@@ -319,6 +322,7 @@ export default function App() {
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'launch') {
         s.phase = 'launch';
+        s.highlightedPart = null;
         s.orbitYaw = 0.52;
         s.orbitPitch = 0.12;
         s.orbitDistance = 38;
@@ -708,6 +712,8 @@ export default function App() {
       }
       if (code === 'ShiftLeft' || code === 'ShiftRight') inp.boost = down;
       if (code === 'KeyQ') inp.tiltForward = down;
+      if (code === 'KeyZ') inp.throttleDown = down;
+      if (code === 'KeyX') inp.cutoff = down;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -803,6 +809,17 @@ export default function App() {
         } else if (e.code === 'Digit3') {
           s.landing.targetZoneId = 2;
           syncUiNow();
+        } else if (e.code === 'KeyX') {
+          s.landing.guidanceMode = 'MANUAL';
+          s.landing.targetThrottle = 0;
+          s.landing.throttle = 0;
+          syncUiNow();
+        } else if (e.code === 'KeyH') {
+          s.landing.guidanceMode = 'MANUAL';
+          const pct = clamp(s.landing.hoverThrottlePct / 100, 0.1, 1);
+          s.landing.targetThrottle = pct;
+          s.landing.throttle = pct;
+          syncUiNow();
         }
       }
 
@@ -862,10 +879,12 @@ export default function App() {
   }, [jumpToPhase, syncUiNow]);
 
   // Universal 360° drag-to-orbit + scroll-wheel zoom across every 3D stage & model
-  const dragStateRef = useRef<{ active: boolean; x: number; y: number }>({
+  const dragStateRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number }>({
     active: false,
     x: 0,
     y: 0,
+    startX: 0,
+    startY: 0,
   });
 
   useEffect(() => {
@@ -902,7 +921,31 @@ export default function App() {
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
     if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi) return;
-    dragStateRef.current = { active: true, x: e.clientX, y: e.clientY };
+    dragStateRef.current = {
+      active: true,
+      x: e.clientX,
+      y: e.clientY,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent) => {
+    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi) return;
+    const travel = Math.hypot(
+      e.clientX - dragStateRef.current.startX,
+      e.clientY - dragStateRef.current.startY
+    );
+    if (travel < 6 && simRef.current.phase === 'launch') {
+      const partId = sceneMgrRef.current?.pickLaunchPart(e.clientX, e.clientY) || null;
+      simRef.current.highlightedPart = partId;
+      if (partId) {
+        soundSynth.init();
+        soundSynth.playClick();
+        unlockFieldNote(LAUNCH_PART_DETAILS[partId]?.unlockNoteId);
+      }
+      syncUiNow();
+    }
   };
 
   const handleCanvasWheel = (e: React.WheelEvent) => {
@@ -968,6 +1011,7 @@ export default function App() {
       <div
         ref={containerRef}
         onPointerDown={handleCanvasPointerDown}
+        onPointerUp={handleCanvasPointerUp}
         onWheel={handleCanvasWheel}
         onContextMenu={(e) => e.preventDefault()}
         className="fixed inset-0 z-0 cursor-grab active:cursor-grabbing"
@@ -1048,6 +1092,11 @@ export default function App() {
         <LaunchHUD
           launch={launchUi}
           resources={resourcesUi}
+          selectedPartId={highlightedPart}
+          onClearSelectedPart={() => {
+            simRef.current.highlightedPart = null;
+            syncUiNow();
+          }}
           muted={muted}
           onToggleMute={toggleMute}
           onPause={() => {
@@ -1187,6 +1236,26 @@ export default function App() {
           }}
           onSetGuidance={(mode: LandingGuidanceMode) => {
             simRef.current.landing.guidanceMode = mode;
+            syncUiNow();
+          }}
+          onSetThrottlePct={(pct: number) => {
+            simRef.current.landing.guidanceMode = 'MANUAL';
+            const norm = clamp(pct / 100, 0, 1);
+            simRef.current.landing.targetThrottle = norm;
+            simRef.current.landing.throttle = norm;
+            syncUiNow();
+          }}
+          onCutoffEngine={() => {
+            simRef.current.landing.guidanceMode = 'MANUAL';
+            simRef.current.landing.targetThrottle = 0;
+            simRef.current.landing.throttle = 0;
+            syncUiNow();
+          }}
+          onMatchHover={() => {
+            simRef.current.landing.guidanceMode = 'MANUAL';
+            const hoverNorm = clamp(simRef.current.landing.hoverThrottlePct / 100, 0.1, 1);
+            simRef.current.landing.targetThrottle = hoverNorm;
+            simRef.current.landing.throttle = hoverNorm;
             syncUiNow();
           }}
         />

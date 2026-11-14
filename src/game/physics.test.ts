@@ -141,6 +141,61 @@ test('Moon and Mars AUTOLAND both touch down softly and Mars ISRU bonus adds des
   }
   assert.equal(marsBoosted.landed, true, 'Mars 0.38g Auto-Land must touch down cleanly');
   assert.equal(marsBoosted.result, 'perfect');
+
+  // Heavy 1.4x MARE Shield Vest on Mars 0.38g must also land softly with AUTOLAND
+  let marsHeavy = createInitialLandingState(PAYLOADS['heavy-shield'].massMultiplier, 'mars', 0);
+  marsHeavy.guidanceMode = 'AUTOLAND';
+  for (let i = 0; i < 2000; i++) {
+    marsHeavy = stepLandingPhysics(
+      marsHeavy,
+      { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false },
+      0.05,
+      false
+    );
+    if (marsHeavy.landed) break;
+  }
+  assert.equal(marsHeavy.landed, true, 'Mars heavy 1.4x shield Auto-Land must touch down cleanly');
+  assert.equal(marsHeavy.result, 'perfect');
+
+  // Sticky pintle throttle: forward ignites >= 10% and holds without forward; throttleDown & cutoff work
+  let manualLander = createInitialLandingState(PAYLOADS['heavy-shield'].massMultiplier, 'mars', 0);
+  manualLander.guidanceMode = 'MANUAL';
+  manualLander = stepLandingPhysics(
+    manualLander,
+    { forward: true, backward: false, left: false, right: false, action: false, tiltForward: false },
+    0.05,
+    false
+  );
+  assert.ok(manualLander.targetThrottle >= 0.1, 'Forward press ignites sticky pintle throttle');
+  const heldThrottle = manualLander.targetThrottle;
+  manualLander = stepLandingPhysics(
+    manualLander,
+    { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false },
+    0.05,
+    false
+  );
+  assert.equal(manualLander.targetThrottle, heldThrottle, 'Throttle holds steady when no keys held');
+  manualLander = stepLandingPhysics(
+    manualLander,
+    { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false, throttleDown: true },
+    0.05,
+    false
+  );
+  assert.ok(manualLander.targetThrottle < heldThrottle, 'throttleDown reduces pintle throttle');
+  manualLander = stepLandingPhysics(
+    manualLander,
+    { forward: false, backward: false, left: false, right: false, action: true, tiltForward: false },
+    0.05,
+    false
+  );
+  assert.ok(manualLander.throttle > 0.4, 'action flares instantaneous engine throttle toward 100%');
+  manualLander = stepLandingPhysics(
+    manualLander,
+    { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false, cutoff: true },
+    0.05,
+    false
+  );
+  assert.equal(manualLander.targetThrottle, 0, 'cutoff commands engine shutdown (0%)');
 });
 
 test('Expanded Moon & Mars Rover conforms to terrain up to ±138m and tracks Mars dust/Walker gait', () => {

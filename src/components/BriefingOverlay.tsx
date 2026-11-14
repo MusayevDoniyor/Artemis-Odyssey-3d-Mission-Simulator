@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, Database, Rocket } from 'lucide-react';
+import { ArrowLeft, BookOpen, Database, Drill, Rocket, ShieldCheck, Sun, Wind } from 'lucide-react';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER, PAYLOADS } from '../game/constants';
 import type {
   CampaignCarryoverState,
@@ -114,59 +114,25 @@ function MissionProfileDiagram({
 }
 
 function PayloadBlueprintIcon({ id, active }: { id: PayloadId; active: boolean }) {
-  const stroke = active ? '#fbbf24' : '#38bdf8';
-  const muted = active ? '#fde68a' : '#94a3b8';
+  const Icon =
+    id === 'heavy-shield'
+      ? ShieldCheck
+      : id === 'oxygen-tanks'
+        ? Wind
+        : id === 'solar-panels'
+          ? Sun
+          : Drill;
 
-  if (id === 'heavy-shield') {
-    return (
-      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
-        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
-        {/* Layered water shield arcs + deflected proton arrow */}
-        <path d="M 14 11 C 22 14, 22 30, 14 33" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M 20 13 C 26 16, 26 28, 20 31" fill="none" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" />
-        <line x1="35" y1="22" x2="25" y2="22" stroke="#f43f5e" strokeWidth="1.8" />
-        <polygon points="25,22 29,19.5 29,24.5" fill="#f43f5e" />
-        <circle cx="10" cy="22" r="3" fill={muted} />
-      </svg>
-    );
-  }
-
-  if (id === 'oxygen-tanks') {
-    return (
-      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
-        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
-        {/* Twin cryo O2 spheres + manifold */}
-        <circle cx="15" cy="24" r="6" fill="none" stroke="#22d3ee" strokeWidth="2" />
-        <circle cx="29" cy="24" r="6" fill="none" stroke={stroke} strokeWidth="2" />
-        <path d="M 15 18 V 13 H 29 V 18" fill="none" stroke={muted} strokeWidth="1.6" />
-        <circle cx="22" cy="13" r="2.2" fill="#34d399" />
-      </svg>
-    );
-  }
-
-  if (id === 'solar-panels') {
-    return (
-      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
-        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
-        {/* Twin photovoltaic wings + central bus */}
-        <rect x="6" y="16" width="12" height="12" rx="1.5" fill="#1e3a8a" stroke={stroke} strokeWidth="1.5" />
-        <rect x="26" y="16" width="12" height="12" rx="1.5" fill="#1e3a8a" stroke={stroke} strokeWidth="1.5" />
-        <line x1="12" y1="16" x2="12" y2="28" stroke="#60a5fa" strokeWidth="1" />
-        <line x1="32" y1="16" x2="32" y2="28" stroke="#60a5fa" strokeWidth="1" />
-        <rect x="19.5" y="18" width="5" height="8" rx="1" fill={muted} />
-      </svg>
-    );
-  }
-
-  // water-drill
   return (
-    <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
-      <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
-      {/* TRIDENT auger biting ice layer */}
-      <rect x="19" y="8" width="6" height="7" rx="1" fill={muted} />
-      <path d="M 22 15 L 22 33 M 19 19 L 25 21 M 19 23 L 25 25 M 19 27 L 25 29" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
-      <line x1="10" y1="33" x2="34" y2="33" stroke="#22d3ee" strokeWidth="1.6" strokeDasharray="3 2" />
-    </svg>
+    <div
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
+        active
+          ? 'border-amber-400/70 bg-amber-500/15 text-amber-300'
+          : 'border-cyan-500/35 bg-slate-950 text-cyan-300'
+      }`}
+    >
+      <Icon className="h-5 w-5" />
+    </div>
   );
 }
 
@@ -225,7 +191,7 @@ export function BriefingOverlay({
       : `Space Weather · ${donki.classType}`;
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/88 p-4 backdrop-blur-md">
       <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-4xl rounded-2xl p-5 md:p-6">
         {/* Top Bar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-cyan-500/20 pb-3.5">
@@ -271,7 +237,7 @@ export function BriefingOverlay({
 
         {/* Mission Flight Profile Diagram + Carryover Loop Schematic */}
         <div className="mb-4 grid gap-3 md:grid-cols-[1.3fr_1fr]">
-          <div className="rounded-xl border border-cyan-500/20 bg-slate-900/75 p-3">
+          <div className="rounded-xl border border-cyan-500/25 bg-slate-900/95 p-3">
             <div className="mb-2 flex flex-wrap gap-1.5">
               {CAMPAIGN_ORDER.map((id) => {
                 const m = CAMPAIGN_MISSIONS[id];
@@ -411,8 +377,8 @@ export function BriefingOverlay({
                 onClick={() => onSelectPayload(p.id)}
                 className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
                   active
-                    ? 'border-amber-400 bg-amber-500/15 shadow-[0_0_24px_rgba(245,158,11,0.16)]'
-                    : 'border-cyan-500/20 bg-slate-900/75 hover:border-cyan-400/60'
+                    ? 'border-amber-400 bg-amber-500/18 shadow-[0_0_24px_rgba(245,158,11,0.18)]'
+                    : 'border-cyan-500/25 bg-slate-900/95 hover:border-cyan-400/60'
                 }`}
               >
                 <PayloadBlueprintIcon id={p.id} active={active} />

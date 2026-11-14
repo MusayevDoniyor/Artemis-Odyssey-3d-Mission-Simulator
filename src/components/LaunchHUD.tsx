@@ -10,14 +10,17 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
-import { PHYSICS } from '../game/constants';
+import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
 import type { GamePhase, LaunchState, ResourceState } from '../game/types';
 import { NASAInsignia } from './NASAInsignia';
 
 interface LaunchHUDProps {
   launch: LaunchState;
   resources: ResourceState;
+  selectedPartId?: string | null;
+  onClearSelectedPart?: () => void;
   muted: boolean;
   onToggleMute: () => void;
   onPause: () => void;
@@ -95,6 +98,8 @@ function getEducationalHint(launch: LaunchState): string {
 export function LaunchHUD({
   launch,
   resources,
+  selectedPartId,
+  onClearSelectedPart,
   muted,
   onToggleMute,
   onPause,
@@ -107,6 +112,7 @@ export function LaunchHUD({
   onJumpToPhase,
   onOpenNasaModal,
 }: LaunchHUDProps) {
+  const inspectedPart = selectedPartId ? LAUNCH_PART_DETAILS[selectedPartId] || null : null;
   const speedTotal = Math.round(Math.hypot(launch.verticalSpeedMs, launch.horizontalSpeedMs));
   const altDisplay =
     launch.altitudeKm < 1
@@ -271,6 +277,9 @@ export function LaunchHUD({
             <p className="text-xs leading-snug text-slate-200">
               Reach 165 km orbit. Keep pitch smooth &amp; stage on cue.
             </p>
+            <p className="mt-1.5 font-mono-tech text-[10px] font-semibold text-cyan-300">
+              Click any 3D SLS / tower part to inspect
+            </p>
           </section>
 
           {/* Mission Status Progression */}
@@ -420,6 +429,30 @@ export function LaunchHUD({
                 ? 'PRESS [SPACE] TO SEPARATE BOOSTERS!'
                 : 'PRESS [SPACE] TO SEPARATE CORE STAGE!'}
             </button>
+          )}
+
+          {inspectedPart && (
+            <div
+              data-testid="launch-part-callout"
+              className="hud-panel tactical-frame pointer-events-auto mt-2 max-w-md rounded-xl p-3.5 text-left"
+            >
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-mono-tech text-[10px] font-bold text-cyan-300 uppercase">
+                  {inspectedPart.role} · {inspectedPart.spec}
+                </span>
+                {onClearSelectedPart && (
+                  <button
+                    type="button"
+                    onClick={onClearSelectedPart}
+                    className="rounded border border-slate-700 bg-slate-900 p-1 text-slate-300 hover:border-cyan-400 hover:text-white"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+              <h3 className="font-display text-sm font-bold text-white">{inspectedPart.name}</h3>
+              <p className="mt-1 text-xs leading-snug text-slate-200">{inspectedPart.fact}</p>
+            </div>
           )}
         </div>
 

@@ -677,6 +677,8 @@ export interface LunarLanderHandles {
   legs: THREE.Group[];
   nozzleGroup: THREE.Group;
   flameMesh: THREE.Mesh;
+  flameInner: THREE.Mesh;
+  machDiamond: THREE.Mesh;
   engineLight: THREE.PointLight;
   rcsLeft: THREE.Mesh;
   rcsRight: THREE.Mesh;
@@ -801,7 +803,7 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
   flameGeo.translate(0, -2.4, 0);
   const flameMesh = new THREE.Mesh(
     flameGeo,
-    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 })
+    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85, depthWrite: false })
   );
   flameMesh.position.y = -0.55;
   flameMesh.visible = false;
@@ -810,7 +812,21 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
   const innerFlameGeo = new THREE.ConeGeometry(0.42, 2.8, 12);
   innerFlameGeo.rotateX(Math.PI);
   innerFlameGeo.translate(0, -1.4, 0);
-  flameMesh.add(new THREE.Mesh(innerFlameGeo, new THREE.MeshBasicMaterial({ color: 0xe0f2fe })));
+  const flameInner = new THREE.Mesh(
+    innerFlameGeo,
+    new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.94, depthWrite: false })
+  );
+  flameMesh.add(flameInner);
+
+  // Supersonic shock-diamond node (glows inside Mars thin CO2 atmosphere under high throttle)
+  const machDiamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.28, 1),
+    new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.9, depthWrite: false })
+  );
+  machDiamond.scale.set(0.85, 1.9, 0.85);
+  machDiamond.position.set(0, -1.55, 0);
+  machDiamond.visible = false;
+  flameMesh.add(machDiamond);
 
   descentStage.add(nozzleGroup);
   const engineLight = new THREE.PointLight(0xf97316, 0, 28);
@@ -943,6 +959,8 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
     legs,
     nozzleGroup,
     flameMesh,
+    flameInner,
+    machDiamond,
     engineLight,
     rcsLeft,
     rcsRight,
@@ -1415,22 +1433,26 @@ function buildLC39BServiceTower(tex: ProceduralTextureSet): {
   elevShaft.position.set(-0.4, towerHeight / 2, 0);
   tower.add(elevShaft);
 
-  // Umbilical Swing Arms connecting Tower -> SLS Core & ICPS
-  [11.2, 16.5, 19.8].forEach((uy, idx) => {
-    const uArm = new THREE.Mesh(new THREE.BoxGeometry(4.4 - idx * 0.25, 0.42, 0.65), steelMat);
-    uArm.position.set(3.8, uy, 0);
+  // Umbilical Swing Arms connecting Tower -> SLS Core & ICPS (flush with hull wall at local x=5.92)
+  [11.2, 16.5, 20.1].forEach((uy, idx) => {
+    const len = idx === 2 ? 4.02 : 3.74;
+    const uArm = new THREE.Mesh(new THREE.BoxGeometry(len, 0.36, 0.58), steelMat);
+    uArm.position.set(1.9 + len / 2, uy, 0);
     tower.add(uArm);
+    const coupler = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.52, 0.72), darkIron);
+    coupler.position.set(1.9 + len, uy, 0);
+    tower.add(coupler);
   });
 
-  // Retractable White Orion Crew Access Arm (pivoted cleanly at tower edge -> Orion hatch)
+  // Retractable White Orion Crew Access Arm (aligned flush with Orion Crew Module hatch at y=22.50)
   const crewAccessArm = new THREE.Group();
-  crewAccessArm.position.set(halfW, 21.8, 0);
-  const walkway = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.88, 1.05), armWhite);
-  walkway.position.set(2.1, 0, 0);
+  crewAccessArm.position.set(halfW, 22.46, 0);
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(4.05, 0.78, 1.0), armWhite);
+  walkway.position.set(2.02, 0, 0);
   walkway.castShadow = true;
   crewAccessArm.add(walkway);
-  const bellows = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.96, 1.16), darkIron);
-  bellows.position.set(4.1, 0, 0);
+  const bellows = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.88, 1.1), darkIron);
+  bellows.position.set(4.02, 0, 0);
   crewAccessArm.add(bellows);
   tower.add(crewAccessArm);
 
@@ -1447,6 +1469,7 @@ function buildLC39BServiceTower(tex: ProceduralTextureSet): {
   topBeacon.position.set(0, towerHeight + 5.15, 0);
   tower.add(topBeacon);
 
+  tagPart(tower, 'lc39b-tower');
   return { tower, crewAccessArm };
 }
 
@@ -1538,6 +1561,108 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
     g.add(baseRing);
   });
 
+  // Elevated Insulated LOX / LH2 Cryogenic Transfer Pipes connecting Spheres to Mobile Launcher
+  const cryoPipeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.25 });
+  const cryoLegA = createStrutBetween(new THREE.Vector3(31, 2.2, -14.5), new THREE.Vector3(5.6, 2.2, -2.5), 0.22, 0.22, cryoPipeMat);
+  const cryoLegB = createStrutBetween(new THREE.Vector3(36, 1.8, -7.5), new THREE.Vector3(5.6, 1.8, 1.8), 0.18, 0.18, cryoPipeMat);
+  g.add(cryoLegA, cryoLegB);
+
+  // Deluge Water Pipe from Elevated Sphere Tank into Flame Trench
+  const delugePipeMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.45, roughness: 0.4 });
+  g.add(createStrutBetween(new THREE.Vector3(-32, 1.4, -12.8), new THREE.Vector3(-4.5, 1.4, -2.2), 0.26, 0.26, delugePipeMat));
+
+  // Crawlerway Road stretching Southwest toward distant Vehicle Assembly Building (VAB)
+  const gravelMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95, metalness: 0.04 });
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, metalness: 0.05 });
+  const crawlerway = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.18, 220), gravelMat);
+  crawlerway.position.set(-22, -0.28, 122);
+  crawlerway.rotation.y = -0.22;
+  crawlerway.receiveShadow = true;
+  g.add(crawlerway);
+
+  // Outer Asphalt Perimeter Road & Pad Turnaround
+  const perimRing = new THREE.Mesh(new THREE.RingGeometry(44, 48.5, 48), roadMat);
+  perimRing.rotation.x = -Math.PI / 2;
+  perimRing.position.y = -0.34;
+  perimRing.receiveShadow = true;
+  g.add(perimRing);
+
+  // Atlantic Ocean Surf & Cape Canaveral Dunes along East/North Horizon
+  const ocean = new THREE.Mesh(
+    new THREE.PlaneGeometry(920, 280),
+    new THREE.MeshStandardMaterial({ color: 0x0c3454, roughness: 0.22, metalness: 0.55 })
+  );
+  ocean.rotation.x = -Math.PI / 2;
+  ocean.position.set(40, -0.52, -260);
+  g.add(ocean);
+
+  const beachSand = new THREE.Mesh(
+    new THREE.BoxGeometry(900, 0.28, 26),
+    new THREE.MeshStandardMaterial({ color: 0x7c6f59, roughness: 0.95, metalness: 0 })
+  );
+  beachSand.position.set(20, -0.32, -118);
+  g.add(beachSand);
+
+  // Distant NASA Vehicle Assembly Building (VAB) Silhouette + Launch Control Center
+  const vabGroup = new THREE.Group();
+  vabGroup.position.set(-76, 0, 232);
+  vabGroup.rotation.y = 0.25;
+  const vabWallMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.72, metalness: 0.15 });
+  const vabDoorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65, metalness: 0.35 });
+  const vabMain = new THREE.Mesh(new THREE.BoxGeometry(36, 40, 32), vabWallMat);
+  vabMain.position.y = 20;
+  vabGroup.add(vabMain);
+  const vabLowBay = new THREE.Mesh(new THREE.BoxGeometry(22, 18, 28), vabWallMat);
+  vabLowBay.position.set(26, 9, 0);
+  vabGroup.add(vabLowBay);
+  const vabDoor = new THREE.Mesh(new THREE.BoxGeometry(8.5, 34, 0.6), vabDoorMat);
+  vabDoor.position.set(-6, 17, -16.1);
+  vabGroup.add(vabDoor);
+  const vabStripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(9, 14),
+    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
+  );
+  vabStripe.position.set(8, 24, -16.2);
+  vabStripe.rotation.y = Math.PI;
+  vabGroup.add(vabStripe);
+  g.add(vabGroup);
+
+  // S-Band Telemetry Tracking Dish Station
+  const dishBase = new THREE.Group();
+  dishBase.position.set(42, 0, 28);
+  const dPedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.45, 5.2, 12), whiteTankMat);
+  dPedestal.position.y = 2.6;
+  dishBase.add(dPedestal);
+  const dDish = new THREE.Mesh(
+    new THREE.SphereGeometry(2.8, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide })
+  );
+  dDish.position.y = 5.6;
+  dDish.rotation.x = Math.PI * 0.72;
+  dishBase.add(dDish);
+  g.add(dishBase);
+
+  // Instanced Space Coast Palmetto Scrub Mounds outside Perimeter Road
+  const scrubGeo = new THREE.DodecahedronGeometry(1.4, 1);
+  const scrubMat = new THREE.MeshStandardMaterial({ color: 0x1e3a2f, roughness: 0.94, metalness: 0.02 });
+  const scrubMesh = new THREE.InstancedMesh(scrubGeo, scrubMat, 88);
+  const sd = new THREE.Object3D();
+  for (let i = 0; i < 88; i++) {
+    const ang = (i * 2.39996) % (Math.PI * 2);
+    const rad = 52 + ((i * 19.7) % 92);
+    const sx = Math.cos(ang) * rad;
+    const sz = Math.sin(ang) * rad;
+    if (sz < -105) continue;
+    sd.position.set(sx, 0.05, sz);
+    const sc = 0.7 + ((i * 7) % 10) * 0.14;
+    sd.scale.set(sc * 1.4, sc * 0.55, sc * 1.4);
+    sd.rotation.y = ang;
+    sd.updateMatrix();
+    scrubMesh.setMatrixAt(i, sd.matrix);
+  }
+  scrubMesh.instanceMatrix.needsUpdate = true;
+  g.add(scrubMesh);
+
   return g;
 }
 
@@ -1547,26 +1672,27 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   group.visible = false;
 
   const skyDome = new THREE.Mesh(
-    new THREE.SphereGeometry(680, 32, 22),
+    new THREE.SphereGeometry(760, 32, 22),
     new THREE.MeshBasicMaterial({ map: tex.duskSky, side: THREE.BackSide, fog: false })
   );
   group.add(skyDome);
 
-  // Realistic Lit Moon Hanging in Upper-Right Sky (between rocket and telemetry HUD)
+  // Realistic Distant Moon Hanging High in the Upper-Right Sky (never floating near the launch tower)
   const moonMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(7.4, 36, 32),
+    new THREE.SphereGeometry(9.2, 36, 32),
     new THREE.MeshStandardMaterial({
-      map: tex.moonAlbedo,
+      map: tex.moonSphereAlbedo,
       bumpMap: tex.moonBump,
-      bumpScale: 0.25,
+      bumpScale: 0.22,
       color: 0xf8fafc,
       emissive: 0x334155,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.36,
       roughness: 0.88,
-      metalness: 0.05,
+      metalness: 0.04,
+      fog: false,
     })
   );
-  moonMesh.position.set(-22, 42, -108);
+  moonMesh.position.set(64, 178, -485);
   group.add(moonMesh);
 
   // Atmospheric Cloud Deck Floating Across Space Coast Horizon
@@ -1588,9 +1714,9 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   for (let i = 0; i < 36; i++) {
     const sp = new THREE.Sprite(i % 2 === 0 ? cloudMat : coolCloudMat);
     const angle = (i / 36) * Math.PI * 1.4 - Math.PI * 0.7;
-    const dist = 120 + (i % 5) * 32;
-    sp.position.set(Math.sin(angle) * dist, 14 + (i % 6) * 5.5, -Math.cos(angle) * dist);
-    const w = 44 + (i % 4) * 18;
+    const dist = 145 + (i % 5) * 34;
+    sp.position.set(Math.sin(angle) * dist, 18 + (i % 6) * 5.5, -Math.cos(angle) * dist);
+    const w = 48 + (i % 4) * 18;
     sp.scale.set(w, w * 0.32, 1);
     cloudLayer.add(sp);
   }
@@ -1599,7 +1725,7 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   // Pad 39B Ground Complex
   const groundGroup = new THREE.Group();
   const plain = new THREE.Mesh(
-    new THREE.PlaneGeometry(720, 720),
+    new THREE.CircleGeometry(480, 56),
     new THREE.MeshStandardMaterial({ map: tex.kscGround, color: 0xffffff, roughness: 0.94, metalness: 0 })
   );
   plain.rotation.x = -Math.PI / 2;
@@ -1739,26 +1865,28 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   const srbLeftBsm = srbLeftBuilt.bsm;
   const srbRightBsm = srbRightBuilt.bsm;
 
-  // Upper Stage (LVSA + ICPS + Orion + NASA Decal + LAS Tower)
+  // Upper Stage Stack (LVSA + ICPS + Stage Adapter + ESM + Orion + Seamless LAS Ogive Tower)
   const upperGroup = new THREE.Group();
+  const icpsGroup = new THREE.Group();
+
   const lvsa = new THREE.Mesh(
     new THREE.CylinderGeometry(0.68, 1.08, 2.2, 28),
     new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.46, metalness: 0.22 })
   );
   lvsa.position.y = 17.9;
-  upperGroup.add(lvsa);
+  icpsGroup.add(lvsa);
 
   const icps = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.66, 0.66, 2.1, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.45 })
+    new THREE.CylinderGeometry(0.68, 0.68, 2.08, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.42 })
   );
-  icps.position.y = 20.05;
-  upperGroup.add(icps);
+  icps.position.y = 20.02;
+  icpsGroup.add(icps);
 
-  // ICPS RL10 Vacuum Cryogenic Engine Bell & Plume (ignites cleanly after Core Stage cutoff)
+  // ICPS RL10 Vacuum Cryogenic Engine Bell & Plume
   const icpsNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 0.68, 16, 1, true), bellMat);
   icpsNozzle.position.y = 18.6;
-  upperGroup.add(icpsNozzle);
+  icpsGroup.add(icpsNozzle);
 
   const icpsFlame = new THREE.Group();
   icpsFlame.position.y = 18.2;
@@ -1776,22 +1904,48 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   icpsCore.position.y = -1.2;
   icpsFlame.add(icpsOuter, icpsCore);
   icpsFlame.visible = false;
-  upperGroup.add(icpsFlame);
+  icpsGroup.add(icpsFlame);
 
-  const orion = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32, 0.66, 1.02, 28),
-    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
-  );
-  orion.position.y = 21.85;
-  upperGroup.add(orion);
-
-  // NASA Meatball decal on Orion fairing
+  // NASA Meatball decal cleanly mounted on ICPS fairing
   const orionDecal = new THREE.Mesh(
     new THREE.PlaneGeometry(0.46, 0.46),
     new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
   );
-  orionDecal.position.set(0, 20.1, 0.68);
-  upperGroup.add(orionDecal);
+  orionDecal.position.set(0, 20.05, 0.7);
+  icpsGroup.add(orionDecal);
+  tagPart(icpsGroup, 'sls-icps');
+  upperGroup.add(icpsGroup);
+
+  const orionStack = new THREE.Group();
+  const stageAdapter = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.67, 0.68, 0.44, 28),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.38 })
+  );
+  stageAdapter.position.y = 21.26;
+  orionStack.add(stageAdapter);
+
+  // European Service Module (ESM) cylindrical bus + folded solar bay ribs
+  const esmBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.67, 0.67, 0.72, 24),
+    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.32, metalness: 0.65 })
+  );
+  esmBody.position.y = 21.82;
+  orionStack.add(esmBody);
+
+  const heatshieldRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.68, 0.67, 0.14, 28),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.45, metalness: 0.5 })
+  );
+  heatshieldRing.position.y = 22.22;
+  orionStack.add(heatshieldRing);
+
+  // Orion Crew Module frustum seated flush atop ESM (22.24..23.12)
+  const orion = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.34, 0.68, 0.88, 28),
+    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
+  );
+  orion.position.y = 22.68;
+  orionStack.add(orion);
 
   // Transonic Mach-1 Condensation Vapor Cone
   const machCone = new THREE.Mesh(
@@ -1806,16 +1960,23 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   );
   machCone.position.y = 18.8;
   machCone.visible = false;
-  upperGroup.add(machCone);
+  orionStack.add(machCone);
 
+  // Launch Abort System (LAS) Ogive Fairing & Escape Tower seated flush on Orion forward ring
   const abortTower = new THREE.Group();
-  abortTower.position.y = 22.45;
+  abortTower.position.y = 23.02;
   const lasBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15, 0.65, 1.45, 24),
+    new THREE.CylinderGeometry(0.15, 0.38, 1.45, 24),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
   );
   lasBody.position.y = 0.62;
   abortTower.add(lasBody);
+  const lasCollar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.19, 0.19, 0.14, 16),
+    collarMat
+  );
+  lasCollar.position.y = 1.32;
+  abortTower.add(lasCollar);
   const lasTip = new THREE.Mesh(
     new THREE.ConeGeometry(0.15, 1.25, 18),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
@@ -1830,8 +1991,10 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   lasFlame.position.y = -0.4;
   lasFlame.visible = false;
   abortTower.add(lasFlame);
-  upperGroup.add(abortTower);
-  tagPart(upperGroup, 'sls-upper');
+  orionStack.add(abortTower);
+
+  tagPart(orionStack, 'sls-upper');
+  upperGroup.add(orionStack);
 
   // Multi-Layer Incandescent Exhaust Plume Group (RS-25 Mach Blue + White Core & SRB Blazing Amber)
   const flameGroup = new THREE.Group();

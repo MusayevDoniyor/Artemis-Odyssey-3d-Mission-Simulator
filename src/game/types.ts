@@ -205,6 +205,8 @@ export interface LandingZone {
   hint: string;
 }
 
+export type LandingPhaseName = 'BRAKING' | 'APPROACH' | 'TERMINAL';
+
 export interface LandingState {
   planet: SurfacePlanet;
   x: number;
@@ -217,6 +219,10 @@ export interface LandingState {
   pitchDeg: number;
   tiltDeg: number;
   throttle: number;
+  targetThrottle: number;
+  thrustKn: number;
+  hoverThrottlePct: number;
+  descentPhase: LandingPhaseName;
   fuelPct: number;
   massMultiplier: number;
   twr: number;
@@ -311,6 +317,8 @@ export interface InputState {
   boost: boolean;
   tiltForward: boolean;
   stabilize: boolean;
+  throttleDown?: boolean;
+  cutoff?: boolean;
 }
 
 export interface CrashFxState {

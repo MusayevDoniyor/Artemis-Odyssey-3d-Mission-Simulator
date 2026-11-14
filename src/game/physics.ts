@@ -56,10 +56,11 @@ export function getSurfaceTerrainHeight(planet: SurfacePlanet, x: number, z: num
       h += Math.cos((dMaaz / 24) * (Math.PI / 2)) * 5.2;
     }
 
-    // Outer Jezero Crater Wall
+    // Outer Jezero Crater Wall (bounded plateau ridge — never spikes above descent approach ring)
     if (distPad > 142) {
-      const rim = (distPad - 142) / 48;
-      h += Math.pow(rim, 1.35) * 20 * (0.72 + 0.28 * Math.sin(Math.atan2(z, x) * 5));
+      const rimT = clamp((distPad - 142) / 56, 0, 1);
+      const smoothRim = rimT * rimT * (3 - 2 * rimT);
+      h += smoothRim * 17.5 * (0.76 + 0.24 * Math.sin(Math.atan2(z, x) * 5));
     }
 
     return h * blend;
@@ -96,10 +97,11 @@ export function getSurfaceTerrainHeight(planet: SurfacePlanet, x: number, z: num
     h += Math.cos((dNobile / 20) * (Math.PI / 2)) * 2.9;
   }
 
-  // Outer South Pole mountain rim outside expanded ±140m perimeter
+  // Outer South Pole mountain rim outside expanded ±140m perimeter (bounded crest plateau)
   if (distPad > 142) {
-    const rim = (distPad - 142) / 48;
-    h += Math.pow(rim, 1.35) * 19 * (0.7 + 0.3 * Math.sin(Math.atan2(z, x) * 6));
+    const rimT = clamp((distPad - 142) / 56, 0, 1);
+    const smoothRim = rimT * rimT * (3 - 2 * rimT);
+    h += smoothRim * 16.5 * (0.74 + 0.26 * Math.sin(Math.atan2(z, x) * 6));
   }
 
   return h * blend;
@@ -543,18 +545,29 @@ export function createInitialLandingState(
   isruFuelBonusPct = 0
 ): LandingState {
   const startFuel = clamp(84 + isruFuelBonusPct, 70, 100);
+  const propKg = (PHYSICS.LANDER_PROP_MASS_KG * startFuel) / 100;
+  const totalMass = (PHYSICS.LANDER_FIXED_MASS_KG + propKg) * massMultiplier;
+  const gravity = planet === 'mars' ? PHYSICS.MARS_GRAVITY : PHYSICS.MOON_GRAVITY;
+  const maxThrust =
+    planet === 'mars' ? PHYSICS.LANDER_MARS_MAX_THRUST_N : PHYSICS.LANDER_MAX_THRUST_N;
+  const hoverThrottlePct = Math.round(clamp(((totalMass * gravity) / maxThrust) * 100, 5, 95));
+
   return {
     planet,
     x: 0,
     y: planet === 'mars' ? 172 : 165,
     z: -36,
     vx: 0,
-    vy: planet === 'mars' ? -4.1 : -3.2,
+    vy: planet === 'mars' ? -4.2 : -3.0,
     vz: 2.2,
     rollDeg: 0,
     pitchDeg: 0,
     tiltDeg: 0,
     throttle: 0,
+    targetThrottle: 0,
+    thrustKn: 0,
+    hoverThrottlePct,
+    descentPhase: 'BRAKING',
     fuelPct: startFuel,
     massMultiplier,
     twr: 0,
@@ -596,7 +609,11 @@ export function evaluateTouchdown(
 
 export function stepLandingPhysics(
   state: LandingState,
-  input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right' | 'action' | 'tiltForward'>,
+  input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right' | 'action' | 'tiltForward'> & {
+    throttleDown?: boolean;
+    cutoff?: boolean;
+    directThrottle?: number;
+  },
   rawDt: number,
   fragilePayload: boolean
 ): LandingState {
@@ -615,30 +632,80 @@ export function stepLandingPhysics(
   const propKg = (PHYSICS.LANDER_PROP_MASS_KG * f.fuelPct) / 100;
   const totalMass = (PHYSICS.LANDER_FIXED_MASS_KG + propKg) * f.massMultiplier;
   const hoverThrottle = (totalMass * gravity) / maxThrust;
+  f.hoverThrottlePct = Math.round(clamp(hoverThrottle * 100, 5, 95));
+  f.descentPhase = alt > 75 ? 'BRAKING' : alt > 18 ? 'APPROACH' : 'TERMINAL';
 
   if (f.guidanceMode === 'AUTOLAND' && f.fuelPct > 0) {
+    // 1:1 NASA Apollo E-Guidance / Mars G-FOLD powered descent controller
     const dx = zone.x - f.x;
     const dz = zone.z - f.z;
-    const desiredVx = clamp(dx * 0.25, -5.5, 5.5);
-    const desiredVz = clamp(dz * 0.25, -5.5, 5.5);
-    const targetRoll = clamp(-(desiredVx - f.vx) * 6.0, -16, 16);
-    const targetPitch = clamp((desiredVz - f.vz) * 6.0, -16, 16);
+    const gain = alt > 45 ? 0.28 : alt > 12 ? 0.34 : 0.42;
+    const maxHoriz = alt > 35 ? 6.5 : alt > 10 ? 3.2 : 1.0;
+    const desiredVx = clamp(dx * gain, -maxHoriz, maxHoriz);
+    const desiredVz = clamp(dz * gain, -maxHoriz, maxHoriz);
 
-    f.rollDeg += (targetRoll - f.rollDeg) * Math.min(1, 5 * dt);
-    f.pitchDeg += (targetPitch - f.pitchDeg) * Math.min(1, 5 * dt);
+    const maxTiltCmd = alt > 28 ? 16 : alt > 10 ? 10 : alt > 4.5 ? 4.5 : 0;
+    const targetRoll = clamp(-(desiredVx - f.vx) * 5.8, -maxTiltCmd, maxTiltCmd);
+    const targetPitch = clamp((desiredVz - f.vz) * 5.8, -maxTiltCmd, maxTiltCmd);
 
-    const safeVy = alt > 75 ? -3.8 : alt > 20 ? -2.2 : -1.1;
-    f.throttle = clamp(hoverThrottle + (safeVy - f.vy) * 0.24, 0.08, 0.96);
-  } else {
-    if (f.guidanceMode === 'RATE_ASSIST' && f.fuelPct > 0) {
-      const targetVy = alt > 28 ? -2.2 : -1.3;
-      f.throttle = clamp(hoverThrottle + (targetVy - f.vy) * 0.24, 0.08, 0.96);
+    f.rollDeg += (targetRoll - f.rollDeg) * Math.min(1, 6.2 * dt);
+    f.pitchDeg += (targetPitch - f.pitchDeg) * Math.min(1, 6.2 * dt);
+
+    const maxBrakeDecel = Math.max(0.8, (maxThrust * 0.72) / totalMass - gravity);
+    let safeVy: number;
+    if (alt > 75) {
+      safeVy = -clamp(Math.sqrt(Math.max(0, alt - 12) * maxBrakeDecel * 0.42) + 1.5, 4.0, 12.5);
+    } else if (alt > 18) {
+      safeVy = -clamp(Math.sqrt(Math.max(0, alt - 4) * maxBrakeDecel * 0.35) + 0.9, 1.8, 5.2);
+    } else if (alt > 4.5) {
+      safeVy = -clamp(0.75 + (alt - 4.5) * 0.14, 0.75, 2.2);
     } else {
-      if ((input.forward || input.action) && f.fuelPct > 0) {
-        f.throttle = clamp(f.throttle + 3.5 * dt, 0, 1);
-      } else {
-        f.throttle = clamp(f.throttle - 3.5 * dt, 0, 1);
+      safeVy = -0.68; // Apollo contact probe terminal descent (< 1.0 m/s)
+    }
+
+    const curTiltRad = (Math.hypot(f.rollDeg, f.pitchDeg) * Math.PI) / 180;
+    const cosTilt = Math.max(0.55, Math.cos(curTiltRad));
+    const reqAccelY = gravity + (safeVy - f.vy) * (alt < 18 ? 3.2 : 2.2);
+    const cmdThrottle = clamp((reqAccelY * totalMass) / (maxThrust * cosTilt), 0.1, 1.0);
+    f.throttle += (cmdThrottle - f.throttle) * Math.min(1, 8.5 * dt);
+    f.targetThrottle = f.throttle;
+  } else {
+    if (typeof input.directThrottle === 'number') {
+      f.targetThrottle = clamp(input.directThrottle, 0, 1);
+    } else if (input.cutoff) {
+      f.targetThrottle = 0;
+    }
+
+    if (f.guidanceMode === 'RATE_ASSIST' && f.fuelPct > 0) {
+      let targetVy = alt > 28 ? -2.2 : -1.1;
+      if (input.forward) targetVy += 1.8;
+      if (input.action) targetVy = 0.6;
+      if (input.throttleDown) targetVy -= 1.6;
+      const curTiltRad = (Math.hypot(f.rollDeg, f.pitchDeg) * Math.PI) / 180;
+      const cosTilt = Math.max(0.55, Math.cos(curTiltRad));
+      const cmdThrottle = clamp(
+        ((gravity + (targetVy - f.vy) * 2.2) * totalMass) / (maxThrust * cosTilt),
+        input.cutoff ? 0 : 0.1,
+        1.0
+      );
+      f.throttle += (cmdThrottle - f.throttle) * Math.min(1, 7.5 * dt);
+      f.targetThrottle = f.throttle;
+    } else {
+      // Sticky NASA pintle injector chamber pressure (DPS / MLE)
+      if (input.forward && f.fuelPct > 0) {
+        if (f.targetThrottle < 0.08) {
+          f.targetThrottle = 0.1; // Instant 10% pintle ignition idle
+        } else {
+          f.targetThrottle = clamp(f.targetThrottle + 0.52 * dt, 0.1, 1);
+        }
+      } else if (input.throttleDown) {
+        f.targetThrottle = clamp(f.targetThrottle - 0.55 * dt, 0, 1);
       }
+
+      const effectiveTarget =
+        f.fuelPct <= 0 ? 0 : input.action ? 1.0 : f.targetThrottle;
+      f.throttle += (effectiveTarget - f.throttle) * Math.min(1, 9.0 * dt);
+      if (f.throttle < 0.005 && effectiveTarget === 0) f.throttle = 0;
     }
 
     if (input.left) f.rollDeg = clamp(f.rollDeg + 42 * dt, -26, 26);
@@ -653,6 +720,7 @@ export function stepLandingPhysics(
   f.tiltDeg = Math.hypot(f.rollDeg, f.pitchDeg);
 
   const thrustForce = f.fuelPct > 0 ? maxThrust * f.throttle : 0;
+  f.thrustKn = thrustForce / 1000;
   const weightN = totalMass * gravity;
   f.twr = weightN > 0 ? thrustForce / weightN : 0;
 
@@ -706,6 +774,8 @@ export function stepLandingPhysics(
     f.y = nextGroundH;
     f.landed = true;
     f.throttle = 0;
+    f.targetThrottle = 0;
+    f.thrustKn = 0;
 
     const impactVy = Math.abs(f.vy);
     const horiz = Math.hypot(f.vx, f.vz);

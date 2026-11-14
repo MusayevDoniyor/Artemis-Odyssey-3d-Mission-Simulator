@@ -118,6 +118,9 @@ export class SpaceSceneManager {
   private emissiveOriginal = new WeakMap<THREE.MeshStandardMaterial, { hex: number; intensity: number }>();
   private lastHighlightedPart: string | null = null;
   private lastHighlightPhase: GamePhase | null = null;
+  private raycaster = new THREE.Raycaster();
+  private pointerNdc = new THREE.Vector2();
+  private launchFog = new THREE.FogExp2(0x162238, 0.0022);
 
   private simRef: { current: SceneSimulationBridge };
   private onFrameTick: (dt: number) => void;
@@ -291,6 +294,28 @@ export class SpaceSceneManager {
 
   getSurfaceColliders(planet: SurfacePlanet): RoverCollider[] {
     return planet === 'mars' ? this.lunarEnv.marsColliders : this.lunarEnv.moonColliders;
+  }
+
+  pickLaunchPart(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNdc, this.camera);
+    const hits = this.raycaster.intersectObjects(
+      [this.launchComplex.rocketFull, this.launchComplex.groundGroup],
+      true
+    );
+    for (const hit of hits) {
+      let cur: THREE.Object3D | null = hit.object;
+      while (cur) {
+        if (typeof cur.userData?.partId === 'string') {
+          return cur.userData.partId;
+        }
+        cur = cur.parent;
+      }
+    }
+    return null;
   }
 
   private detectSoftwareGl(): boolean {
@@ -468,11 +493,15 @@ export class SpaceSceneManager {
 
     const targets = [
       this.launchComplex.rocketFull,
+      this.launchComplex.groundGroup,
       this.lander.group,
       this.roverModel.group,
       this.lunarEnv.group,
       this.showcaseSatellite.group,
     ];
+
+    const highlightActive =
+      (phase === 'inspector' || phase === 'launch') && Boolean(partId);
 
     targets.forEach((root) => {
       root.traverse((obj) => {
@@ -487,14 +516,12 @@ export class SpaceSceneManager {
         }
         const orig = this.emissiveOriginal.get(mat)!;
         const meshPart = obj.userData.partId as string | undefined;
-        if (phase === 'inspector' && partId && meshPart) {
-          if (meshPart === partId) {
-            mat.emissive.setHex(0xf59e0b);
-            mat.emissiveIntensity = 0.95;
-          } else {
-            mat.emissive.setHex(orig.hex);
-            mat.emissiveIntensity = orig.intensity * 0.28;
-          }
+        if (highlightActive && meshPart === partId) {
+          mat.emissive.setHex(phase === 'launch' ? 0x22d3ee : 0xf59e0b);
+          mat.emissiveIntensity = phase === 'launch' ? 0.72 : 0.95;
+        } else if (phase === 'inspector' && partId && meshPart) {
+          mat.emissive.setHex(orig.hex);
+          mat.emissiveIntensity = orig.intensity * 0.28;
         } else {
           mat.emissive.setHex(orig.hex);
           mat.emissiveIntensity = orig.intensity;
@@ -525,6 +552,10 @@ export class SpaceSceneManager {
     this.showcaseSatellite.group.visible = showSatelliteShowcase;
     this.lunarEnv.group.visible = showLunar;
     this.starField.visible = !showLaunch || s.launch.altitudeKm > 18;
+    this.scene.fog = showLaunch && s.launch.altitudeKm < 16 ? this.launchFog : null;
+    if (showLaunch) {
+      this.launchFog.density = Math.max(0, 0.0022 * (1 - s.launch.altitudeKm / 16));
+    }
 
     this.lander.group.visible =
       phase === 'landing' ||
@@ -629,7 +660,7 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.abortTower.visible = true;
-      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
       lc.lasFlame.visible = false;
       lc.srbLeftBsm.visible = false;
@@ -676,7 +707,7 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.abortTower.visible = true;
-      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
       lc.lasFlame.visible = false;
       lc.srbLeftBsm.visible = false;
@@ -888,11 +919,11 @@ export class SpaceSceneManager {
       const tLas = elapsedSec - this.lasDetachedTime;
       lc.abortTower.visible = tLas < 2.2;
       lc.lasFlame.visible = tLas < 1.25;
-      lc.abortTower.position.set(tLas * 1.6, 22.45 + tLas * 19.0, tLas * 0.9);
+      lc.abortTower.position.set(tLas * 1.6, 23.02 + tLas * 19.0, tLas * 0.9);
       lc.abortTower.rotation.z = -tLas * 0.34;
     } else {
       lc.abortTower.visible = true;
-      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
       lc.lasFlame.visible = false;
     }
@@ -1133,31 +1164,68 @@ export class SpaceSceneManager {
     lm.nozzleGroup.rotation.x = (f.pitchDeg * Math.PI) / 360;
 
     const firing = f.throttle > 0.05 && f.fuelPct > 0 && !f.landed;
+    const groundY = getSurfaceTerrainHeight(f.planet, f.x, f.z);
+    const alt = Math.max(0, f.y - groundY);
+
     lm.flameMesh.visible = firing;
-    lm.engineLight.intensity = firing ? f.throttle * 12 : 0;
+    lm.engineLight.intensity = firing ? 3.5 + f.throttle * 14 : 0;
     if (firing) {
-      const flick = 0.88 + Math.sin(elapsedSec * 42) * 0.14;
-      lm.flameMesh.scale.set(0.8 + f.throttle * 0.3, f.throttle * flick * 1.35, 0.8 + f.throttle * 0.3);
+      const flick = 0.9 + Math.sin(elapsedSec * 46) * 0.12;
+      const outerMat = lm.flameMesh.material as THREE.MeshBasicMaterial;
+      const innerMat = lm.flameInner.material as THREE.MeshBasicMaterial;
+      const isMars = f.planet === 'mars';
+      // NASA Vacuum Lunar Plume (wide under-expanded pale amber/cyan) vs Mars Mach-Diamond Plume
+      outerMat.color.setHex(isMars ? 0xf97316 : 0xfdba74);
+      outerMat.opacity = isMars ? 0.55 + f.throttle * 0.38 : 0.32 + f.throttle * 0.45;
+      innerMat.color.setHex(isMars ? 0xfef08a : 0xe0f2fe);
+      const radialSpread = isMars ? 0.52 + f.throttle * 0.45 : 0.78 + f.throttle * 0.72;
+      const lengthScale = (0.35 + f.throttle * 1.15) * flick;
+      lm.flameMesh.scale.set(radialSpread, lengthScale, radialSpread);
+      lm.machDiamond.visible = isMars && f.throttle > 0.35;
+      if (lm.machDiamond.visible) {
+        lm.machDiamond.scale.set(0.85, 1.3 + f.throttle * 0.8, 0.85);
+      }
+
       if (!s.paused) {
         this.emitParticle(
-          f.x + (Math.random() - 0.5) * 0.8,
-          f.y - 0.4,
-          f.z + (Math.random() - 0.5) * 0.8,
-          (Math.random() - 0.5) * 3.5,
-          -4.5 - Math.random() * 3,
-          (Math.random() - 0.5) * 3.5,
-          0.36,
-          0.95,
-          0.55,
-          0.2
+          f.x + (Math.random() - 0.5) * 0.65,
+          f.y - 0.35,
+          f.z + (Math.random() - 0.5) * 0.65,
+          (Math.random() - 0.5) * (isMars ? 2.6 : 4.2),
+          -4.5 - f.throttle * 4.5 - Math.random() * 2,
+          (Math.random() - 0.5) * (isMars ? 2.6 : 4.2),
+          0.34,
+          isMars ? 0.98 : 0.95,
+          isMars ? 0.58 : 0.82,
+          isMars ? 0.22 : 0.48
         );
+
+        // Plume-Surface Interaction (PSI): radial regolith dust sheet when firing below 18m
+        if (alt < 18) {
+          const psiIntensity = Math.min(1, ((18 - alt) / 18) * f.throttle * 1.35);
+          const count = psiIntensity > 0.45 ? 3 : 1;
+          for (let k = 0; k < count; k++) {
+            const ang = Math.random() * Math.PI * 2;
+            const spd = (5.5 + Math.random() * 7.5) * psiIntensity;
+            this.emitParticle(
+              f.x + Math.cos(ang) * 0.8,
+              groundY + 0.35,
+              f.z + Math.sin(ang) * 0.8,
+              Math.cos(ang) * spd,
+              0.9 + Math.random() * 1.6 * psiIntensity,
+              Math.sin(ang) * spd,
+              0.72,
+              isMars ? 0.82 : 0.62,
+              isMars ? 0.44 : 0.64,
+              isMars ? 0.28 : 0.68
+            );
+          }
+        }
       }
     }
 
     lm.rcsLeft.visible = !f.landed && s.input.right;
     lm.rcsRight.visible = !f.landed && s.input.left;
-
-    const groundY = getSurfaceTerrainHeight(f.planet, f.x, f.z);
     const guideAttr = this.guideLine.geometry.attributes.position as THREE.BufferAttribute;
     guideAttr.setXYZ(0, f.x, f.y, f.z);
     guideAttr.setXYZ(1, f.x, groundY + 0.25, f.z);

@@ -35,12 +35,12 @@ export const PHYSICS = {
   SLS_ORBIT_TARGET_KM: 165,
   LAUNCH_TIME_SCALE: 11.5,
 
-  // Descent Vehicle Parameters (Moon 1.625 m/s² vs Mars 3.721 m/s² powered descent)
-  LANDER_FIXED_MASS_KG: 7258,
-  LANDER_PROP_MASS_KG: 8845,
-  LANDER_MAX_THRUST_N: 43900,
-  LANDER_MARS_MAX_THRUST_N: 76500,
-  LANDER_FUEL_FLOW_KG_S: 14.4,
+  // Descent Vehicle Parameters (1:1 Apollo LMDE 46.7 kN Moon 0.165g & Mars 112 kN Quad-MLE 0.38g)
+  LANDER_FIXED_MASS_KG: 4850,
+  LANDER_PROP_MASS_KG: 6450,
+  LANDER_MAX_THRUST_N: 46700,
+  LANDER_MARS_MAX_THRUST_N: 112000,
+  LANDER_FUEL_FLOW_KG_S: 14.8,
   LANDER_PERFECT_VY: 2.5,
   LANDER_HARD_VY: 4.8,
   LANDER_PERFECT_TILT: 12,
@@ -700,6 +700,13 @@ export const VEHICLE_CATALOG: Record<
         fact: '54.9 m solid boosters deliver primary Pad 39B acceleration for 2 minutes before jettison.',
       },
       {
+        id: 'sls-icps',
+        name: 'LVSA & ICPS Upper Stage',
+        role: 'RL10 Trans-Lunar Burn',
+        fact: 'Cryogenic LH₂/LOX stage powered by a single 110 kN RL10B-2 engine pushing Orion toward the Moon.',
+        unlockNoteId: 'note-isru-electrolysis',
+      },
+      {
         id: 'sls-upper',
         name: 'Orion & Water-Wall Bay',
         role: 'Crew Cabin & LAS',
@@ -841,3 +848,54 @@ export const OSDR_FACTS = [
     summary: 'Moon (0.165g) polar ice ISRU refuels Gateway NRHO & Jezero Crater (0.38g) operations.',
   },
 ];
+
+export interface LaunchPartDetail {
+  id: string;
+  name: string;
+  role: string;
+  spec: string;
+  fact: string;
+  unlockNoteId?: string;
+}
+
+export const LAUNCH_PART_DETAILS: Record<string, LaunchPartDetail> = {
+  'sls-core': {
+    id: 'sls-core',
+    name: 'Core Stage & 4× RS-25',
+    role: 'Main Cryogenic Stage',
+    spec: '65.1 m · LH₂/LOX · 8,800 kN Vacuum',
+    fact: 'Feeds four RS-25 engines with super-cold liquid hydrogen (-253°C) and oxygen (-183°C) for 8 minutes.',
+    unlockNoteId: 'note-isru-electrolysis',
+  },
+  'sls-boosters': {
+    id: 'sls-boosters',
+    name: 'Twin 5-Segment SRBs',
+    role: 'Liftoff Solid Boosters',
+    spec: '54.9 m · ~32,000 kN Combined',
+    fact: 'Provides over 75% of pad liftoff thrust before firing separation motors cleanly at 45 km altitude.',
+  },
+  'sls-icps': {
+    id: 'sls-icps',
+    name: 'ICPS & Stage Adapter (LVSA)',
+    role: 'Trans-Lunar Injection',
+    spec: '1× RL10B-2 · 110 kN · 465 s Isp',
+    fact: 'Ignites in vacuum after Core cutoff to raise Orion from 165 km orbit onto a lunar transfer arc.',
+    unlockNoteId: 'note-isru-electrolysis',
+  },
+  'sls-upper': {
+    id: 'sls-upper',
+    name: 'Orion Capsule, ESM & LAS Tower',
+    role: 'Crew & Abort System',
+    spec: '5.0 m Cabin · Water-Wall Shield',
+    fact: 'European Service Module supplies power/air while hydrogen-rich water walls halve proton dose (OSD-569).',
+    unlockNoteId: 'note-orion-water-shield',
+  },
+  'lc39b-tower': {
+    id: 'lc39b-tower',
+    name: 'LC-39B Mobile Launcher & Tower',
+    role: 'Launch Complex 39B',
+    spec: '115 m Tower · 450,000 gal Deluge',
+    fact: 'Crew Access Arm retracts at T-2s while water deluge floods the flame trench to absorb acoustic shock.',
+  },
+};
+
