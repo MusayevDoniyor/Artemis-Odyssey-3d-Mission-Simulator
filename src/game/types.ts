@@ -9,13 +9,17 @@ export type GamePhase =
   | 'victory'
   | 'gameover';
 
+export type CampaignMissionId = 'artemis-2' | 'artemis-3' | 'artemis-4' | 'mars-pathfinder';
+
+export type SurfacePlanet = 'moon' | 'mars';
+
 export type CameraMode = 'chase' | 'cockpit' | 'overhead' | 'orbit';
 
-export type VehicleShowcaseId = 'rocket' | 'lander' | 'rover' | 'outpost';
+export type VehicleShowcaseId = 'rocket' | 'lander' | 'rover' | 'outpost' | 'satellite';
 
 export type PayloadId = 'heavy-shield' | 'oxygen-tanks' | 'solar-panels' | 'water-drill';
 
-export type SpaceTargetId = 'moon' | 'mars' | 'jupiter';
+export type SpaceTargetId = 'relay-orbit' | 'moon' | 'gateway' | 'mars';
 
 export type RoverDriveMode = 'DRIVE' | 'CRAB' | 'SPIN' | 'WALKER';
 
@@ -51,12 +55,99 @@ export interface DonkiStatus {
   description: string;
 }
 
+export interface OsdrStudy {
+  accession: string;
+  title: string;
+  organism: string;
+  radiationType: string;
+  doseThresholdMsv: number;
+  shieldingAttenuationPct: number;
+  keyFinding: string;
+  gameplayRule: string;
+  uri: string;
+}
+
+export interface OsdrStatus {
+  isLive: boolean;
+  totalCatalogStudies: number;
+  studies: OsdrStudy[];
+}
+
+export interface FieldNote {
+  id: string;
+  category: 'vehicle' | 'osdr' | 'donki' | 'isru';
+  title: string;
+  sourceRef: string;
+  summary: string;
+  appliedRule: string;
+}
+
+export interface AnomalyChoice {
+  id: string;
+  label: string;
+  rationale: string;
+  isOptimal: boolean;
+  deltaResources: Partial<ResourceState>;
+  doseDeltaMsv: number;
+  scienceMultiplier: number;
+}
+
+export interface MissionAnomaly {
+  id: string;
+  missionId: CampaignMissionId;
+  title: string;
+  context: string;
+  requiredNoteId: string;
+  nasaRef: string;
+  choices: AnomalyChoice[];
+  resolvedChoiceId: string | null;
+  resolvedSummary: string | null;
+}
+
+export interface CampaignCarryoverState {
+  activeMission: CampaignMissionId;
+  completedMissions: CampaignMissionId[];
+  relaySatelliteOnline: boolean;
+  highResMapUnlocked: boolean;
+  isruWaterKg: number;
+  isruFuelBonusPct: number;
+  solarGridKw: number;
+  regolithShieldLevel: number;
+  radiationDoseMsv: number;
+  marsSamplesCached: number;
+  unlockedFieldNotes: string[];
+  solvedAnomalies: string[];
+}
+
+export interface CampaignMissionSpec {
+  id: CampaignMissionId;
+  code: string;
+  shortLabel: string;
+  title: string;
+  planet: SurfacePlanet;
+  startPhase: GamePhase;
+  hasSurfaceOps: boolean;
+  nasaGrounding: string;
+  objectiveSummary: string;
+  reuseInput: string;
+  reuseOutput: string;
+}
+
+export type LaunchSequencePhase = 'PRE_SIM' | 'COUNTDOWN' | 'READY' | 'ASCENDING';
+
 export interface LaunchState {
+  launchSequence: LaunchSequencePhase;
+  countdownSec: number;
+  autoGuidance: boolean;
   ignited: boolean;
   elapsed: number;
   altitudeKm: number;
   verticalSpeedMs: number;
   horizontalSpeedMs: number;
+  netAccelMs2: number;
+  thrustKn: number;
+  dragKn: number;
+  massKg: number;
   dynamicPressureKpa: number;
   pitchDeg: number;
   throttle: number;
@@ -66,6 +157,17 @@ export interface LaunchState {
   lasJettisoned: boolean;
   orbitReached: boolean;
   stagePrompt: string | null;
+}
+
+export interface OrbitalSatState {
+  deployed: boolean;
+  satX: number;
+  satZ: number;
+  solarDeployedPct: number;
+  dishAlignedPct: number;
+  linkLocked: boolean;
+  rotationErrorDeg: number;
+  telemetrySignalPct: number;
 }
 
 export interface SpaceFlightState {
@@ -82,7 +184,11 @@ export interface SpaceFlightState {
   elapsedDays: number;
   inRadiationZone: boolean;
   arrivedMoon: boolean;
+  arrivedMars: boolean;
+  arrivedGateway: boolean;
+  inSatDeployZone: boolean;
   visitedTargets: SpaceTargetId[];
+  orbitalSat: OrbitalSatState;
   statusText: string;
 }
 
@@ -100,6 +206,7 @@ export interface LandingZone {
 }
 
 export interface LandingState {
+  planet: SurfacePlanet;
   x: number;
   y: number;
   z: number;
@@ -136,6 +243,7 @@ export interface RoverCollider {
 
 export interface RoverObjective {
   id: string;
+  planet: SurfacePlanet;
   title: string;
   siteName: string;
   instrument: string;
@@ -146,11 +254,18 @@ export interface RoverObjective {
   progress: number;
   completed: boolean;
   reward: Partial<ResourceState>;
+  isruWaterGainKg?: number;
+  isruFuelGainPct?: number;
+  solarGainKw?: number;
+  shieldLevelGain?: number;
+  marsSamplesGain?: number;
+  unlockNoteId?: string;
   rewardText: string;
   nasaFact: string;
 }
 
 export interface RoverState {
+  planet: SurfacePlanet;
   x: number;
   y: number;
   z: number;
@@ -167,6 +282,7 @@ export interface RoverState {
   headlightsOn: boolean;
   wheelSlipPct: number;
   hydrogenSignal: number;
+  dustAccumulationPct: number;
   collisionLabel: string;
 }
 
@@ -183,6 +299,7 @@ export interface VehiclePartSpec {
   name: string;
   role: string;
   fact: string;
+  unlockNoteId?: string;
 }
 
 export interface InputState {
@@ -193,4 +310,5 @@ export interface InputState {
   action: boolean;
   boost: boolean;
   tiltForward: boolean;
+  stabilize: boolean;
 }

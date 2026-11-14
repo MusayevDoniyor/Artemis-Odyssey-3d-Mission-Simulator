@@ -101,6 +101,33 @@ class SoundSynth {
   playDrillTick() {
     this.playTone(860 + Math.random() * 80, 0.05, 'sine', 0.07);
   }
+
+  playCountdownBeep(isReady = false) {
+    if (isReady) {
+      this.playTone(1046.5, 0.14, 'sine', 0.16);
+      setTimeout(() => this.playTone(1318.5, 0.24, 'sine', 0.16), 110);
+    } else {
+      this.playTone(784, 0.14, 'sine', 0.14);
+    }
+  }
+
+  playIgnitionRoar() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(52, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(118, this.ctx.currentTime + 0.55);
+    gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.24, this.ctx.currentTime + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.9);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.9);
+  }
 }
 
 export const soundSynth = new SoundSynth();

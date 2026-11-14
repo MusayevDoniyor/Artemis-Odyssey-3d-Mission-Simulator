@@ -1,7 +1,13 @@
 import * as THREE from 'three';
-import { INITIAL_OBJECTIVES, LANDING_ZONES, SOLAR_TARGETS } from '../game/constants';
-import { getLunarTerrainHeight } from '../game/physics';
-import type { RoverCollider, SpaceTargetId } from '../game/types';
+import {
+  MARS_LANDING_ZONES,
+  MARS_OBJECTIVES,
+  MOON_LANDING_ZONES,
+  MOON_OBJECTIVES,
+  SOLAR_TARGETS,
+} from '../game/constants';
+import { getLunarTerrainHeight, getSurfaceTerrainHeight } from '../game/physics';
+import type { RoverCollider, SpaceTargetId, SurfacePlanet } from '../game/types';
 import type { ProceduralTextureSet } from './textures';
 
 export function tagPart(obj: THREE.Object3D, partId: string) {
@@ -10,20 +16,45 @@ export function tagPart(obj: THREE.Object3D, partId: string) {
   });
 }
 
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+
+function createStrutBetween(
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  rTop: number,
+  rBot: number,
+  mat: THREE.Material
+): THREE.Mesh {
+  const dir = new THREE.Vector3().subVectors(p2, p1);
+  const len = Math.max(0.001, dir.length());
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, len, 10), mat);
+  mesh.position.copy(p1).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(UP_AXIS, dir.normalize());
+  mesh.castShadow = true;
+  return mesh;
+}
+
 export interface LunarEnvironmentHandles {
   group: THREE.Group;
   colliders: RoverCollider[];
+  moonColliders: RoverCollider[];
+  marsColliders: RoverCollider[];
+  applyPlanet: (planet: SurfacePlanet) => void;
+  earthGroup: THREE.Group;
   earthGlobe: THREE.Mesh;
   earthClouds: THREE.Mesh;
+  marsDecorGroup: THREE.Group;
   padLight: THREE.PointLight;
   objectiveMeshes: Array<{
     id: string;
+    planet: SurfacePlanet;
     group: THREE.Group;
     crystal: THREE.Mesh;
     beam: THREE.Mesh;
   }>;
   landingZoneMeshes: Array<{
     id: number;
+    planet: SurfacePlanet;
     group: THREE.Group;
     ring: THREE.Mesh;
     cyl: THREE.Mesh;
@@ -38,7 +69,9 @@ export interface LunarEnvironmentHandles {
 
 export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironmentHandles {
   const group = new THREE.Group();
-  const colliders: RoverCollider[] = [];
+  const moonColliders: RoverCollider[] = [];
+  const marsColliders: RoverCollider[] = [];
+  let activePlanet: SurfacePlanet = 'moon';
 
   // 1. Earth in Lunar Sky
   const earthGroup = new THREE.Group();
@@ -78,79 +111,99 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   earthGroup.add(earthAtmo);
   group.add(earthGroup);
 
-  // 2. Displaced Lunar South Pole Terrain
-  const terrainGeo = new THREE.PlaneGeometry(460, 460, 140, 140);
+  // 2. Displaced Dual-Planet Surface Terrain (520m x 520m covering ±140m corridors)
+  const terrainGeo = new THREE.PlaneGeometry(520, 520, 150, 150);
   terrainGeo.rotateX(-Math.PI / 2);
-  const posAttr = terrainGeo.attributes.position;
-  const colors: number[] = [];
-  for (let i = 0; i < posAttr.count; i++) {
-    const x = posAttr.getX(i);
-    const z = posAttr.getZ(i);
-    const y = getLunarTerrainHeight(x, z);
-    posAttr.setY(i, y);
-    const shade = 0.62 + Math.min(0.24, Math.max(-0.18, y * 0.03));
-    colors.push(shade, shade + 0.01, shade + 0.03);
-  }
-  terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  terrainGeo.computeVertexNormals();
 
-  const terrain = new THREE.Mesh(
-    terrainGeo,
-    new THREE.MeshStandardMaterial({
-      map: tex.moonAlbedo,
-      bumpMap: tex.moonBump,
-      bumpScale: 0.35,
-      vertexColors: true,
-      roughness: 0.94,
-      metalness: 0.05,
-    })
-  );
+  const rebuildTerrainGeometry = (planet: SurfacePlanet) => {
+    const posAttr = terrainGeo.attributes.position;
+    const colors: number[] = [];
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      const y = getSurfaceTerrainHeight(planet, x, z);
+      posAttr.setY(i, y);
+      if (planet === 'mars') {
+        const shade = 0.78 + Math.min(0.2, Math.max(-0.18, y * 0.028));
+        colors.push(shade, shade * 0.88, shade * 0.82);
+      } else {
+        const shade = 0.62 + Math.min(0.24, Math.max(-0.18, y * 0.03));
+        colors.push(shade, shade + 0.01, shade + 0.03);
+      }
+    }
+    posAttr.needsUpdate = true;
+    terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    terrainGeo.computeVertexNormals();
+  };
+  rebuildTerrainGeometry('moon');
+
+  const terrainMat = new THREE.MeshStandardMaterial({
+    map: tex.moonAlbedo,
+    bumpMap: tex.moonBump,
+    bumpScale: 0.42,
+    vertexColors: true,
+    roughness: 0.94,
+    metalness: 0.05,
+  });
+  const terrain = new THREE.Mesh(terrainGeo, terrainMat);
   terrain.receiveShadow = true;
   group.add(terrain);
 
-  // 3. Artemis Sintered Hexagonal Landing Pad
+  // 3. Artemis 30m Sintered Landing Pad with 'H' Marking (Blueprint Accurate)
   const padGroup = new THREE.Group();
   const padBase = new THREE.Mesh(
-    new THREE.CylinderGeometry(8.8, 9.6, 0.36, 6),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.55, roughness: 0.42 })
+    new THREE.CylinderGeometry(9.2, 10.0, 0.36, 8),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.55, roughness: 0.45 })
   );
   padBase.position.y = 0.18;
   padBase.receiveShadow = true;
   padGroup.add(padBase);
 
   const ringMat = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8,
+    color: 0xf59e0b,
     side: THREE.DoubleSide,
     polygonOffset: true,
     polygonOffsetFactor: -1,
   });
-  const padRing = new THREE.Mesh(new THREE.RingGeometry(5.6, 6.1, 32), ringMat);
+  const padRing = new THREE.Mesh(new THREE.RingGeometry(6.2, 6.65, 36), ringMat);
   padRing.rotation.x = -Math.PI / 2;
   padRing.position.y = 0.39;
   padGroup.add(padRing);
 
   const padInner = new THREE.Mesh(
-    new THREE.RingGeometry(2.2, 2.55, 24),
-    new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide })
+    new THREE.RingGeometry(2.8, 3.1, 32),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
   );
   padInner.rotation.x = -Math.PI / 2;
-  padInner.position.y = 0.41;
+  padInner.position.y = 0.4;
   padGroup.add(padInner);
 
-  for (let i = 0; i < 6; i++) {
-    const a = (i * Math.PI) / 3;
+  // Landing Pad 'H' markings
+  const hMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
+  const hBarL = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 2.8), hMat);
+  hBarL.rotation.x = -Math.PI / 2;
+  hBarL.position.set(-0.95, 0.41, 0);
+  const hBarR = hBarL.clone();
+  hBarR.position.x = 0.95;
+  const hCross = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.45), hMat);
+  hCross.rotation.x = -Math.PI / 2;
+  hCross.position.set(0, 0.41, 0);
+  padGroup.add(hBarL, hBarR, hCross);
+
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
     const bollard = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16, 0.22, 0.65, 8),
+      new THREE.CylinderGeometry(0.16, 0.22, 0.68, 8),
       new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 })
     );
-    bollard.position.set(Math.cos(a) * 8.3, 0.42, Math.sin(a) * 8.3);
+    bollard.position.set(Math.cos(a) * 8.6, 0.42, Math.sin(a) * 8.6);
     padGroup.add(bollard);
 
     const lamp = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 10, 10),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      new THREE.SphereGeometry(0.22, 10, 10),
+      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x38bdf8 : 0xf59e0b })
     );
-    lamp.position.set(Math.cos(a) * 8.3, 0.82, Math.sin(a) * 8.3);
+    lamp.position.set(Math.cos(a) * 8.6, 0.84, Math.sin(a) * 8.6);
     padGroup.add(lamp);
   }
   const padLight = new THREE.PointLight(0x38bdf8, 2.2, 36);
@@ -158,104 +211,219 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   padGroup.add(padLight);
   group.add(padGroup);
 
-  // 4. Artemis Base Camp Outpost (-15, 0, -13)
+  // 4. Artemis Base Camp Outpost (-15, 0, -13) — Blueprint Accurate (28m x 24m x 8.5m)
   const habGroup = new THREE.Group();
   habGroup.position.set(-15, 0, -13);
 
   const habCore = new THREE.Group();
-  const habBase = new THREE.Mesh(
-    new THREE.CylinderGeometry(6.2, 6.9, 1.3, 24),
-    new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8, metalness: 0.15 })
-  );
-  habBase.position.y = 0.65;
+  const hullWhite = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.45, metalness: 0.35 });
+  const hullDark = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.55, metalness: 0.55 });
+  const nasaBadgeMat = new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true });
+
+  // Lower Pressurized Foundation Collar
+  const habBase = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 7.1, 1.5, 12), hullDark);
+  habBase.position.y = 0.75;
   habBase.castShadow = true;
   habCore.add(habBase);
 
+  const collarRing = new THREE.Mesh(new THREE.CylinderGeometry(6.1, 6.4, 0.85, 16), hullWhite);
+  collarRing.position.y = 1.9;
+  habCore.add(collarRing);
+
+  // Multi-deck Warm Interior Core visible inside Geodesic Dome
+  const deck1 = new THREE.Mesh(
+    new THREE.CylinderGeometry(4.4, 4.8, 0.22, 16),
+    new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xf59e0b, emissiveIntensity: 0.35 })
+  );
+  deck1.position.y = 2.3;
+  const deck2 = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.2, 3.5, 0.2, 16),
+    new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x38bdf8, emissiveIntensity: 0.3 })
+  );
+  deck2.position.y = 4.0;
+  const centerCore = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.85, 1.0, 4.4, 12),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xfbbf24, emissiveIntensity: 0.22 })
+  );
+  centerCore.position.y = 3.8;
+  habCore.add(deck1, deck2, centerCore);
+
+  // Geodesic Glass Dome + Titanium Geodesic Rib Frame
   const habDome = new THREE.Mesh(
-    new THREE.SphereGeometry(5.6, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(5.6, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.MeshStandardMaterial({
-      color: 0xbae6fd,
+      color: 0x7dd3fc,
       transparent: true,
-      opacity: 0.62,
-      metalness: 0.25,
-      roughness: 0.15,
+      opacity: 0.42,
+      metalness: 0.3,
+      roughness: 0.12,
       emissive: 0x0284c7,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.25,
     })
   );
-  habDome.position.y = 1.25;
+  habDome.position.y = 2.1;
   habCore.add(habDome);
 
-  const airlock = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.3, 1.3, 4.8, 16),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.55, roughness: 0.35 })
+  const domeCage = new THREE.Mesh(
+    new THREE.SphereGeometry(5.65, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xcbd5e1, wireframe: true, metalness: 0.75, roughness: 0.25 })
   );
-  airlock.rotation.z = Math.PI / 2;
-  airlock.position.set(5.6, 1.35, 1.2);
-  airlock.castShadow = true;
-  habCore.add(airlock);
+  domeCage.position.y = 2.1;
+  habCore.add(domeCage);
+
+  // Apex cupola ring on dome top
+  const cupola = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.1, 0.65, 12), hullWhite);
+  cupola.position.y = 6.95;
+  habCore.add(cupola);
+
+  // 4 Radial Pressurized Modules (Front Airlock, Lab, Storage, Rover Garage)
+  const moduleAngles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  moduleAngles.forEach((ang, idx) => {
+    const mod = new THREE.Group();
+    mod.rotation.y = ang;
+
+    const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 3.6, 16), hullWhite);
+    tunnel.rotation.z = Math.PI / 2;
+    tunnel.position.set(7.4, 1.45, 0);
+    tunnel.castShadow = true;
+    mod.add(tunnel);
+
+    const endCap = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.45, 16), hullDark);
+    endCap.rotation.z = Math.PI / 2;
+    endCap.position.set(9.2, 1.45, 0);
+    mod.add(endCap);
+
+    // Module side windows / bay door
+    const bayLight = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.4, 0.65),
+      new THREE.MeshBasicMaterial({ color: idx === 0 ? 0xfbbf24 : 0x38bdf8 })
+    );
+    bayLight.rotation.y = Math.PI / 2;
+    bayLight.position.set(9.44, 1.45, 0);
+    mod.add(bayLight);
+
+    // NASA meatball decal on pressurized module side
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), nasaBadgeMat);
+    badge.position.set(7.6, 1.55, 1.37);
+    mod.add(badge);
+
+    // Support legs beneath radial modules
+    [-1.1, 1.1].forEach((lz) => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.2, 8), hullDark);
+      leg.position.set(8.2, 0.6, lz);
+      mod.add(leg);
+    });
+
+    habCore.add(mod);
+  });
+
   tagPart(habCore, 'base-habitat');
   habGroup.add(habCore);
 
+  // Twin Articulated Vertical Solar Power Towers (10m x 6m blueprint proportions)
   const solarGroup = new THREE.Group();
-  for (let s = 0; s < 2; s++) {
-    const mast = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.18, 4.6, 10),
-      new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.75, roughness: 0.25 })
-    );
-    mast.position.set(-7.2, 2.3, -2.2 + s * 3.4);
+  [-4.2, 4.2].forEach((sz) => {
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.55, 1.1, 10), hullDark);
+    pedestal.position.set(-8.6, 0.55, sz);
+    solarGroup.add(pedestal);
+
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 6.2, 10), hullWhite);
+    mast.position.set(-8.6, 4.1, sz);
     solarGroup.add(mast);
 
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 2.8), hullDark);
+    yoke.position.set(-8.6, 6.8, sz);
+    solarGroup.add(yoke);
+
     const panel = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 3.8, 2.1),
-      new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.5, roughness: 0.2 })
+      new THREE.BoxGeometry(0.14, 4.8, 2.8),
+      new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.55, roughness: 0.18 })
     );
-    panel.position.set(-7.2, 3.6, -2.2 + s * 3.4);
+    panel.position.set(-8.6, 6.8, sz);
     panel.rotation.z = 0.22;
     panel.castShadow = true;
     solarGroup.add(panel);
-  }
+  });
   tagPart(solarGroup, 'base-power');
   habGroup.add(solarGroup);
 
+  // Deep Space Comms Antenna Tower
   const commsGroup = new THREE.Group();
-  const dishPole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14, 0.18, 4.8, 10),
-    new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.75, roughness: 0.3 })
-  );
-  dishPole.position.set(-4.2, 3.4, -4.8);
+  const dishPole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.24, 5.4, 10), hullWhite);
+  dishPole.position.set(-5.2, 3.8, -5.8);
   commsGroup.add(dishPole);
 
   const dishBowl = new THREE.Mesh(
-    new THREE.SphereGeometry(1.4, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.6, roughness: 0.2, side: THREE.DoubleSide })
+    new THREE.SphereGeometry(1.65, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.65, roughness: 0.2, side: THREE.DoubleSide })
   );
-  dishBowl.position.set(-4.2, 5.7, -4.8);
-  dishBowl.rotation.x = Math.PI * 0.68;
+  dishBowl.position.set(-5.2, 6.4, -5.8);
+  dishBowl.rotation.x = Math.PI * 0.66;
   commsGroup.add(dishBowl);
+
+  const feedHorn = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.1, 8), hullDark);
+  feedHorn.position.set(-5.2, 6.7, -5.2);
+  feedHorn.rotation.x = Math.PI * 0.35;
+  commsGroup.add(feedHorn);
+
   tagPart(commsGroup, 'base-comms');
   habGroup.add(commsGroup);
 
   group.add(habGroup);
-  colliders.push({ x: -15, z: -13, r: 7.0, type: 'habitat', label: 'Artemis Habitat Dome' });
-  colliders.push({ x: -9.8, z: -11.8, r: 2.1, type: 'habitat', label: 'Habitat Airlock' });
+  moonColliders.push({ x: -15, z: -13, r: 9.6, type: 'habitat', label: 'Artemis Base Camp' });
+  marsColliders.push({ x: -15, z: -13, r: 9.6, type: 'habitat', label: 'Jezero Base & MOXIE' });
 
-  // 5. Instanced Lunar Boulders (> 20 instances) with Solid Colliders
-  const boulderSpecs: Array<{ x: number; y: number; z: number; s: number; rot: number }> = [];
-  for (let i = 0; i < 64; i++) {
+  // 4b. Mars Jezero Crater Sedimentary Delta Mesas & Basalt Buttes (visible only on Mars)
+  const marsDecorGroup = new THREE.Group();
+  marsDecorGroup.visible = false;
+  const mesaMat = new THREE.MeshStandardMaterial({
+    map: tex.marsAlbedo,
+    color: 0xd97745,
+    roughness: 0.92,
+    metalness: 0.04,
+  });
+  [
+    { x: 78, z: -84, rTop: 11, rBot: 17, h: 12 },
+    { x: -88, z: -64, rTop: 9, rBot: 15, h: 11 },
+    { x: 92, z: 72, rTop: 10, rBot: 16, h: 10 },
+    { x: -82, z: 86, rTop: 12, rBot: 18, h: 13 },
+  ].forEach((m) => {
+    const mesa = new THREE.Mesh(new THREE.CylinderGeometry(m.rTop, m.rBot, m.h, 7), mesaMat);
+    mesa.position.set(m.x, getSurfaceTerrainHeight('mars', m.x, m.z) + m.h * 0.4, m.z);
+    mesa.castShadow = true;
+    mesa.receiveShadow = true;
+    marsDecorGroup.add(mesa);
+  });
+  // Distant Phobos orbital speck in Mars sky
+  const phobos = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(3.2, 1),
+    new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.9 })
+  );
+  phobos.position.set(160, 118, -320);
+  marsDecorGroup.add(phobos);
+  group.add(marsDecorGroup);
+
+  // 5. Instanced Boulders (expanded across ±138m corridors, clean around all Moon & Mars waypoints)
+  const allStations = [...MOON_OBJECTIVES, ...MARS_OBJECTIVES];
+  const allLandingZones = [...MOON_LANDING_ZONES, ...MARS_LANDING_ZONES];
+  const boulderSpecs: Array<{ x: number; yMoon: number; yMars: number; z: number; s: number; rot: number }> = [];
+  for (let i = 0; i < 96; i++) {
     const angle = i * 2.39996;
-    const dist = 18.5 + i * 1.75;
+    const dist = 20 + i * 1.42;
     const rx = Math.cos(angle) * dist;
     const rz = Math.sin(angle) * dist;
-    const nearObj = INITIAL_OBJECTIVES.some((o) => Math.hypot(rx - o.x, rz - o.z) < 6.5);
-    const nearPad = LANDING_ZONES.some((lz) => Math.hypot(rx - lz.x, rz - lz.z) < lz.radius + 3.5);
-    const nearHab = Math.hypot(rx + 15, rz + 13) < 11;
+    const nearObj = allStations.some((o) => Math.hypot(rx - o.x, rz - o.z) < 7.5);
+    const nearPad = allLandingZones.some((lz) => Math.hypot(rx - lz.x, rz - lz.z) < lz.radius + 3.5);
+    const nearHab = Math.hypot(rx + 15, rz + 13) < 13;
     if (nearObj || nearPad || nearHab) continue;
 
-    const ry = getLunarTerrainHeight(rx, rz);
+    const yMoon = getSurfaceTerrainHeight('moon', rx, rz);
+    const yMars = getSurfaceTerrainHeight('mars', rx, rz);
     const s = 0.48 + (i % 6) * 0.22;
-    boulderSpecs.push({ x: rx, y: ry, z: rz, s, rot: i * 0.7 });
-    colliders.push({ x: rx, z: rz, r: s * 1.05, type: 'rock', label: 'Lunar Boulder' });
+    boulderSpecs.push({ x: rx, yMoon, yMars, z: rz, s, rot: i * 0.7 });
+    const c: RoverCollider = { x: rx, z: rz, r: s * 1.05, type: 'rock', label: 'Surface Boulder' };
+    moonColliders.push(c);
+    marsColliders.push({ ...c, label: 'Basalt Boulder' });
   }
 
   const rockGeo = new THREE.DodecahedronGeometry(1.0, 1);
@@ -271,35 +439,49 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   boulderInstanced.receiveShadow = true;
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
-  boulderSpecs.forEach((b, idx) => {
-    dummy.position.set(b.x, b.y + b.s * 0.28, b.z);
-    dummy.rotation.set(b.rot, b.rot * 1.3, 0);
-    dummy.scale.set(b.s * 1.2, b.s * 0.75, b.s * 1.05);
-    dummy.updateMatrix();
-    boulderInstanced.setMatrixAt(idx, dummy.matrix);
-    const tone = 0.78 + (idx % 5) * 0.06;
-    tint.setRGB(tone, tone, tone + 0.03);
-    boulderInstanced.setColorAt(idx, tint);
-  });
-  boulderInstanced.instanceMatrix.needsUpdate = true;
-  if (boulderInstanced.instanceColor) boulderInstanced.instanceColor.needsUpdate = true;
+
+  const updateBouldersForPlanet = (planet: SurfacePlanet) => {
+    boulderSpecs.forEach((b, idx) => {
+      const y = planet === 'mars' ? b.yMars : b.yMoon;
+      dummy.position.set(b.x, y + b.s * 0.28, b.z);
+      dummy.rotation.set(b.rot, b.rot * 1.3, 0);
+      dummy.scale.set(b.s * 1.2, b.s * 0.75, b.s * 1.05);
+      dummy.updateMatrix();
+      boulderInstanced.setMatrixAt(idx, dummy.matrix);
+      const tone = 0.78 + (idx % 5) * 0.06;
+      if (planet === 'mars') {
+        tint.setRGB(tone * 1.05, tone * 0.58, tone * 0.42);
+      } else {
+        tint.setRGB(tone, tone, tone + 0.03);
+      }
+      boulderInstanced.setColorAt(idx, tint);
+    });
+    boulderInstanced.instanceMatrix.needsUpdate = true;
+    if (boulderInstanced.instanceColor) boulderInstanced.instanceColor.needsUpdate = true;
+    rockMat.map = planet === 'mars' ? tex.marsAlbedo : tex.moonAlbedo;
+    rockMat.needsUpdate = true;
+  };
+  updateBouldersForPlanet('moon');
   boulderInstanced.computeBoundingSphere();
   group.add(boulderInstanced);
 
-  // 6. Science Stations at Objective Coordinates
+  // 6. Science Stations at Moon & Mars Objective Coordinates
   const objectiveMeshes: LunarEnvironmentHandles['objectiveMeshes'] = [];
-  INITIAL_OBJECTIVES.forEach((obj) => {
+  allStations.forEach((obj) => {
     const g = new THREE.Group();
-    const ty = getLunarTerrainHeight(obj.x, obj.z);
+    const ty = getSurfaceTerrainHeight(obj.planet, obj.x, obj.z);
     g.position.set(obj.x, ty, obj.z);
-    colliders.push({ x: obj.x, z: obj.z, r: 1.5, type: 'station', label: obj.siteName });
+    g.visible = obj.planet === 'moon';
+    const stationCol: RoverCollider = { x: obj.x, z: obj.z, r: 1.5, type: 'station', label: obj.siteName };
+    if (obj.planet === 'mars') marsColliders.push(stationCol);
+    else moonColliders.push(stationCol);
 
-    if (obj.id === 'ice-sample') {
+    if (obj.id.includes('ice') || obj.id.includes('hydrogen')) {
       for (let k = 0; k < 5; k++) {
         const shard = new THREE.Mesh(
           new THREE.ConeGeometry(0.45, 1.5, 6),
           new THREE.MeshStandardMaterial({
-            color: 0x7dd3fc,
+            color: obj.color,
             emissive: 0x0284c7,
             emissiveIntensity: 0.45,
             roughness: 0.2,
@@ -310,7 +492,7 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
         shard.position.set(Math.cos(a) * 1.0, 0.7, Math.sin(a) * 1.0);
         g.add(shard);
       }
-    } else if (obj.id === 'solar-deploy') {
+    } else if (obj.id.includes('solar') || obj.id.includes('maaz')) {
       const box = new THREE.Mesh(
         new THREE.CylinderGeometry(1.0, 1.2, 0.8, 8),
         new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.8, roughness: 0.3 })
@@ -323,11 +505,24 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
       );
       wing.position.y = 2.2;
       g.add(wing);
+    } else if (obj.id.includes('moxie') || obj.id.includes('delta')) {
+      const unit = new THREE.Mesh(
+        new THREE.BoxGeometry(2.1, 1.3, 1.6),
+        new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xf8fafc, metalness: 0.75, roughness: 0.28 })
+      );
+      unit.position.y = 0.75;
+      g.add(unit);
+      const tank = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 1.8, 12),
+        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.3 })
+      );
+      tank.position.set(1.2, 0.9, 0);
+      g.add(tank);
     } else {
       for (let b = 0; b < 3; b++) {
         const mono = new THREE.Mesh(
           new THREE.DodecahedronGeometry(0.95, 0),
-          new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.75, metalness: 0.15 })
+          new THREE.MeshStandardMaterial({ color: obj.planet === 'mars' ? 0xfdba74 : 0x86efac, roughness: 0.75, metalness: 0.15 })
         );
         mono.position.set((b - 1) * 1.1, 0.8, (b % 2) * 0.5);
         g.add(mono);
@@ -369,40 +564,45 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     g.add(ring);
 
     group.add(g);
-    objectiveMeshes.push({ id: obj.id, group: g, crystal, beam });
+    objectiveMeshes.push({ id: obj.id, planet: obj.planet, group: g, crystal, beam });
   });
 
-  // 7. Three Landing Zones
+  // 7. Moon & Mars Landing Zones
   const landingZoneMeshes: LunarEnvironmentHandles['landingZoneMeshes'] = [];
-  LANDING_ZONES.forEach((lz) => {
-    const zg = new THREE.Group();
-    const zy = getLunarTerrainHeight(lz.x, lz.z);
-    zg.position.set(lz.x, zy + 0.25, lz.z);
+  const registerZones = (zones: typeof MOON_LANDING_ZONES, planet: SurfacePlanet) => {
+    zones.forEach((lz) => {
+      const zg = new THREE.Group();
+      const zy = getSurfaceTerrainHeight(planet, lz.x, lz.z);
+      zg.position.set(lz.x, zy + 0.25, lz.z);
+      zg.visible = planet === 'moon';
 
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(lz.radius - 0.55, lz.radius, 36),
-      new THREE.MeshBasicMaterial({ color: lz.color, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    zg.add(ring);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(lz.radius - 0.55, lz.radius, 36),
+        new THREE.MeshBasicMaterial({ color: lz.color, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      zg.add(ring);
 
-    const cyl = new THREE.Mesh(
-      new THREE.CylinderGeometry(lz.radius, lz.radius, 12, 24, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: lz.color,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.1,
-        depthWrite: false,
-      })
-    );
-    cyl.position.y = 6;
-    cyl.visible = false;
-    zg.add(cyl);
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(lz.radius, lz.radius, 12, 24, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: lz.color,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.1,
+          depthWrite: false,
+        })
+      );
+      cyl.position.y = 6;
+      cyl.visible = false;
+      zg.add(cyl);
 
-    group.add(zg);
-    landingZoneMeshes.push({ id: lz.id, group: zg, ring, cyl });
-  });
+      group.add(zg);
+      landingZoneMeshes.push({ id: lz.id, planet, group: zg, ring, cyl });
+    });
+  };
+  registerZones(MOON_LANDING_ZONES, 'moon');
+  registerZones(MARS_LANDING_ZONES, 'mars');
 
   // 8. Four Approach Sky Gates
   const approachGates: LunarEnvironmentHandles['approachGates'] = [];
@@ -436,17 +636,38 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   trajectoryArc.visible = false;
   group.add(trajectoryArc);
 
-  return {
+  const envHandles: LunarEnvironmentHandles = {
     group,
-    colliders,
+    colliders: moonColliders,
+    moonColliders,
+    marsColliders,
+    applyPlanet: (planet: SurfacePlanet) => {
+      if (activePlanet === planet) return;
+      activePlanet = planet;
+      rebuildTerrainGeometry(planet);
+      terrainMat.map = planet === 'mars' ? tex.marsAlbedo : tex.moonAlbedo;
+      terrainMat.bumpMap = planet === 'mars' ? tex.marsBump : tex.moonBump;
+      terrainMat.needsUpdate = true;
+      updateBouldersForPlanet(planet);
+      earthGroup.visible = planet === 'moon';
+      marsDecorGroup.visible = planet === 'mars';
+      envHandles.colliders = planet === 'mars' ? marsColliders : moonColliders;
+      objectiveMeshes.forEach((om) => {
+        om.group.visible = om.planet === planet;
+      });
+    },
+    earthGroup,
     earthGlobe,
     earthClouds,
+    marsDecorGroup,
     padLight,
     objectiveMeshes,
     landingZoneMeshes,
     approachGates,
     trajectoryArc,
   };
+
+  return envHandles;
 }
 
 export interface LunarLanderHandles {
@@ -460,79 +681,124 @@ export interface LunarLanderHandles {
 }
 
 export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles {
+  // Blueprint Accurate: Apollo LM-2 (Eagle Class) — 7.3m height x 7.0m width
   const group = new THREE.Group();
   const descentStage = new THREE.Group();
   const ascentStage = new THREE.Group();
 
-  const descentHull = new THREE.Mesh(
-    new THREE.CylinderGeometry(2.2, 2.35, 1.55, 8),
-    new THREE.MeshStandardMaterial({
-      map: tex.foilAlbedo,
-      bumpMap: tex.foilBump,
-      bumpScale: 0.08,
-      color: 0xffffff,
-      metalness: 0.82,
-      roughness: 0.25,
-    })
-  );
-  descentHull.position.y = 1.65;
+  const foilMat = new THREE.MeshStandardMaterial({
+    map: tex.foilAlbedo,
+    bumpMap: tex.foilBump,
+    bumpScale: 0.11,
+    color: 0xffffff,
+    metalness: 0.85,
+    roughness: 0.24,
+  });
+  const strutMat = new THREE.MeshStandardMaterial({
+    map: tex.foilAlbedo,
+    color: 0xfbbf24,
+    metalness: 0.82,
+    roughness: 0.28,
+  });
+  const cabinLightMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.55, roughness: 0.35 });
+  const cabinDarkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.65, roughness: 0.35 });
+  const tankMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.82, roughness: 0.22 });
+
+  // Octagonal Descent Stage Hull
+  const descentHull = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.35, 1.65, 8), foilMat);
+  descentHull.position.y = 1.75;
+  descentHull.rotation.y = Math.PI / 8;
   descentHull.castShadow = true;
   descentStage.add(descentHull);
 
-  const tankMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.75, roughness: 0.25 });
+  // Side recessed equipment frame ribs & spherical helium/propellant tanks
   for (let i = 0; i < 4; i++) {
     const a = (i * Math.PI) / 2;
-    const tank = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 14), tankMat);
-    tank.position.set(Math.cos(a) * 1.95, 1.65, Math.sin(a) * 1.95);
+    const bay = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.15, 0.35), cabinDarkMat);
+    bay.position.set(Math.sin(a) * 2.1, 1.75, Math.cos(a) * 2.1);
+    bay.rotation.y = a;
+    descentStage.add(bay);
+
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.05, 12), tankMat);
+    tank.position.set(Math.sin(a) * 2.15, 1.75, Math.cos(a) * 2.15);
     descentStage.add(tank);
   }
 
+  // 4 Articulated Tripod Landing Legs + Boarding Ladder on Front Leg (+Z)
   const legsGroup = new THREE.Group();
   for (let i = 0; i < 4; i++) {
-    const a = (i * Math.PI) / 2 + Math.PI / 4;
-    const leg = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.07, 2.5, 10),
-      new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.78, roughness: 0.3 })
-    );
-    leg.position.set(Math.cos(a) * 2.5, 1.3, Math.sin(a) * 2.5);
-    leg.rotation.z = -Math.cos(a) * 0.42;
-    leg.rotation.x = Math.sin(a) * 0.42;
-    legsGroup.add(leg);
+    const a = (i * Math.PI) / 2;
+    const legRoot = new THREE.Group();
+    legRoot.rotation.y = a;
 
-    const footpad = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.56, 0.62, 0.14, 16),
-      new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.82, roughness: 0.28 })
-    );
-    footpad.position.set(Math.cos(a) * 3.05, 0.07, Math.sin(a) * 3.05);
-    legsGroup.add(footpad);
+    const pUpperCenter = new THREE.Vector3(0, 2.38, 2.08);
+    const pFoot = new THREE.Vector3(0, 0.14, 3.24);
+    const pMidCollar = new THREE.Vector3(0, 1.38, 2.60);
+    const pLowerCenter = new THREE.Vector3(0, 1.02, 2.16);
+    const pAnkle = new THREE.Vector3(0, 0.36, 3.12);
+
+    // Primary telescoping shock strut (upper hull -> footpad ball joint)
+    legRoot.add(createStrutBetween(pUpperCenter, pFoot, 0.085, 0.068, strutMat));
+
+    // Dual diagonal upper V-braces (hull side outriggers -> mid-leg collar)
+    legRoot.add(createStrutBetween(new THREE.Vector3(-0.82, 2.42, 1.98), pMidCollar, 0.048, 0.045, strutMat));
+    legRoot.add(createStrutBetween(new THREE.Vector3(0.82, 2.42, 1.98), pMidCollar, 0.048, 0.045, strutMat));
+
+    // Lower A-frame deploy trusses (lower hull -> ankle collar)
+    legRoot.add(createStrutBetween(pLowerCenter, pAnkle, 0.05, 0.045, strutMat));
+    legRoot.add(createStrutBetween(new THREE.Vector3(-0.66, 1.05, 2.08), pAnkle, 0.042, 0.04, strutMat));
+    legRoot.add(createStrutBetween(new THREE.Vector3(0.66, 1.05, 2.08), pAnkle, 0.042, 0.04, strutMat));
+
+    // Dish Footpad + Ankle Collar + Contact Probe
+    const footpad = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 0.14, 18), strutMat);
+    footpad.position.set(0, 0.07, 3.24);
+    legRoot.add(footpad);
 
     if (i !== 0) {
       const probe = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.015, 1.15, 6),
+        new THREE.CylinderGeometry(0.02, 0.015, 1.05, 6),
         new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.15 })
       );
-      probe.position.set(Math.cos(a) * 3.05, -0.52, Math.sin(a) * 3.05);
-      legsGroup.add(probe);
+      probe.position.set(0, -0.46, 3.24);
+      legRoot.add(probe);
+    } else {
+      // Front Astronaut Boarding Ladder cleanly parallel along the +Z primary strut
+      const lTop = new THREE.Vector3(-0.21, 2.38, 2.26);
+      const lBot = new THREE.Vector3(-0.21, 0.42, 3.22);
+      const rTop = new THREE.Vector3(0.21, 2.38, 2.26);
+      const rBot = new THREE.Vector3(0.21, 0.42, 3.22);
+      legRoot.add(createStrutBetween(lTop, lBot, 0.024, 0.024, tankMat));
+      legRoot.add(createStrutBetween(rTop, rBot, 0.024, 0.024, tankMat));
+
+      for (let r = 0; r < 7; r++) {
+        const t = 0.08 + (r / 6) * 0.84;
+        const pL = new THREE.Vector3().lerpVectors(lTop, lBot, t);
+        const pR = new THREE.Vector3().lerpVectors(rTop, rBot, t);
+        legRoot.add(createStrutBetween(pL, pR, 0.018, 0.018, tankMat));
+      }
     }
+
+    legsGroup.add(legRoot);
   }
   descentStage.add(legsGroup);
 
+  // Gimbaled Variable-Thrust Descent Engine Bell
   const nozzleGroup = new THREE.Group();
-  nozzleGroup.position.y = 0.72;
+  nozzleGroup.position.y = 0.85;
   const bell = new THREE.Mesh(
-    new THREE.ConeGeometry(0.92, 1.25, 20, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2, side: THREE.DoubleSide })
+    new THREE.ConeGeometry(0.88, 1.32, 22, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.92, roughness: 0.2, side: THREE.DoubleSide })
   );
   nozzleGroup.add(bell);
 
-  const flameGeo = new THREE.ConeGeometry(0.88, 4.8, 16);
+  const flameGeo = new THREE.ConeGeometry(0.86, 4.8, 16);
   flameGeo.rotateX(Math.PI);
   flameGeo.translate(0, -2.4, 0);
   const flameMesh = new THREE.Mesh(
     flameGeo,
     new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 })
   );
-  flameMesh.position.y = -0.5;
+  flameMesh.position.y = -0.55;
   flameMesh.visible = false;
   nozzleGroup.add(flameMesh);
 
@@ -547,60 +813,120 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
   descentStage.add(engineLight);
   tagPart(descentStage, 'lm-descent');
 
-  // Ascent Cabin
-  const cabin = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.48, 1.88, 1.65, 8),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.58, roughness: 0.35 })
-  );
-  cabin.position.y = 3.18;
-  cabin.castShadow = true;
-  ascentStage.add(cabin);
+  // Faceted Ascent Stage Crew Cabin (LM-2 Blueprint Accurate)
+  const cabinCenter = new THREE.Mesh(new THREE.CylinderGeometry(1.58, 1.92, 1.72, 8), cabinLightMat);
+  cabinCenter.position.y = 3.45;
+  cabinCenter.rotation.y = Math.PI / 8;
+  cabinCenter.castShadow = true;
+  ascentStage.add(cabinCenter);
 
-  const hatch = new THREE.Mesh(
-    new THREE.BoxGeometry(1.15, 1.05, 0.9),
-    new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.5, roughness: 0.45 })
-  );
-  hatch.position.set(0, 2.98, 1.45);
-  ascentStage.add(hatch);
+  // Side cylindrical Ascent Propellant & Life Support Cheek Pods
+  [-1.48, 1.48].forEach((cx) => {
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.62, 1.05, 14), cabinDarkMat);
+    pod.rotation.z = Math.PI / 2;
+    pod.position.set(cx, 3.35, -0.18);
+    ascentStage.add(pod);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.54, 12, 10), tankMat);
+    cap.scale.set(0.42, 1, 1);
+    cap.position.set(cx + Math.sign(cx) * 0.52, 3.35, -0.18);
+    ascentStage.add(cap);
+  });
 
+  // Forward Cockpit Face + Egress Hatch + Astronaut Porch
+  const fwdPanel = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.45, 1.15), cabinDarkMat);
+  fwdPanel.position.set(0, 3.38, 1.42);
+  ascentStage.add(fwdPanel);
+
+  const egressHatch = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.78, 0.14), cabinLightMat);
+  egressHatch.position.set(0, 2.98, 2.02);
+  ascentStage.add(egressHatch);
+
+  const porch = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.1, 0.42), tankMat);
+  porch.position.set(0, 2.54, 2.15);
+  ascentStage.add(porch);
+
+  // Two Canted Triangular Cockpit Windows
   const winMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  const winL = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 0.44), winMat);
-  winL.position.set(-0.54, 3.38, 1.56);
-  winL.rotation.x = -0.18;
-  ascentStage.add(winL);
-  const winR = winL.clone();
-  winR.position.x = 0.54;
-  ascentStage.add(winR);
+  [-0.46, 0.46].forEach((wx, idx) => {
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 0.44), winMat);
+    win.position.set(wx, 3.68, 1.98);
+    win.rotation.x = -0.22;
+    win.rotation.z = idx === 0 ? 0.16 : -0.16;
+    ascentStage.add(win);
+  });
 
-  const dishMast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.06, 0.9, 8),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.7, roughness: 0.25 })
-  );
-  dishMast.position.set(0.9, 4.3, 0.35);
+  // Overhead Docking Tunnel Collar
+  const dockCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.68, 0.42, 16), tankMat);
+  dockCollar.position.set(0, 4.48, 0);
+  ascentStage.add(dockCollar);
+
+  // S-Band Steerable Parabolic Dish & Feed Horn
+  const dishMast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.85, 8), tankMat);
+  dishMast.position.set(0.95, 4.65, 0.45);
   ascentStage.add(dishMast);
   const dish = new THREE.Mesh(
-    new THREE.SphereGeometry(0.55, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.44),
-    new THREE.MeshStandardMaterial({ color: 0xfef08a, metalness: 0.85, roughness: 0.2, side: THREE.DoubleSide })
+    new THREE.SphereGeometry(0.56, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xfef08a, metalness: 0.78, roughness: 0.25, side: THREE.DoubleSide })
   );
-  dish.position.set(0.9, 4.75, 0.35);
-  dish.rotation.x = Math.PI * 0.7;
+  dish.position.set(0.95, 5.15, 0.45);
+  dish.rotation.x = Math.PI * 0.72;
   ascentStage.add(dish);
+  const lmFeed = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, 0.36, 8), cabinDarkMat);
+  lmFeed.position.set(0.95, 5.18, 0.62);
+  lmFeed.rotation.x = Math.PI * 0.22;
+  ascentStage.add(lmFeed);
+
+  const nasaDecal = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.52, 0.52),
+    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
+  );
+  nasaDecal.position.set(0, 1.75, 2.38);
+  descentStage.add(nasaDecal);
   tagPart(ascentStage, 'lm-ascent');
 
+  // 4-Quad RCS Thruster Clusters (16 nozzles total) on outrigger brackets
   const rcsGroup = new THREE.Group();
+  const rcsPodMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+  [
+    [-1.78, 1.25],
+    [1.78, 1.25],
+    [-1.78, -1.25],
+    [1.78, -1.25],
+  ].forEach(([rx, rz]) => {
+    const cluster = new THREE.Group();
+    cluster.position.set(rx, 3.65, rz);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.36, 10), rcsPodMat);
+    cluster.add(body);
+    // 4 small orthogonal RCS nozzles per quad
+    const nUp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 8), tankMat);
+    nUp.position.y = 0.26;
+    const nDn = nUp.clone();
+    nDn.rotation.x = Math.PI;
+    nDn.position.y = -0.26;
+    const nSide = nUp.clone();
+    nSide.rotation.z = Math.sign(rx) * -Math.PI / 2;
+    nSide.position.set(Math.sign(rx) * 0.24, 0, 0);
+    const nFwd = nUp.clone();
+    nFwd.rotation.x = Math.sign(rz) * Math.PI / 2;
+    nFwd.position.set(0, 0, Math.sign(rz) * 0.24);
+    cluster.add(nUp, nDn, nSide, nFwd);
+    rcsGroup.add(cluster);
+  });
+
   const rcsGeo = new THREE.ConeGeometry(0.24, 1.2, 8);
   const rcsMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.85 });
   const rcsLeft = new THREE.Mesh(rcsGeo, rcsMat);
-  rcsLeft.position.set(-2.3, 3.25, 0);
+  rcsLeft.position.set(-2.35, 3.65, 0.6);
   rcsLeft.rotation.z = -Math.PI / 2;
   rcsLeft.visible = false;
   rcsGroup.add(rcsLeft);
 
   const rcsRight = new THREE.Mesh(rcsGeo, rcsMat);
-  rcsRight.position.set(2.3, 3.25, 0);
+  rcsRight.position.set(2.35, 3.65, 0.6);
   rcsRight.rotation.z = Math.PI / 2;
   rcsRight.visible = false;
   rcsGroup.add(rcsRight);
+
   tagPart(rcsGroup, 'lm-rcs');
   tagPart(nozzleGroup, 'lm-rcs');
 
@@ -614,7 +940,8 @@ export interface ViperRoverHandles {
   wheelModules: Array<{
     pivot: THREE.Group;
     spin: THREE.Group;
-    arm: THREE.Mesh;
+    arm: THREE.Object3D;
+    knuckle: THREE.Mesh;
     side: number;
     forward: number;
     baseY: number;
@@ -627,151 +954,221 @@ export interface ViperRoverHandles {
 }
 
 export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
+  // Blueprint Accurate: VIPER Lunar Rover (2.0 m x 1.8 m x 1.4 m, 430 kg)
   const group = new THREE.Group();
   const bodyGroup = new THREE.Group();
 
-  const chassisMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, metalness: 0.35, roughness: 0.55 });
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.78, roughness: 0.25 });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.45, roughness: 0.4 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.78, roughness: 0.25 });
   const foilMat = new THREE.MeshStandardMaterial({
     map: tex.foilAlbedo,
+    bumpMap: tex.foilBump,
+    bumpScale: 0.08,
     color: 0xffffff,
-    metalness: 0.78,
-    roughness: 0.28,
+    metalness: 0.82,
+    roughness: 0.25,
   });
 
-  // Cleanly proportioned 1.6m wide x 2.3m long chassis (NO root non-uniform scale distortion!)
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.65, 2.2), chassisMat);
-  chassis.position.y = 0.85;
-  chassis.castShadow = true;
-  bodyGroup.add(chassis);
+  // Central Gold Kapton Avionics Core + White Machined Structural Frame
+  const coreBox = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.56, 1.65), foilMat);
+  coreBox.position.set(0, 0.86, 0);
+  coreBox.castShadow = true;
+  bodyGroup.add(coreBox);
 
-  const warmBox = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.42, 1.72), foilMat);
-  warmBox.position.set(0, 1.24, -0.08);
-  warmBox.castShadow = true;
-  bodyGroup.add(warmBox);
+  const upperDeck = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.14, 1.85), frameMat);
+  upperDeck.position.set(0, 1.18, 0);
+  upperDeck.castShadow = true;
+  bodyGroup.add(upperDeck);
+
+  // Front & Aft Equipment Bumper Panels with unobstructed NASA Meatball Decal
+  const frontFace = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.52, 0.14), frameMat);
+  frontFace.position.set(0, 0.86, 0.88);
+  bodyGroup.add(frontFace);
+
+  const nasaFront = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.38, 0.38),
+    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
+  );
+  nasaFront.position.set(-0.18, 0.88, 0.96);
+  bodyGroup.add(nasaFront);
+
+  const nasaRear = nasaFront.clone();
+  nasaRear.position.set(0, 0.88, -0.96);
+  nasaRear.rotation.y = Math.PI;
+  bodyGroup.add(nasaRear);
+
+  // Aft Battery Pack Module
+  const batteryBox = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.44, 0.34), darkMetal);
+  batteryBox.position.set(0, 0.86, -0.95);
+  bodyGroup.add(batteryBox);
+
   tagPart(bodyGroup, 'rover-mobility');
 
-  // 3-Sided Solar Panels
+  // High-Efficiency Twin Wing Top-Mounted Solar Array (mounted cleanly aft of camera mast)
   const solarGroup = new THREE.Group();
   const panelMat = new THREE.MeshStandardMaterial({
     map: tex.solarPanel,
-    color: 0xffffff,
-    metalness: 0.45,
+    color: 0xbfe3ff,
+    metalness: 0.52,
     roughness: 0.22,
   });
-  const panelL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.64, 1.95), panelMat);
-  panelL.position.set(-0.71, 0.88, 0);
-  solarGroup.add(panelL);
-  const panelR = panelL.clone();
-  panelR.position.x = 0.71;
-  solarGroup.add(panelR);
-  const panelAft = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.64, 0.06), panelMat);
-  panelAft.position.set(0, 0.88, -1.14);
-  solarGroup.add(panelAft);
+  [-0.64, 0.64].forEach((px) => {
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.06, 1.56), panelMat);
+    wing.position.set(px, 1.29, -0.2);
+    wing.rotation.z = -Math.sign(px) * 0.06;
+    wing.castShadow = true;
+    solarGroup.add(wing);
+  });
+  [-0.72, 0.72].forEach((sx) => {
+    const sideWing = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 1.62), panelMat);
+    sideWing.position.set(sx, 0.96, -0.05);
+    solarGroup.add(sideWing);
+  });
   tagPart(solarGroup, 'rover-power');
   bodyGroup.add(solarGroup);
 
-  // Camera Mast + Spotlight + High-Gain Dish
+  // Panoramic Stereo Camera Mast (clear in front of solar wings) + Headlight + Rear Dish & Whip Antenna
   const commsGroup = new THREE.Group();
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.08, 1.45, 10), frameMat);
-  mast.position.set(0, 1.85, 0.62);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.072, 1.15, 10), frameMat);
+  mast.position.set(-0.34, 1.8, 0.72);
   commsGroup.add(mast);
 
   const camHead = new THREE.Group();
-  camHead.position.set(0, 2.55, 0.62);
-  camHead.add(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(0.6, 0.28, 0.36),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.3 })
-    )
-  );
-  const lensGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.1, 12);
+  camHead.position.set(-0.34, 2.38, 0.72);
+  camHead.add(new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.24, 0.32), frameMat));
+  const bezelGeo = new THREE.CylinderGeometry(0.082, 0.082, 0.08, 12);
+  bezelGeo.rotateX(Math.PI / 2);
+  const lensGeo = new THREE.CylinderGeometry(0.058, 0.058, 0.1, 12);
   lensGeo.rotateX(Math.PI / 2);
   const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  const lensL = new THREE.Mesh(lensGeo, lensMat);
-  lensL.position.set(-0.16, 0, 0.2);
-  camHead.add(lensL);
-  const lensR = lensL.clone();
-  lensR.position.x = 0.16;
-  camHead.add(lensR);
+  [-0.15, 0.15].forEach((lx) => {
+    const bezel = new THREE.Mesh(bezelGeo, darkMetal);
+    bezel.position.set(lx, 0, 0.17);
+    camHead.add(bezel);
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.position.set(lx, 0, 0.18);
+    camHead.add(lens);
+  });
   commsGroup.add(camHead);
 
-  const headlight = new THREE.SpotLight(0xe0f2fe, 2.0, 38, Math.PI / 4, 0.45, 1);
-  headlight.position.set(0, 2.45, 0.85);
+  const headlight = new THREE.SpotLight(0xe0f2fe, 2.2, 38, Math.PI / 4, 0.45, 1);
+  headlight.position.set(-0.34, 2.3, 0.92);
   headlight.target.position.set(0, 0, 12);
   commsGroup.add(headlight);
   commsGroup.add(headlight.target);
 
+  // Rear High-Gain Parabolic Dish (tilted upward/aft) + Vertical Comms Whip Antenna
   const dish = new THREE.Mesh(
-    new THREE.ConeGeometry(0.42, 0.24, 16),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.3 })
+    new THREE.SphereGeometry(0.36, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.7, roughness: 0.25, side: THREE.DoubleSide })
   );
-  dish.position.set(0, 1.56, -0.82);
-  dish.rotation.x = -0.5;
+  dish.position.set(0.32, 1.56, -0.78);
+  dish.rotation.x = Math.PI * 0.85;
   commsGroup.add(dish);
+
+  const whip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.028, 1.15, 8), darkMetal);
+  whip.position.set(-0.42, 1.82, -0.78);
+  commsGroup.add(whip);
+
   tagPart(commsGroup, 'rover-comms');
   bodyGroup.add(commsGroup);
 
-  // TRIDENT Rotary-Percussive Ice Drill Arm
+  // Forward 2-Segment Articulated TRIDENT Ice Drill Arm (right-front mount, metallic steel & gold collar)
   const drillArm = new THREE.Group();
-  drillArm.position.set(0, 0.82, 0.98);
-  const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.72, 10), frameMat);
-  seg.rotation.x = Math.PI / 2;
-  seg.position.set(0, 0.06, 0.34);
-  drillArm.add(seg);
+  drillArm.position.set(0.46, 0.88, 0.9);
+  const boom1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.62), frameMat);
+  boom1.position.set(0, 0.04, 0.3);
+  drillArm.add(boom1);
+
   const housing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.11, 0.09, 0.68, 12),
-    new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.75, roughness: 0.25 })
+    new THREE.CylinderGeometry(0.085, 0.075, 0.64, 12),
+    darkMetal
   );
-  housing.position.set(0, -0.3, 0.7);
+  housing.position.set(0, -0.26, 0.62);
   drillArm.add(housing);
-  const drillBit = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.38, 10), foilMat);
-  drillBit.position.set(0, -0.82, 0.7);
+
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.1, 12), foilMat);
+  collar.position.set(0, -0.52, 0.62);
+  drillArm.add(collar);
+
+  const drillBit = new THREE.Mesh(
+    new THREE.ConeGeometry(0.068, 0.44, 10),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.88, roughness: 0.22 })
+  );
+  drillBit.position.set(0, -0.78, 0.62);
+  drillBit.rotation.x = Math.PI;
   drillArm.add(drillBit);
   tagPart(drillArm, 'rover-science');
   bodyGroup.add(drillArm);
 
   group.add(bodyGroup);
 
-  // 4 Articulated Rocker-Bogie Wheel-Legs (FL, FR, RL, RR)
+  // 4 Rocker-Bogie Articulated Wheel-Legs (FL, FR, RL, RR) pivoted at differential hubs
+  [-0.68, 0.68].forEach((sx) => {
+    const diffPivot = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.14, 10), darkMetal);
+    diffPivot.rotation.z = Math.PI / 2;
+    diffPivot.position.set(sx, 0.78, 0);
+    tagPart(diffPivot, 'rover-mobility');
+    group.add(diffPivot);
+  });
+
   const wheelModules: ViperRoverHandles['wheelModules'] = [];
   const corners: Array<[number, number]> = [
-    [-0.88, 0.92],
-    [0.88, 0.92],
-    [-0.88, -0.92],
-    [0.88, -0.92],
+    [-0.92, 0.9],
+    [0.92, 0.9],
+    [-0.92, -0.9],
+    [0.92, -0.9],
   ];
-  const tireMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.88, metalness: 0.2 });
-  const grouserMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.75, metalness: 0.45 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85, metalness: 0.25 });
+  const grouserMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.65, metalness: 0.55 });
 
   corners.forEach(([wx, wz]) => {
     const side = Math.sign(wx);
     const forward = Math.sign(wz);
 
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.75), frameMat);
-    arm.position.set(side * 0.68, 0.56, forward * 0.62);
-    arm.castShadow = true;
+    // Rocker-Bogie arm pivoted right at differential hub (side * 0.68, 0.78, 0) -> knuckle top (wx, 0.56, wz)
+    const arm = new THREE.Group();
+    arm.position.set(side * 0.68, 0.78, 0);
+    const elbow = new THREE.Vector3(side * 0.2, -0.06, forward * 0.45);
+    const knuckleTop = new THREE.Vector3(wx - side * 0.68, 0.56 - 0.78, wz);
+    arm.add(createStrutBetween(new THREE.Vector3(0, 0, 0), elbow, 0.048, 0.045, frameMat));
+    arm.add(createStrutBetween(elbow, knuckleTop, 0.045, 0.042, frameMat));
+    const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), darkMetal);
+    elbowJoint.position.copy(elbow);
+    arm.add(elbowJoint);
     tagPart(arm, 'rover-mobility');
     group.add(arm);
 
+    // Vertical Steering Knuckle fork above wheel
     const pivot = new THREE.Group();
     pivot.position.set(wx, 0.34, wz);
 
+    const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), darkMetal);
+    knuckle.position.set(0, 0.24, 0);
+    pivot.add(knuckle);
+
     const spin = new THREE.Group();
-    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.24, 24), tireMat);
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.24, 24), tireMat);
     tire.rotation.z = Math.PI / 2;
     tire.castShadow = true;
     spin.add(tire);
 
-    for (let t = 0; t < 10; t++) {
-      const a = (t / 10) * Math.PI * 2;
-      const grouser = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.06), grouserMat);
-      grouser.position.set(0, Math.cos(a) * 0.28, Math.sin(a) * 0.28);
+    // Deep High-Traction Lunar Grouser Cleats
+    for (let t = 0; t < 12; t++) {
+      const a = (t / 12) * Math.PI * 2;
+      const grouser = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.06), grouserMat);
+      grouser.position.set(0, Math.cos(a) * 0.3, Math.sin(a) * 0.3);
       grouser.rotation.x = a;
       spin.add(grouser);
     }
 
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.26, 12), foilMat);
+    // 6-Spoke Inner Wheel Rim + Gold Hubcap
+    for (let s = 0; s < 3; s++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.44, 0.045), grouserMat);
+      spoke.rotation.x = (s * Math.PI) / 3;
+      spin.add(spoke);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.27, 12), foilMat);
     hub.rotation.z = Math.PI / 2;
     spin.add(hub);
 
@@ -779,7 +1176,7 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     tagPart(pivot, 'rover-mobility');
     group.add(pivot);
 
-    wheelModules.push({ pivot, spin, arm, side, forward, baseY: 0.34 });
+    wheelModules.push({ pivot, spin, arm, knuckle, side, forward, baseY: 0.34 });
   });
 
   return { group, bodyGroup, wheelModules, drillArm, drillBit, dish, camHead, headlight };
@@ -790,6 +1187,8 @@ export interface LaunchComplexHandles {
   groundGroup: THREE.Group;
   earthLimb: THREE.Group;
   moonMesh: THREE.Mesh;
+  cloudLayer: THREE.Group;
+  crewAccessArm: THREE.Group;
   rocketFull: THREE.Group;
   coreGroup: THREE.Group;
   srbLeft: THREE.Group;
@@ -800,82 +1199,404 @@ export interface LaunchComplexHandles {
   trenchLight: THREE.PointLight;
 }
 
+function buildMobileLauncherAndTrench(tex: ProceduralTextureSet): THREE.Group {
+  const g = new THREE.Group();
+  const concreteMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, metalness: 0.08 });
+  const darkSteelMat = new THREE.MeshStandardMaterial({
+    map: tex.towerSteel,
+    color: 0xcbd5e1,
+    metalness: 0.72,
+    roughness: 0.36,
+  });
+  const hazardMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.55, metalness: 0.25 });
+
+  // Raised LC-39B Concrete Apron Split Around Central Flame Trench
+  const apronLeft = new THREE.Mesh(new THREE.BoxGeometry(16, 1.2, 28), concreteMat);
+  apronLeft.position.set(-12, 0.2, 0);
+  apronLeft.receiveShadow = true;
+  const apronRight = apronLeft.clone();
+  apronRight.position.x = 12;
+  g.add(apronLeft, apronRight);
+
+  // Sloped Apron Approach Ramps
+  const rampFront = new THREE.Mesh(new THREE.BoxGeometry(40, 0.8, 12), concreteMat);
+  rampFront.position.set(0, -0.05, 19);
+  rampFront.rotation.x = 0.08;
+  rampFront.receiveShadow = true;
+  const rampBack = rampFront.clone();
+  rampBack.position.z = -19;
+  rampBack.rotation.x = -0.08;
+  g.add(rampFront, rampBack);
+
+  // Flame Trench Floor & Sloped Blast Deflector Wedge
+  const trenchFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(10, 0.4, 34),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.92, metalness: 0.15 })
+  );
+  trenchFloor.position.set(0, -0.25, 0);
+  g.add(trenchFloor);
+
+  const deflector = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 4.4, 8.6, 4),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.78, roughness: 0.42 })
+  );
+  deflector.rotation.y = Math.PI / 4;
+  deflector.scale.set(1.1, 0.45, 1.45);
+  deflector.position.set(0, 0.75, 0);
+  g.add(deflector);
+
+  // Concrete Flame Trench Blast Walls
+  [-4.2, 4.2].forEach((wx) => {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 26), concreteMat);
+    wall.position.set(wx, 0.75, 0);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    g.add(wall);
+  });
+
+  // Mobile Launcher Platform (MLP) Steel Deck & Corner Pedestal Legs
+  const mlpBase = new THREE.Group();
+  const mlpDeckMat = new THREE.MeshStandardMaterial({
+    map: tex.towerSteel,
+    color: 0x334155,
+    metalness: 0.35,
+    roughness: 0.72,
+  });
+  const deckSlab = new THREE.Mesh(new THREE.BoxGeometry(14.6, 1.55, 14.6), mlpDeckMat);
+  deckSlab.position.set(-1.6, 1.72, 0);
+  deckSlab.castShadow = true;
+  deckSlab.receiveShadow = true;
+  mlpBase.add(deckSlab);
+
+  // Perimeter Hazard Safety Curb (leaving dark steel MLP deck surface visible!)
+  [
+    [-1.6, 7.36, 14.8, 0.22],
+    [-1.6, -7.36, 14.8, 0.22],
+  ].forEach(([cx, cz, w, d]) => {
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), hazardMat);
+    curb.position.set(cx, 2.48, cz);
+    mlpBase.add(curb);
+  });
+  [
+    [-8.96, 0, 0.22, 14.8],
+    [5.76, 0, 0.22, 14.8],
+  ].forEach(([cx, cz, w, d]) => {
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), hazardMat);
+    curb.position.set(cx, 2.48, cz);
+    mlpBase.add(curb);
+  });
+
+  // MLP Central Flame Exhaust Trench Collar under SLS Engines
+  const exhaustWell = new THREE.Mesh(
+    new THREE.BoxGeometry(5.2, 0.16, 3.8),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.85, metalness: 0.45 })
+  );
+  exhaustWell.position.set(0, 2.45, 0);
+  mlpBase.add(exhaustWell);
+
+  // 6 MLP Support Mount Pedestals
+  [
+    [-7.6, -5.8],
+    [-7.6, 5.8],
+    [-1.6, -5.8],
+    [-1.6, 5.8],
+    [4.4, -5.8],
+    [4.4, 5.8],
+  ].forEach(([px, pz]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 1.1), darkSteelMat);
+    leg.position.set(px, 0.7, pz);
+    mlpBase.add(leg);
+  });
+
+  // 4 Hold-Down Posts & Twin Tail Service Masts cradling SLS
+  [
+    [-1.62, -0.52],
+    [-1.62, 0.52],
+    [1.62, -0.52],
+    [1.62, 0.52],
+  ].forEach(([hx, hz]) => {
+    const clampPost = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.85, 0.32), hazardMat);
+    clampPost.position.set(hx, 2.75, hz);
+    mlpBase.add(clampPost);
+  });
+
+  [-1.95, 1.95].forEach((tz) => {
+    const tsm = new THREE.Mesh(new THREE.BoxGeometry(0.75, 2.8, 0.75), darkSteelMat);
+    tsm.position.set(-2.35, 3.85, tz);
+    tsm.castShadow = true;
+    mlpBase.add(tsm);
+  });
+
+  g.add(mlpBase);
+  return g;
+}
+
+function buildLC39BServiceTower(tex: ProceduralTextureSet): {
+  tower: THREE.Group;
+  crewAccessArm: THREE.Group;
+} {
+  const tower = new THREE.Group();
+  tower.position.set(-6.6, 2.5, 0);
+
+  const steelMat = new THREE.MeshStandardMaterial({
+    map: tex.towerSteel,
+    color: 0xe2e8f0,
+    metalness: 0.78,
+    roughness: 0.3,
+  });
+  const darkIron = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.82, roughness: 0.35 });
+  const armWhite = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.45, roughness: 0.28 });
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+
+  const towerHeight = 31.5;
+  const halfW = 1.9;
+  const corners: Array<[number, number]> = [
+    [-halfW, -halfW],
+    [halfW, -halfW],
+    [-halfW, halfW],
+    [halfW, halfW],
+  ];
+
+  // 4 Main Vertical Structural Columns
+  corners.forEach(([cx, cz]) => {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, towerHeight, 10), steelMat);
+    col.position.set(cx, towerHeight / 2, cz);
+    col.castShadow = true;
+    tower.add(col);
+  });
+
+  // 7 Tiered Access Platforms + Diagonal Cross-Bracing per Bay
+  const bayHeights = [0, 4.5, 9.0, 13.5, 18.0, 22.5, 27.0, 31.5];
+  for (let b = 0; b < bayHeights.length - 1; b++) {
+    const y0 = bayHeights[b];
+    const y1 = bayHeights[b + 1];
+
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(halfW * 2.18, 0.28, halfW * 2.18), darkIron);
+    deck.position.y = y1;
+    deck.castShadow = true;
+    tower.add(deck);
+
+    // Front, Back, Left, Right X-bracing trusses
+    const faces: Array<[number, number, number, number]> = [
+      [-halfW, halfW, halfW, halfW],
+      [-halfW, -halfW, halfW, -halfW],
+      [-halfW, -halfW, -halfW, halfW],
+      [halfW, -halfW, halfW, halfW],
+    ];
+    faces.forEach(([x1, z1, x2, z2]) => {
+      tower.add(createStrutBetween(new THREE.Vector3(x1, y0, z1), new THREE.Vector3(x2, y1, z2), 0.06, 0.06, steelMat));
+      tower.add(createStrutBetween(new THREE.Vector3(x2, y0, z2), new THREE.Vector3(x1, y1, z1), 0.06, 0.06, steelMat));
+    });
+  }
+
+  // Interior Dual Crew Elevator Shaft
+  const elevShaft = new THREE.Mesh(new THREE.BoxGeometry(1.15, towerHeight - 1.5, 1.15), darkIron);
+  elevShaft.position.set(-0.4, towerHeight / 2, 0);
+  tower.add(elevShaft);
+
+  // Umbilical Swing Arms connecting Tower -> SLS Core & ICPS
+  [11.2, 16.5, 19.8].forEach((uy, idx) => {
+    const uArm = new THREE.Mesh(new THREE.BoxGeometry(4.4 - idx * 0.25, 0.42, 0.65), steelMat);
+    uArm.position.set(3.8, uy, 0);
+    tower.add(uArm);
+  });
+
+  // Retractable White Orion Crew Access Arm (pivoted cleanly at tower edge -> Orion hatch)
+  const crewAccessArm = new THREE.Group();
+  crewAccessArm.position.set(halfW, 21.8, 0);
+  const walkway = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.88, 1.05), armWhite);
+  walkway.position.set(2.1, 0, 0);
+  walkway.castShadow = true;
+  crewAccessArm.add(walkway);
+  const bellows = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.96, 1.16), darkIron);
+  bellows.position.set(4.1, 0, 0);
+  crewAccessArm.add(bellows);
+  tower.add(crewAccessArm);
+
+  // Top Hammerhead Crane + Lightning Protection Spire
+  const craneBoom = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.55, 1.1), darkIron);
+  craneBoom.position.set(1.2, towerHeight + 0.45, 0);
+  tower.add(craneBoom);
+
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.16, 4.6, 8), steelMat);
+  spire.position.set(0, towerHeight + 2.8, 0);
+  tower.add(spire);
+
+  const topBeacon = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), beaconMat);
+  topBeacon.position.set(0, towerHeight + 5.15, 0);
+  tower.add(topBeacon);
+
+  return { tower, crewAccessArm };
+}
+
+function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
+  const g = new THREE.Group();
+  const steelMat = new THREE.MeshStandardMaterial({
+    map: tex.towerSteel,
+    color: 0x94a3b8,
+    metalness: 0.72,
+    roughness: 0.35,
+  });
+  const whiteTankMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.45, roughness: 0.32 });
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+  const xenonMat = new THREE.MeshBasicMaterial({ color: 0xfef3c7 });
+
+  // 4 Catenary Lightning Protection Towers around Pad 39B
+  [
+    [-25, -18],
+    [25, -18],
+    [-27, 17],
+    [27, 17],
+  ].forEach(([lx, lz]) => {
+    const lt = new THREE.Group();
+    lt.position.set(lx, 0, lz);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.95, 34, 6), steelMat);
+    mast.position.y = 17;
+    mast.castShadow = true;
+    lt.add(mast);
+
+    const mastTip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.16, 5.2, 6), steelMat);
+    mastTip.position.y = 36.4;
+    lt.add(mastTip);
+
+    const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), beaconMat);
+    redLight.position.y = 39.1;
+    lt.add(redLight);
+    g.add(lt);
+  });
+
+  // 6 Stadium Xenon Floodlight Masts illuminating Pad 39B
+  [
+    [-19, 10],
+    [19, 10],
+    [-22, -4],
+    [22, -4],
+    [-16, -19],
+    [16, -19],
+  ].forEach(([fx, fz]) => {
+    const fl = new THREE.Group();
+    fl.position.set(fx, 0, fz);
+    fl.lookAt(0, 8, 0);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.24, 13.5, 8), steelMat);
+    pole.position.y = 6.75;
+    fl.add(pole);
+
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.35, 0.32), steelMat);
+    rack.position.y = 13.6;
+    fl.add(rack);
+
+    const lampFace = new THREE.Mesh(new THREE.PlaneGeometry(2.35, 1.1), xenonMat);
+    lampFace.position.set(0, 13.6, 0.18);
+    fl.add(lampFace);
+    g.add(fl);
+  });
+
+  // LC-39B Deluge Water Tower & Spherical LH2 / LOX Cryo Storage Tanks
+  const waterTower = new THREE.Group();
+  waterTower.position.set(-34, 0, -14);
+  const wtLegs = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 2.2, 13, 8, 1, true), steelMat);
+  wtLegs.position.y = 6.5;
+  waterTower.add(wtLegs);
+  const wtBowl = new THREE.Mesh(new THREE.SphereGeometry(3.2, 18, 14), whiteTankMat);
+  wtBowl.scale.set(1, 0.78, 1);
+  wtBowl.position.y = 14.5;
+  wtBowl.castShadow = true;
+  waterTower.add(wtBowl);
+  g.add(waterTower);
+
+  [
+    [32, -16, 3.6],
+    [38, -8, 2.8],
+  ].forEach(([cx, cz, rad]) => {
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(rad, 20, 16), whiteTankMat);
+    sphere.position.set(cx, rad + 1.4, cz);
+    sphere.castShadow = true;
+    g.add(sphere);
+    const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.78, rad * 0.9, 1.6, 12), steelMat);
+    baseRing.position.set(cx, 0.8, cz);
+    g.add(baseRing);
+  });
+
+  return g;
+}
+
 export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComplexHandles {
+  // Blueprint Accurate: SLS Block 1 (111.3m height, Core 65.1m x 8.4m, Twin SRBs 54.9m x 3.7m, Orion + LAS 9.8m)
   const group = new THREE.Group();
   group.visible = false;
 
   const skyDome = new THREE.Mesh(
-    new THREE.SphereGeometry(680, 32, 20),
+    new THREE.SphereGeometry(680, 32, 22),
     new THREE.MeshBasicMaterial({ map: tex.duskSky, side: THREE.BackSide, fog: false })
   );
   group.add(skyDome);
 
+  // Realistic Lit Moon Hanging in Upper-Right Sky (between rocket and telemetry HUD)
   const moonMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(7.0, 28, 28),
-    new THREE.MeshStandardMaterial({ map: tex.moonAlbedo, color: 0xffffff, roughness: 0.9, metalness: 0.05 })
+    new THREE.SphereGeometry(7.4, 36, 32),
+    new THREE.MeshStandardMaterial({
+      map: tex.moonAlbedo,
+      bumpMap: tex.moonBump,
+      bumpScale: 0.25,
+      color: 0xf8fafc,
+      emissive: 0x334155,
+      emissiveIntensity: 0.3,
+      roughness: 0.88,
+      metalness: 0.05,
+    })
   );
-  moonMesh.position.set(26, 26, -34);
+  moonMesh.position.set(-22, 42, -108);
   group.add(moonMesh);
+
+  // Atmospheric Cloud Deck Floating Across Space Coast Horizon
+  const cloudLayer = new THREE.Group();
+  const cloudMat = new THREE.SpriteMaterial({
+    map: tex.cloudPuff,
+    color: 0xfde68a,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+  });
+  const coolCloudMat = new THREE.SpriteMaterial({
+    map: tex.cloudPuff,
+    color: 0x94a3b8,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+  });
+  for (let i = 0; i < 36; i++) {
+    const sp = new THREE.Sprite(i % 2 === 0 ? cloudMat : coolCloudMat);
+    const angle = (i / 36) * Math.PI * 1.4 - Math.PI * 0.7;
+    const dist = 120 + (i % 5) * 32;
+    sp.position.set(Math.sin(angle) * dist, 14 + (i % 6) * 5.5, -Math.cos(angle) * dist);
+    const w = 44 + (i % 4) * 18;
+    sp.scale.set(w, w * 0.32, 1);
+    cloudLayer.add(sp);
+  }
+  group.add(cloudLayer);
 
   // Pad 39B Ground Complex
   const groundGroup = new THREE.Group();
   const plain = new THREE.Mesh(
-    new THREE.PlaneGeometry(680, 680),
-    new THREE.MeshStandardMaterial({ map: tex.kscGround, color: 0xffffff, roughness: 0.95, metalness: 0 })
+    new THREE.PlaneGeometry(720, 720),
+    new THREE.MeshStandardMaterial({ map: tex.kscGround, color: 0xffffff, roughness: 0.94, metalness: 0 })
   );
   plain.rotation.x = -Math.PI / 2;
   plain.position.y = -0.4;
   plain.receiveShadow = true;
   groundGroup.add(plain);
 
-  const padDeck = new THREE.Mesh(
-    new THREE.CylinderGeometry(17, 19, 0.8, 8),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.85, metalness: 0.1 })
-  );
-  padDeck.position.y = 0.4;
-  padDeck.receiveShadow = true;
-  groundGroup.add(padDeck);
-
-  const mlp = new THREE.Mesh(
-    new THREE.BoxGeometry(12.5, 2.2, 12.5),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.35 })
-  );
-  mlp.position.y = 1.5;
-  groundGroup.add(mlp);
-
-  // Launch Umbilical Tower
-  const tower = new THREE.Group();
-  tower.position.set(-8.0, 0, 0);
-  const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.28 });
-  [
-    [-1.4, -1.4],
-    [1.4, -1.4],
-    [-1.4, 1.4],
-    [1.4, 1.4],
-  ].forEach(([cx, cz]) => {
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 36, 10), steelMat);
-    col.position.set(cx, 18, cz);
-    tower.add(col);
-  });
-  [7, 14, 21, 28, 34].forEach((py) => {
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, 3.4), steelMat);
-    deck.position.y = py;
-    tower.add(deck);
-  });
-  const crewArm = new THREE.Mesh(
-    new THREE.BoxGeometry(5.2, 0.75, 1.0),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.55, roughness: 0.3 })
-  );
-  crewArm.position.set(3.2, 21.5, 0);
-  tower.add(crewArm);
+  groundGroup.add(buildMobileLauncherAndTrench(tex));
+  const { tower, crewAccessArm } = buildLC39BServiceTower(tex);
   groundGroup.add(tower);
+  groundGroup.add(buildPerimeterInfrastructure(tex));
 
-  const trenchLight = new THREE.PointLight(0xf97316, 0, 42);
-  trenchLight.position.set(0, 1.0, 0);
+  const trenchLight = new THREE.PointLight(0xf97316, 0, 56);
+  trenchLight.position.set(0, 1.4, 2.0);
   groundGroup.add(trenchLight);
   group.add(groundGroup);
 
-  // Curved Earth Horizon for > 24 km
+  // Curved Earth Horizon for > 20 km
   const earthLimb = new THREE.Group();
   earthLimb.position.set(0, -102, 0);
   earthLimb.add(
@@ -887,17 +1608,30 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   earthLimb.visible = false;
   group.add(earthLimb);
 
-  // SLS Block 1 Stack
+  // SLS Block 1 Stack (Single Rocket Instance shared across Title, Inspector, and Launch)
   const rocketFull = new THREE.Group();
   const coreGroup = new THREE.Group();
   const coreStage = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.06, 1.06, 15.8, 32),
-    new THREE.MeshStandardMaterial({ map: tex.slsCore, color: 0xffffff, roughness: 0.55, metalness: 0.18 })
+    new THREE.CylinderGeometry(1.08, 1.08, 15.8, 32),
+    new THREE.MeshStandardMaterial({ map: tex.slsCore, color: 0xffffff, roughness: 0.5, metalness: 0.16 })
   );
   coreStage.position.y = 8.9;
   coreStage.castShadow = true;
   coreGroup.add(coreStage);
 
+  // External LOX Feedlines & Avionics System Tunnel along Core Stage
+  const feedMat = new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.48, metalness: 0.25 });
+  const racewayMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.42, metalness: 0.28 });
+  [-1.1, 1.1].forEach((fx) => {
+    const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 13.8, 10), feedMat);
+    conduit.position.set(fx, 8.6, 0.25);
+    coreGroup.add(conduit);
+  });
+  const sysTunnel = new THREE.Mesh(new THREE.BoxGeometry(0.18, 14.2, 0.18), racewayMat);
+  sysTunnel.position.set(0, 8.8, 1.1);
+  coreGroup.add(sysTunnel);
+
+  // 4 Detailed RS-25 Engine Bells + Turbopump Gimbal Collars + Glowing Throats
   const rs25Positions: Array<[number, number, number]> = [
     [-0.44, 0.9, -0.44],
     [0.44, 0.9, -0.44],
@@ -905,104 +1639,154 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     [0.44, 0.9, 0.44],
   ];
   const bellMat = new THREE.MeshStandardMaterial({
-    color: 0xcbd5e1,
+    color: 0x94a3b8,
     metalness: 0.92,
     roughness: 0.18,
     side: THREE.DoubleSide,
   });
+  const collarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
   rs25Positions.forEach(([px, py, pz]) => {
-    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.42, 0.92, 20, 1, true), bellMat);
-    bell.position.set(px, py - 0.3, pz);
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.28, 14), collarMat);
+    collar.position.set(px, py + 0.16, pz);
+    coreGroup.add(collar);
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.44, 0.95, 22, 1, true), bellMat);
+    bell.position.set(px, py - 0.34, pz);
     coreGroup.add(bell);
   });
   tagPart(coreGroup, 'sls-core');
 
-  // Twin 5-Segment Solid Rocket Boosters
+  // Twin 5-Segment Solid Rocket Boosters (54.9m proportion)
   const makeSrb = (xOffset: number) => {
     const g = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.46, 0.46, 11.4, 24),
-      new THREE.MeshStandardMaterial({ map: tex.slsSrb, color: 0xffffff, roughness: 0.35, metalness: 0.2 })
+      new THREE.CylinderGeometry(0.47, 0.47, 11.4, 24),
+      new THREE.MeshStandardMaterial({ map: tex.slsSrb, color: 0xffffff, roughness: 0.34, metalness: 0.18 })
     );
     body.position.set(xOffset, 7.2, 0);
+    body.castShadow = true;
     g.add(body);
+
     const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.46, 1.9, 24),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.15 })
+      new THREE.ConeGeometry(0.47, 1.95, 24),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.18 })
     );
-    cone.position.set(xOffset, 13.85, 0);
+    cone.position.set(xOffset, 13.88, 0);
     g.add(cone);
+
+    // 5-Segment Field Joint Stiffener Rings
+    [3.0, 5.4, 7.8, 10.2].forEach((ry) => {
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.49, 0.1, 20), collarMat);
+      ring.position.set(xOffset, ry, 0);
+      g.add(ring);
+    });
+
+    // Upper & Lower Heavy Attach Struts to Core Stage
+    [3.2, 11.6].forEach((sy) => {
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.24, 0.32), collarMat);
+      strut.position.set(xOffset * 0.76, sy, 0);
+      g.add(strut);
+    });
+
     const skirt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.46, 0.62, 1.1, 20),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 })
+      new THREE.CylinderGeometry(0.47, 0.66, 1.15, 20),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.38, metalness: 0.2 })
     );
-    skirt.position.set(xOffset, 1.1, 0);
+    skirt.position.set(xOffset, 1.05, 0);
     g.add(skirt);
+
+    const srbNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.44, 0.65, 18, 1, true), bellMat);
+    srbNozzle.position.set(xOffset, 0.35, 0);
+    g.add(srbNozzle);
+
     tagPart(g, 'sls-boosters');
     return g;
   };
   const srbLeft = makeSrb(-1.62);
   const srbRight = makeSrb(1.62);
 
-  // Upper Stage (LVSA + ICPS + Orion + LAS)
+  // Upper Stage (LVSA + ICPS + Orion + NASA Decal + LAS Tower)
   const upperGroup = new THREE.Group();
   const lvsa = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.66, 1.06, 2.2, 28),
-    new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.48, metalness: 0.22 })
+    new THREE.CylinderGeometry(0.68, 1.08, 2.2, 28),
+    new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.46, metalness: 0.22 })
   );
   lvsa.position.y = 17.9;
   upperGroup.add(lvsa);
 
   const icps = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.65, 0.65, 2.1, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.32, metalness: 0.45 })
+    new THREE.CylinderGeometry(0.66, 0.66, 2.1, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.45 })
   );
   icps.position.y = 20.05;
   upperGroup.add(icps);
 
   const orion = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32, 0.64, 0.98, 28),
-    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.35, metalness: 0.3 })
+    new THREE.CylinderGeometry(0.32, 0.66, 1.02, 28),
+    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
   );
   orion.position.y = 21.85;
   upperGroup.add(orion);
 
+  // NASA Meatball decal on Orion fairing
+  const orionDecal = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.46, 0.46),
+    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
+  );
+  orionDecal.position.set(0, 20.1, 0.68);
+  upperGroup.add(orionDecal);
+
   const abortTower = new THREE.Group();
   abortTower.position.y = 22.45;
   const lasBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14, 0.64, 1.4, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 })
+    new THREE.CylinderGeometry(0.15, 0.65, 1.45, 24),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
   );
-  lasBody.position.y = 0.6;
+  lasBody.position.y = 0.62;
   abortTower.add(lasBody);
   const lasTip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.14, 1.2, 18),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 })
+    new THREE.ConeGeometry(0.15, 1.25, 18),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
   );
-  lasTip.position.y = 1.9;
+  lasTip.position.y = 1.95;
   abortTower.add(lasTip);
   upperGroup.add(abortTower);
   tagPart(upperGroup, 'sls-upper');
 
-  // Plume Group
+  // Multi-Layer Incandescent Exhaust Plume Group (RS-25 Mach Blue + White Core & SRB Blazing Amber)
   const flameGroup = new THREE.Group();
   rs25Positions.forEach(([px, , pz]) => {
-    const p = new THREE.Mesh(
-      new THREE.ConeGeometry(0.24, 1.9, 12),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9 })
+    const outer = new THREE.Mesh(
+      new THREE.ConeGeometry(0.28, 2.6, 14),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.88 })
     );
-    p.rotation.x = Math.PI;
-    p.position.set(px, -0.2, pz);
-    flameGroup.add(p);
+    outer.rotation.x = Math.PI;
+    outer.position.set(px, -0.5, pz);
+    flameGroup.add(outer);
+
+    const core = new THREE.Mesh(
+      new THREE.ConeGeometry(0.14, 1.65, 10),
+      new THREE.MeshBasicMaterial({ color: 0xfef9c3, transparent: true, opacity: 0.95 })
+    );
+    core.rotation.x = Math.PI;
+    core.position.set(px, -0.2, pz);
+    flameGroup.add(core);
   });
   [-1.62, 1.62].forEach((bx) => {
-    const srbFlame = new THREE.Mesh(
-      new THREE.ConeGeometry(0.68, 4.2, 14),
-      new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.9 })
+    const srbOuter = new THREE.Mesh(
+      new THREE.ConeGeometry(0.76, 5.4, 16),
+      new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 })
     );
-    srbFlame.rotation.x = Math.PI;
-    srbFlame.position.set(bx, -1.6, 0);
-    flameGroup.add(srbFlame);
+    srbOuter.rotation.x = Math.PI;
+    srbOuter.position.set(bx, -2.1, 0);
+    flameGroup.add(srbOuter);
+
+    const srbInner = new THREE.Mesh(
+      new THREE.ConeGeometry(0.42, 3.6, 12),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.95 })
+    );
+    srbInner.rotation.x = Math.PI;
+    srbInner.position.set(bx, -1.3, 0);
+    flameGroup.add(srbInner);
   });
   flameGroup.position.y = 0.6;
   flameGroup.visible = false;
@@ -1016,6 +1800,8 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     groundGroup,
     earthLimb,
     moonMesh,
+    cloudLayer,
+    crewAccessArm,
     rocketFull,
     coreGroup,
     srbLeft,
@@ -1027,12 +1813,134 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   };
 }
 
+// Modular Satellite Factory — isolated cleanly so user-supplied Satellite blueprints plug directly in!
+export interface OrbitalSatelliteHandles {
+  group: THREE.Group;
+  busGroup: THREE.Group;
+  solarLeftPivot: THREE.Group;
+  solarRightPivot: THREE.Group;
+  dishPivot: THREE.Group;
+  beaconMesh: THREE.Mesh;
+  linkBeam: THREE.Mesh;
+}
+
+export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatelliteHandles {
+  const group = new THREE.Group();
+  const busGroup = new THREE.Group();
+
+  const foilMat = new THREE.MeshStandardMaterial({
+    map: tex.foilAlbedo,
+    bumpMap: tex.foilBump,
+    bumpScale: 0.08,
+    color: 0xffffff,
+    metalness: 0.85,
+    roughness: 0.24,
+  });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.3 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.28 });
+  const solarMat = new THREE.MeshStandardMaterial({
+    map: tex.solarPanel,
+    color: 0xdbeafe,
+    metalness: 0.5,
+    roughness: 0.2,
+  });
+
+  // Octagonal Kapton Foil Bus + HERMES Magnetometer Boom
+  const busBody = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.72, 1.35, 8), foilMat);
+  busGroup.add(busBody);
+
+  const collarTop = new THREE.Mesh(new THREE.CylinderGeometry(0.74, 0.74, 0.16, 16), frameMat);
+  collarTop.position.y = 0.72;
+  busGroup.add(collarTop);
+
+  const starTracker = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 0.35, 10), darkMetal);
+  starTracker.position.set(0.45, 0.76, 0.38);
+  starTracker.rotation.x = 0.4;
+  busGroup.add(starTracker);
+
+  const hermesBoom = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.6, 8), frameMat);
+  hermesBoom.position.set(0, -1.4, 0);
+  busGroup.add(hermesBoom);
+
+  const magSensor = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), frameMat);
+  magSensor.position.set(0, -2.25, 0);
+  busGroup.add(magSensor);
+
+  const nasaPatch = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.42, 0.42),
+    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
+  );
+  nasaPatch.position.set(0, 0.05, 0.74);
+  busGroup.add(nasaPatch);
+
+  tagPart(busGroup, 'sat-bus');
+  group.add(busGroup);
+
+  // Twin Articulated Unfolding Photovoltaic Wings
+  const createWing = (dir: -1 | 1) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(dir * 0.75, 0.1, 0);
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 0.24), darkMetal);
+    yoke.position.set(dir * 0.18, 0, 0);
+    pivot.add(yoke);
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.05, 0.86), solarMat);
+    inner.position.set(dir * 1.12, 0, 0);
+    pivot.add(inner);
+    const outer = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.05, 0.86), solarMat);
+    outer.position.set(dir * 2.68, 0, 0);
+    pivot.add(outer);
+    tagPart(pivot, 'sat-solar');
+    return pivot;
+  };
+  const solarLeftPivot = createWing(-1);
+  const solarRightPivot = createWing(1);
+  group.add(solarLeftPivot, solarRightPivot);
+
+  // Gimbaled Ka-Band & Optical Laser Dish
+  const dishPivot = new THREE.Group();
+  dishPivot.position.set(0, 0.88, 0.18);
+  const dishBowl = new THREE.Mesh(
+    new THREE.SphereGeometry(0.78, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.7, roughness: 0.2, side: THREE.DoubleSide })
+  );
+  dishBowl.rotation.x = Math.PI * 0.72;
+  dishPivot.add(dishBowl);
+
+  const feedHorn = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 0.65, 8), darkMetal);
+  feedHorn.position.set(0, 0.28, 0.36);
+  feedHorn.rotation.x = Math.PI * 0.28;
+  dishPivot.add(feedHorn);
+
+  const linkBeam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.35, 16, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.42, side: THREE.DoubleSide })
+  );
+  linkBeam.rotation.x = Math.PI * 0.45;
+  linkBeam.position.set(0, 0.4, 8.2);
+  linkBeam.visible = false;
+  dishPivot.add(linkBeam);
+
+  tagPart(dishPivot, 'sat-dish');
+  group.add(dishPivot);
+
+  const beaconMesh = new THREE.Mesh(
+    new THREE.TorusGeometry(2.4, 0.09, 10, 32),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 })
+  );
+  beaconMesh.rotation.x = Math.PI / 2;
+  group.add(beaconMesh);
+
+  return { group, busGroup, solarLeftPivot, solarRightPivot, dishPivot, beaconMesh, linkBeam };
+}
+
 export interface SolarSystemHandles {
   group: THREE.Group;
   shipGroup: THREE.Group;
   shipFlame: THREE.Mesh;
   shipShieldShell: THREE.Mesh;
   stormRing: THREE.Mesh;
+  satellite: OrbitalSatelliteHandles;
+  gatewayGroup: THREE.Group;
   planets: Record<SpaceTargetId, THREE.Mesh>;
   targetBeacon: THREE.Mesh;
   courseLine: THREE.Line;
@@ -1089,29 +1997,66 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   earth.position.set(-22, -2, 26);
   group.add(earth);
 
-  // Moon, Mars, Jupiter
+  // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars
   const planets = {} as Record<SpaceTargetId, THREE.Mesh>;
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
     const spec = SOLAR_TARGETS[id];
     const mat =
       id === 'moon'
         ? new THREE.MeshStandardMaterial({ map: tex.moonAlbedo, color: 0xffffff, roughness: 0.85, metalness: 0.05 })
-        : new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.65, metalness: 0.1 });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(spec.radius, 28, 24), mat);
+        : id === 'mars'
+          ? new THREE.MeshStandardMaterial({ map: tex.marsAlbedo, color: 0xffffff, roughness: 0.82, metalness: 0.06 })
+          : new THREE.MeshStandardMaterial({
+              color: spec.color,
+              emissive: spec.color,
+              emissiveIntensity: 0.25,
+              roughness: 0.4,
+              metalness: 0.6,
+              wireframe: id === 'relay-orbit',
+            });
+    const geom =
+      id === 'relay-orbit'
+        ? new THREE.SphereGeometry(1.1, 16, 12)
+        : new THREE.SphereGeometry(spec.radius, 28, 24);
+    const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(spec.x, 0, spec.z);
+    if (id === 'gateway') mesh.visible = false; // Rendered with detailed Gateway station mesh below
     group.add(mesh);
     planets[id] = mesh;
 
-    // Orbit ring around Earth/Sun for visual clarity
     const orbitDist = Math.hypot(spec.x - sunPos.x, spec.z - sunPos.z);
     const orbit = new THREE.Mesh(
       new THREE.RingGeometry(orbitDist - 0.16, orbitDist + 0.16, 96),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.18, side: THREE.DoubleSide })
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.16, side: THREE.DoubleSide })
     );
     orbit.rotation.x = -Math.PI / 2;
     orbit.position.set(sunPos.x, -3.6, sunPos.z);
     group.add(orbit);
   });
+
+  // Lunar Gateway NRHO Multi-Module Station at gateway target coordinates
+  const gwSpec = SOLAR_TARGETS.gateway;
+  const gatewayGroup = new THREE.Group();
+  gatewayGroup.position.set(gwSpec.x, 0, gwSpec.z);
+  const gwHull = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.3 });
+  const gwGold = new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.82, roughness: 0.26 });
+  const ppe = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.72, 2.2, 12), gwGold);
+  ppe.rotation.z = Math.PI / 2;
+  const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 2.6, 12), gwHull);
+  halo.rotation.z = Math.PI / 2;
+  halo.position.x = 2.4;
+  const gwSolarL = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 4.6, 0.08),
+    new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.5, roughness: 0.2 })
+  );
+  gwSolarL.position.set(-0.2, 0, 0);
+  gatewayGroup.add(ppe, halo, gwSolarL);
+  group.add(gatewayGroup);
+
+  // Modular Orbital Satellite deployed in HERMES Relay Orbit
+  const satellite = createOrbitalSatellite(tex);
+  satellite.group.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
+  group.add(satellite.group);
 
   // Target Selection Beacon Ring
   const targetBeacon = new THREE.Mesh(
@@ -1121,7 +2066,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   targetBeacon.rotation.x = Math.PI / 2;
   group.add(targetBeacon);
 
-  // 3D Orion/ICPS Spacecraft
+  // 3D Orion / European Service Module Spacecraft
   const shipGroup = new THREE.Group();
   const hull = new THREE.Mesh(
     new THREE.CylinderGeometry(0.55, 0.72, 2.2, 16),
@@ -1139,12 +2084,17 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   shipGroup.add(nose);
 
   const wingMat = new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.4, roughness: 0.22 });
-  const wingL = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.06, 0.75), wingMat);
-  wingL.position.set(-1.6, 0, -0.3);
-  shipGroup.add(wingL);
-  const wingR = wingL.clone();
-  wingR.position.x = 1.6;
-  shipGroup.add(wingR);
+  [-1, 1].forEach((side) => {
+    const wTop = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 0.68), wingMat);
+    wTop.position.set(side * 1.55, 0.24, -0.35);
+    wTop.rotation.z = side * 0.22;
+    shipGroup.add(wTop);
+
+    const wBot = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 0.68), wingMat);
+    wBot.position.set(side * 1.55, -0.24, -0.35);
+    wBot.rotation.z = -side * 0.22;
+    shipGroup.add(wBot);
+  });
 
   const shipFlame = new THREE.Mesh(
     new THREE.ConeGeometry(0.55, 2.4, 12),
@@ -1172,5 +2122,16 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   );
   group.add(courseLine);
 
-  return { group, shipGroup, shipFlame, shipShieldShell, stormRing, planets, targetBeacon, courseLine };
+  return {
+    group,
+    shipGroup,
+    shipFlame,
+    shipShieldShell,
+    stormRing,
+    satellite,
+    gatewayGroup,
+    planets,
+    targetBeacon,
+    courseLine,
+  };
 }

@@ -23,8 +23,64 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// 12-hour in-memory cache for NASA DONKI so student/judge sessions stay snappy
+// 6-hour in-memory caches for NASA DONKI & OSDR so student/judge sessions stay snappy
 let donkiCache: { expiresAt: number; payload: unknown } | null = null;
+let osdrCache: { expiresAt: number; payload: unknown } | null = null;
+
+const CURATED_OSDR_STUDIES = [
+  {
+    accession: 'OSD-569',
+    title: 'Artemis I MARE (Helga & Zohar) Anthropomorphic Phantom Radiation Dosimetry',
+    organism: 'Human Phantom + Active/Passive Dosimeters',
+    radiationType: 'GCR & Solar Particle Event (SPE)',
+    doseThresholdMsv: 150,
+    shieldingAttenuationPct: 48,
+    keyFinding:
+      'Polyethylene/water-equivalent vest & Orion service mass reduce blood-forming organ SPE dose by ~48%.',
+    gameplayRule:
+      'Orienting water/propellant tanks toward solar flares cuts orbital & outpost radiation dose nearly in half.',
+    uri: 'https://osdr.nasa.gov/bio/repo/',
+  },
+  {
+    accession: 'OSD-612',
+    title: 'BioSentinel Deep-Space Yeast DNA Double-Strand Break Repair in Lunar Flyby',
+    organism: 'Saccharomyces cerevisiae',
+    radiationType: 'Deep-Space High-LET Ions (Outside Van Allen Belt)',
+    doseThresholdMsv: 120,
+    shieldingAttenuationPct: 35,
+    keyFinding:
+      'Outside Earth’s magnetosphere, unshielded cells accumulate double-strand DNA breaks during Solar Particle Events.',
+    gameplayRule:
+      'Deploy Gateway HERMES/ERSA warning early or boost magnetic/polyethylene shielding before SPE arrival.',
+    uri: 'https://osdr.nasa.gov/bio/repo/',
+  },
+  {
+    accession: 'OSD-489',
+    title: 'Lunar Regolith Simulant & Sintered Berm Radiation Attenuation Modeling',
+    organism: 'Biological Cell Models & Shield Phantoms',
+    radiationType: 'Secondary Neutron & Proton Scatter',
+    doseThresholdMsv: 180,
+    shieldingAttenuationPct: 62,
+    keyFinding:
+      'Packing 1.5 m+ of compacted lunar regolith over habitats blocks primary SPE protons while minimizing secondary neutron albedo.',
+    gameplayRule:
+      'Survey Anorthosite/Nobile regolith quarries to unlock +62% habitat storm berm attenuation.',
+    uri: 'https://osdr.nasa.gov/bio/repo/',
+  },
+  {
+    accession: 'OSD-366',
+    title: 'Mars Surface Cosmic-Ray Dose Profile & CO₂ / Dust Shielding Effects (MSL-RAD)',
+    organism: 'Microbial & Mammalian Analog Models',
+    radiationType: 'Galactic Cosmic Rays (0.67 mSv/day nominal, spikes during SPE)',
+    doseThresholdMsv: 210,
+    shieldingAttenuationPct: 30,
+    keyFinding:
+      'Mars’ thin CO₂ atmosphere absorbs low-energy particles, but Jezero dust storms sharply cut solar power (~35%).',
+    gameplayRule:
+      'Keep Jezero MOXIE power reserves above 35% and park in rover shelter bays during high-flux flares.',
+    uri: 'https://osdr.nasa.gov/bio/repo/',
+  },
+];
 
 async function startServer() {
   const app = express();
@@ -94,6 +150,63 @@ async function startServer() {
     }
   });
 
+  // 1b. NASA Open Science Data Repository (OSDR) Radiation & Space Biology Studies
+  app.get('/api/osdr', async (_req, res) => {
+    if (osdrCache && Date.now() < osdrCache.expiresAt) {
+      return res.json(osdrCache.payload);
+    }
+
+    try {
+      const response = await fetch(
+        'https://osdr.nasa.gov/osdr/data/search?term=radiation%20shielding&from=0&size=4&type=cgene',
+        { signal: AbortSignal.timeout(4500) }
+      );
+      if (!response.ok) throw new Error(`OSDR HTTP ${response.status}`);
+      const json = (await response.json()) as {
+        hits?: {
+          total?: number;
+          hits?: Array<{
+            _id?: string;
+            _source?: {
+              Accession?: string;
+              'Study Title'?: string;
+              organism?: string;
+            };
+          }>;
+        };
+      };
+
+      const liveHits = (json.hits?.hits || []).slice(0, 4).map((hit, idx) => {
+        const src = hit._source || {};
+        const fallback = CURATED_OSDR_STUDIES[idx % CURATED_OSDR_STUDIES.length];
+        const accession = src.Accession || hit._id || fallback.accession;
+        return {
+          ...fallback,
+          accession,
+          title: src['Study Title'] || fallback.title,
+          organism: src.organism || fallback.organism,
+          uri: `https://osdr.nasa.gov/bio/repo/data/studies/${encodeURIComponent(accession)}`,
+        };
+      });
+
+      const payload = {
+        isLive: true,
+        totalCatalogStudies: json.hits?.total || liveHits.length,
+        studies: liveHits.length > 0 ? liveHits : CURATED_OSDR_STUDIES,
+      };
+      osdrCache = { expiresAt: Date.now() + 1000 * 60 * 60 * 6, payload };
+      return res.json(payload);
+    } catch {
+      const payload = {
+        isLive: false,
+        totalCatalogStudies: CURATED_OSDR_STUDIES.length,
+        studies: CURATED_OSDR_STUDIES,
+      };
+      osdrCache = { expiresAt: Date.now() + 1000 * 60 * 15, payload };
+      return res.json(payload);
+    }
+  });
+
   // 2. Google Search Grounding for live NASA Artemis & Space Weather science briefs
   app.get('/api/nasa-grounding', async (req, res) => {
     const topic = String(req.query.topic || 'artemis').slice(0, 80);
@@ -101,11 +214,13 @@ async function startServer() {
 
     const queryMap: Record<string, string> = {
       artemis:
-        'Give a short, accurate 3-bullet kid-friendly update on NASA Artemis lunar South Pole exploration, Orion spacecraft, and lunar ice prospecting for ages 7-12.',
+        'Give a short, accurate 3-bullet kid-friendly update on NASA Artemis II–IV, Lunar Gateway, and South Pole exploration for ages 8-14.',
       radiation:
         'Give a short, accurate 3-bullet kid-friendly summary of how NASA monitors solar flares (DONKI) and protects astronauts from space radiation (OSDR).',
       rover:
         'Give a short, accurate 3-bullet kid-friendly summary of NASA VIPER lunar rover, TRIDENT ice drill, and searching for water ice on the Moon.',
+      mars:
+        'Give a short, accurate 3-bullet kid-friendly summary of NASA Mars Perseverance rover in Jezero Crater, MOXIE oxygen production, and sample caching.',
     };
 
     const prompt = queryMap[topic] || queryMap.artemis;
@@ -115,14 +230,17 @@ async function startServer() {
         grounded: false,
         summary:
           topic === 'radiation'
-            ? '• NASA Space Weather (DONKI) tracks solar flares and coronal mass ejections before radiation arrives.\n• NASA Open Science Data Repository (OSDR) studies how radiation shielding keeps astronaut cells safe.\n• Every lunar base trades electrical power against active shielding and life support.'
+            ? '• NASA Space Weather (DONKI) tracks solar flares and coronal mass ejections before radiation arrives.\n• NASA Open Science Data Repository (OSDR) studies how water, hydrogen-rich plastics, and regolith shield crew DNA.\n• Every lunar & Mars base trades electrical power against active shielding and life support.'
             : topic === 'rover'
-              ? '• NASA rovers at the Moon South Pole look inside permanently shadowed craters for trapped water ice.\n• The TRIDENT rotary-percussive drill samples up to 1 meter below the regolith in 10 cm bites.\n• Water ice can be split into breathable oxygen and rocket fuel.'
-              : '• NASA Artemis missions prepare humans to live and work sustainably at the lunar South Pole.\n• The Space Launch System (SLS) and Orion spacecraft carry crews beyond low Earth orbit.\n• High sunlit ridges provide solar power near shadowed ice-bearing craters.',
+              ? '• NASA rovers at the Moon South Pole look inside permanently shadowed craters for trapped water ice.\n• The TRIDENT rotary-percussive drill samples up to 1 meter below the regolith in 10 cm bites.\n• Water ice is split via electrolysis into breathable O₂ and LH₂ rocket propellant.'
+              : topic === 'mars'
+                ? '• Jezero Crater holds an ancient river delta where clay minerals preserved signs of past Martian water.\n• Perseverance caches core tubes while MOXIE proved astronauts can convert Martian CO₂ air into pure O₂.\n• Regional dust storms cut sunlight, testing solar vs nuclear backup planning.'
+                : '• Artemis II tests Orion and deep-space life support on a crewed lunar flyby (~10 days).\n• Artemis III & VIPER prospect South Pole water ice along sunlit ridges like Malapert next to icy craters.\n• Artemis IV expands Lunar Gateway (HERMES/IDA) to stage reusable fuel and Mars-bound hardware.',
         sources: [
           { title: 'NASA Artemis Program', uri: 'https://www.nasa.gov/humans-in-space/artemis/' },
           { title: 'NASA DONKI Space Weather', uri: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/' },
           { title: 'NASA Open Science Data Repository (OSDR)', uri: 'https://osdr.nasa.gov/' },
+          { title: 'NASA Mars Perseverance (Jezero)', uri: 'https://science.nasa.gov/mission/mars-2020-perseverance/' },
         ],
       });
     }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BriefingOverlay } from './components/BriefingOverlay';
+import { FieldNotebookModal } from './components/FieldNotebookModal';
 import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
 import { NasaDataModal } from './components/NasaDataModal';
@@ -10,15 +11,19 @@ import { TitleOverlay } from './components/TitleOverlay';
 import { VehicleInspectorOverlay } from './components/VehicleInspectorOverlay';
 import { soundSynth } from './game/audio';
 import {
-  INITIAL_OBJECTIVES,
-  LANDING_ZONES,
+  CAMPAIGN_ANOMALIES,
+  CAMPAIGN_MISSIONS,
+  CAMPAIGN_ORDER,
   PAYLOADS,
-  SOLAR_STORM_EVENTS,
   VEHICLE_CATALOG,
+  getLandingZones,
+  getPlanetObjectives,
 } from './game/constants';
 import {
-  applyOutpostDecision,
+  applyAnomalyDecision,
+  beginLaunchCountdown,
   clamp,
+  createInitialCampaignCarryover,
   createInitialLandingState,
   createInitialLaunchState,
   createInitialRoverState,
@@ -28,25 +33,27 @@ import {
   stepLaunchPhysics,
   stepRoverPhysics,
   stepSpaceFlightPhysics,
-  type OutpostDecisionId,
 } from './game/physics';
 import type {
   CameraMode,
+  CampaignCarryoverState,
+  CampaignMissionId,
   DonkiStatus,
   GamePhase,
   InputState,
   LandingGuidanceMode,
   LandingState,
   LaunchState,
-  OutpostEvent,
+  MissionAnomaly,
+  OsdrStatus,
   PayloadId,
   ResourceState,
-  RoverCollider,
   RoverDriveMode,
   RoverObjective,
   RoverState,
   SpaceFlightState,
   SpaceTargetId,
+  SurfacePlanet,
   VehicleShowcaseId,
 } from './game/types';
 import { SpaceSceneManager, type SceneSimulationBridge } from './three/SpaceSceneManager';
@@ -61,6 +68,12 @@ const DEFAULT_DONKI: DonkiStatus = {
   description: 'Fetching latest solar flare telemetry from NASA DONKI.',
 };
 
+const DEFAULT_OSDR: OsdrStatus = {
+  isLive: false,
+  totalCatalogStudies: 4,
+  studies: [],
+};
+
 const EMPTY_INPUT: InputState = {
   forward: false,
   backward: false,
@@ -69,26 +82,42 @@ const EMPTY_INPUT: InputState = {
   action: false,
   boost: false,
   tiltForward: false,
+  stabilize: false,
 };
 
-function cloneObjectives(): RoverObjective[] {
-  return INITIAL_OBJECTIVES.map((o) => ({ ...o, reward: { ...o.reward }, progress: 0, completed: false }));
+function clonePlanetObjectives(planet: SurfacePlanet): RoverObjective[] {
+  return getPlanetObjectives(planet).map((o) => ({
+    ...o,
+    reward: { ...o.reward },
+    progress: 0,
+    completed: false,
+  }));
 }
 
-function cloneEvent(): OutpostEvent {
-  return { ...SOLAR_STORM_EVENTS[0], resolvedChoice: null, scienceMultiplier: 1.0 };
+function cloneAnomalyForMission(missionId: CampaignMissionId): MissionAnomaly | null {
+  const found = CAMPAIGN_ANOMALIES.find((a) => a.missionId === missionId);
+  if (!found) return null;
+  return {
+    ...found,
+    choices: found.choices.map((c) => ({ ...c, deltaResources: { ...c.deltaResources } })),
+    resolvedChoiceId: null,
+    resolvedSummary: null,
+  };
 }
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneMgrRef = useRef<SpaceSceneManager | null>(null);
-  const collidersRef = useRef<RoverCollider[]>([]);
 
   const isAutostart =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autostart') === '1';
 
+  const carryoverRef = useRef<CampaignCarryoverState>(createInitialCampaignCarryover());
+
   const simRef = useRef<SceneSimulationBridge>({
     phase: isAutostart ? 'launch' : 'title',
+    campaignMission: 'artemis-2',
+    planet: 'moon',
     paused: false,
     cameraMode: 'chase',
     showcase: 'outpost',
@@ -99,23 +128,24 @@ export default function App() {
     orbitDistance: 24,
     activeDrillingId: null,
     launch: createInitialLaunchState(),
-    space: createInitialSpaceFlightState(),
-    landing: createInitialLandingState(PAYLOADS['oxygen-tanks'].massMultiplier),
-    rover: createInitialRoverState(),
+    space: createInitialSpaceFlightState('artemis-2'),
+    landing: createInitialLandingState(PAYLOADS['oxygen-tanks'].massMultiplier, 'moon'),
+    rover: createInitialRoverState(6, 6, 'moon'),
     resources: { power: 75, oxygen: 75, shield: 70 },
-    objectives: cloneObjectives(),
+    objectives: clonePlanetObjectives('moon'),
     input: { ...EMPTY_INPUT },
   });
 
   const payloadRef = useRef<PayloadId>('oxygen-tanks');
   const scoreRef = useRef<number>(0);
-  const outpostEventRef = useRef<OutpostEvent | null>(null);
-  const roverTimerRef = useRef<number>(0);
+  const activeAnomalyRef = useRef<MissionAnomaly | null>(null);
+  const phaseTimerRef = useRef<number>(0);
   const scienceMultRef = useRef<number>(1.0);
   const discoveryObjRef = useRef<RoverObjective | null>(null);
   const failReasonRef = useRef<string>('');
   const lastUiSyncRef = useRef<number>(0);
   const lastDrillSoundRef = useRef<number>(0);
+  const launchPrevCountdownDigitRef = useRef<number>(4);
 
   const [phase, setPhase] = useState<GamePhase>(simRef.current.phase);
   const [paused, setPaused] = useState<boolean>(false);
@@ -125,15 +155,19 @@ export default function App() {
   const [highlightedPart, setHighlightedPart] = useState<string | null>(null);
   const [selectedPayload, setSelectedPayload] = useState<PayloadId>('oxygen-tanks');
   const [donki, setDonki] = useState<DonkiStatus>(DEFAULT_DONKI);
+  const [osdr, setOsdr] = useState<OsdrStatus>(DEFAULT_OSDR);
   const [nasaModalOpen, setNasaModalOpen] = useState<boolean>(false);
+  const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
+  const [mapExpanded, setMapExpanded] = useState<boolean>(false);
 
+  const [carryoverUi, setCarryoverUi] = useState<CampaignCarryoverState>(carryoverRef.current);
   const [launchUi, setLaunchUi] = useState<LaunchState>(simRef.current.launch);
   const [spaceUi, setSpaceUi] = useState<SpaceFlightState>(simRef.current.space);
   const [landingUi, setLandingUi] = useState<LandingState>(simRef.current.landing);
   const [roverUi, setRoverUi] = useState<RoverState>(simRef.current.rover);
   const [resourcesUi, setResourcesUi] = useState<ResourceState>(simRef.current.resources);
   const [objectivesUi, setObjectivesUi] = useState<RoverObjective[]>(simRef.current.objectives);
-  const [activeEventUi, setActiveEventUi] = useState<OutpostEvent | null>(null);
+  const [activeAnomalyUi, setActiveAnomalyUi] = useState<MissionAnomaly | null>(null);
   const [discoveryObjUi, setDiscoveryObjUi] = useState<RoverObjective | null>(null);
   const [scoreUi, setScoreUi] = useState<number>(0);
   const [failReason, setFailReason] = useState<string>('');
@@ -145,16 +179,41 @@ export default function App() {
     setCameraMode(s.cameraMode);
     setShowcase(s.showcase);
     setHighlightedPart(s.highlightedPart);
+    setCarryoverUi({
+      ...carryoverRef.current,
+      completedMissions: [...carryoverRef.current.completedMissions],
+      unlockedFieldNotes: [...carryoverRef.current.unlockedFieldNotes],
+      solvedAnomalies: [...carryoverRef.current.solvedAnomalies],
+    });
     setLaunchUi({ ...s.launch });
-    setSpaceUi({ ...s.space });
+    setSpaceUi({ ...s.space, orbitalSat: { ...s.space.orbitalSat } });
     setLandingUi({ ...s.landing });
     setRoverUi({ ...s.rover });
     setResourcesUi({ ...s.resources });
     setObjectivesUi(s.objectives.map((o) => ({ ...o })));
-    setActiveEventUi(outpostEventRef.current ? { ...outpostEventRef.current } : null);
+    setActiveAnomalyUi(activeAnomalyRef.current ? { ...activeAnomalyRef.current } : null);
     setDiscoveryObjUi(discoveryObjRef.current ? { ...discoveryObjRef.current } : null);
     setScoreUi(scoreRef.current);
     setFailReason(failReasonRef.current);
+  }, []);
+
+  const unlockFieldNote = useCallback((noteId?: string) => {
+    if (!noteId) return;
+    if (!carryoverRef.current.unlockedFieldNotes.includes(noteId)) {
+      carryoverRef.current = {
+        ...carryoverRef.current,
+        unlockedFieldNotes: [...carryoverRef.current.unlockedFieldNotes, noteId],
+      };
+    }
+  }, []);
+
+  const markMissionComplete = useCallback((id: CampaignMissionId) => {
+    if (!carryoverRef.current.completedMissions.includes(id)) {
+      carryoverRef.current = {
+        ...carryoverRef.current,
+        completedMissions: [...carryoverRef.current.completedMissions, id],
+      };
+    }
   }, []);
 
   // Update body[data-state] for deterministic automation/accessibility state checks
@@ -162,11 +221,11 @@ export default function App() {
     let bodyState = 'playing';
     if (phase === 'title') bodyState = 'title';
     else if (phase === 'gameover' || phase === 'victory') bodyState = 'gameover';
-    else if (paused || nasaModalOpen || discoveryObjUi) bodyState = 'paused';
+    else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi) bodyState = 'paused';
     document.body.dataset.state = bodyState;
-  }, [phase, paused, nasaModalOpen, discoveryObjUi]);
+  }, [phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi]);
 
-  // Fetch live NASA DONKI solar flare telemetry
+  // Fetch live NASA DONKI + OSDR telemetry
   useEffect(() => {
     fetch('/api/donki')
       .then((r) => r.json())
@@ -176,28 +235,56 @@ export default function App() {
         simRef.current.donkiFlareActive = flareHeavy;
       })
       .catch(() => {});
+
+    fetch('/api/osdr')
+      .then((r) => r.json())
+      .then((data: OsdrStatus) => {
+        setOsdr(data);
+      })
+      .catch(() => {});
   }, []);
 
   const applyPayloadBonus = useCallback((id: PayloadId): ResourceState => {
     const p = PAYLOADS[id];
+    const solarBonus = Math.min(18, Math.round(carryoverRef.current.solarGridKw * 0.25));
+    const bermBonus = Math.min(16, carryoverRef.current.regolithShieldLevel * 8);
     return {
-      power: clamp(75 + (p.bonus.power || 0), 0, 100),
+      power: clamp(75 + (p.bonus.power || 0) + solarBonus, 0, 100),
       oxygen: clamp(75 + (p.bonus.oxygen || 0), 0, 100),
-      shield: clamp(70 + (p.bonus.shield || 0), 0, 100),
+      shield: clamp(70 + (p.bonus.shield || 0) + bermBonus, 0, 100),
     };
   }, []);
 
+  const selectCampaignMission = useCallback(
+    (id: CampaignMissionId) => {
+      const spec = CAMPAIGN_MISSIONS[id];
+      carryoverRef.current = {
+        ...carryoverRef.current,
+        activeMission: id,
+      };
+      simRef.current.campaignMission = id;
+      simRef.current.planet = spec.planet;
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
   const jumpToPhase = useCallback(
-    (targetPhase: GamePhase) => {
+    (targetPhase: GamePhase, planetOverride?: SurfacePlanet) => {
       soundSynth.init();
       soundSynth.playClick();
       const s = simRef.current;
       const payload = PAYLOADS[payloadRef.current];
+      const activeSpec = CAMPAIGN_MISSIONS[carryoverRef.current.activeMission];
+      const targetPlanet = planetOverride || activeSpec.planet || s.planet;
 
       s.paused = false;
+      s.planet = targetPlanet;
       s.input = { ...EMPTY_INPUT };
       s.activeDrillingId = null;
       discoveryObjRef.current = null;
+      activeAnomalyRef.current = null;
+      phaseTimerRef.current = 0;
       failReasonRef.current = '';
 
       if (targetPhase === 'title') {
@@ -208,7 +295,9 @@ export default function App() {
       } else if (targetPhase === 'inspector') {
         s.phase = 'inspector';
         s.showcase = 'rocket';
-        s.highlightedPart = VEHICLE_CATALOG.rocket.parts[0].id;
+        const firstPart = VEHICLE_CATALOG.rocket.parts[0];
+        s.highlightedPart = firstPart.id;
+        unlockFieldNote(firstPart.unlockNoteId);
         s.orbitYaw = 0.65;
         s.orbitPitch = 0.15;
         s.orbitDistance = 35;
@@ -220,43 +309,73 @@ export default function App() {
       } else if (targetPhase === 'launch') {
         s.phase = 'launch';
         s.resources = applyPayloadBonus(payloadRef.current);
-        s.launch = createInitialLaunchState();
+        s.launch = createInitialLaunchState(s.launch.autoGuidance);
+        launchPrevCountdownDigitRef.current = 4;
         scoreRef.current = 0;
+        soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'space') {
         s.phase = 'space';
         s.resources = applyPayloadBonus(payloadRef.current);
-        s.space = createInitialSpaceFlightState();
+        s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
       } else if (targetPhase === 'landing') {
         s.phase = 'landing';
         s.cameraMode = 'chase';
         s.resources = applyPayloadBonus(payloadRef.current);
-        s.landing = createInitialLandingState(payload.massMultiplier);
+        s.landing = createInitialLandingState(
+          payload.massMultiplier,
+          targetPlanet,
+          carryoverRef.current.isruFuelBonusPct
+        );
       } else if (targetPhase === 'rover') {
         s.phase = 'rover';
         s.cameraMode = 'chase';
         s.resources = applyPayloadBonus(payloadRef.current);
-        s.rover = createInitialRoverState(6, 6);
-        s.objectives = cloneObjectives();
-        outpostEventRef.current = null;
-        roverTimerRef.current = 0;
+        s.rover = createInitialRoverState(6, 6, targetPlanet);
+        s.objectives = clonePlanetObjectives(targetPlanet);
         scienceMultRef.current = 1.0;
       }
       syncUiNow();
     },
-    [applyPayloadBonus, syncUiNow]
+    [applyPayloadBonus, syncUiNow, unlockFieldNote]
   );
+
+  const startActiveMission = useCallback(() => {
+    const spec = CAMPAIGN_MISSIONS[carryoverRef.current.activeMission];
+    scoreRef.current = 0;
+    jumpToPhase(spec.startPhase, spec.planet);
+  }, [jumpToPhase]);
 
   // Per-frame physics + game progression loop
   const onFrameTick = useCallback(
     (dt: number) => {
       const s = simRef.current;
-      if (s.paused || nasaModalOpen || discoveryObjRef.current) {
+      if (s.paused || nasaModalOpen || fieldNotebookOpen || discoveryObjRef.current) {
         soundSynth.setThrustVolume(0);
         return;
       }
 
       if (s.phase === 'launch') {
-        s.launch = stepLaunchPhysics(s.launch, s.input, dt);
+        const prevSeq = s.launch.launchSequence;
+        const launchInput =
+          prevSeq === 'PRE_SIM' || prevSeq === 'COUNTDOWN'
+            ? { ...s.input, forward: false, action: false, stabilize: false }
+            : s.input;
+        s.launch = stepLaunchPhysics(s.launch, launchInput, dt);
+
+        if (s.launch.launchSequence === 'COUNTDOWN') {
+          const digit = Math.max(1, Math.ceil(s.launch.countdownSec));
+          if (digit !== launchPrevCountdownDigitRef.current) {
+            launchPrevCountdownDigitRef.current = digit;
+            soundSynth.playCountdownBeep(false);
+          }
+        } else if (prevSeq === 'COUNTDOWN' && s.launch.launchSequence === 'READY') {
+          soundSynth.playCountdownBeep(true);
+          syncUiNow();
+        } else if (prevSeq === 'READY' && s.launch.launchSequence === 'ASCENDING') {
+          soundSynth.playIgnitionRoar();
+          syncUiNow();
+        }
+
         soundSynth.setThrustVolume(s.launch.ignited && s.launch.fuelPct > 0 ? s.launch.throttle : 0);
 
         if (s.launch.orbitReached) {
@@ -264,20 +383,54 @@ export default function App() {
           soundSynth.playSuccess();
           scoreRef.current += 500;
           s.phase = 'space';
-          s.space = createInitialSpaceFlightState();
+          phaseTimerRef.current = 0;
+          activeAnomalyRef.current = null;
+          s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
           syncUiNow();
           return;
         }
       } else if (s.phase === 'space') {
         const prevTargets = s.space.visitedTargets.length;
+        const prevSatLocked = s.space.orbitalSat.linkLocked;
         const result = stepSpaceFlightPhysics(s.space, s.resources, s.input, s.donkiFlareActive, dt);
         s.space = result.space;
         s.resources = result.resources;
-        if (s.space.visitedTargets.length > prevTargets) {
+        phaseTimerRef.current += dt;
+
+        // Trigger orbital Applied Knowledge Anomaly in Artemis II or Artemis IV
+        if (
+          !activeAnomalyRef.current &&
+          (s.campaignMission === 'artemis-2' || s.campaignMission === 'artemis-4') &&
+          phaseTimerRef.current > 2.8
+        ) {
+          const anom = cloneAnomalyForMission(s.campaignMission);
+          if (anom && !carryoverRef.current.solvedAnomalies.includes(anom.id)) {
+            activeAnomalyRef.current = anom;
+            soundSynth.playTone(440, 0.25, 'triangle', 0.16);
+            syncUiNow();
+          }
+        }
+
+        if (!prevSatLocked && s.space.orbitalSat.linkLocked) {
+          scoreRef.current += 650;
+          carryoverRef.current = {
+            ...carryoverRef.current,
+            relaySatelliteOnline: true,
+            highResMapUnlocked: true,
+          };
+          unlockFieldNote('note-hermes-relay');
+          soundSynth.playSuccess();
+          syncUiNow();
+        } else if (s.space.visitedTargets.length > prevTargets) {
           scoreRef.current += 300;
           soundSynth.playSuccess();
+          syncUiNow();
         }
-        const thrustOn = (s.input.forward || (s.space.autoPilot && !s.space.arrivedMoon)) && s.space.fuelPct > 0;
+
+        const thrustOn =
+          (s.input.forward ||
+            (s.space.autoPilot && !s.space.arrivedMoon && !s.space.arrivedMars && !s.space.arrivedGateway)) &&
+          s.space.fuelPct > 0;
         soundSynth.setThrustVolume(thrustOn ? (s.space.boostActive ? 0.75 : 0.45) : 0);
 
         if (s.resources.shield <= 0) {
@@ -297,7 +450,10 @@ export default function App() {
           soundSynth.setThrustVolume(0);
           if (s.landing.result === 'crash') {
             soundSynth.playCrash();
-            failReasonRef.current = 'Lunar touchdown was too fast or tilted! Brake earlier next time.';
+            failReasonRef.current =
+              s.landing.planet === 'mars'
+                ? 'Mars Jezero touchdown was too fast or tilted! 0.38g demands earlier braking.'
+                : 'Lunar touchdown was too fast or tilted! Brake earlier next time.';
             s.phase = 'gameover';
             syncUiNow();
             return;
@@ -306,19 +462,20 @@ export default function App() {
           if (s.landing.result === 'hard' && payload.fragile) {
             s.resources.power = clamp(s.resources.power - 25, 10, 100);
           }
-          if (s.landing.targetZoneId === 2 && s.landing.distToPad <= LANDING_ZONES[2].radius + 3.5) {
+          const zones = getLandingZones(s.landing.planet);
+          if (s.landing.targetZoneId === 2 && s.landing.distToPad <= zones[2].radius + 3.5) {
             s.resources.power = clamp(s.resources.power + 20, 0, 100);
           }
           scoreRef.current += s.landing.score;
           soundSynth.playSuccess();
 
-          // Enter Rover & Base phase at landing coordinates (clamped safe from habitat)
-          const startX = clamp(s.landing.x + 5, -75, 75);
-          const startZ = clamp(s.landing.z + 5, -75, 75);
-          s.rover = createInitialRoverState(startX, startZ);
-          s.objectives = cloneObjectives();
-          outpostEventRef.current = null;
-          roverTimerRef.current = 0;
+          const startX = clamp(s.landing.x + 5, -120, 120);
+          const startZ = clamp(s.landing.z + 5, -120, 120);
+          s.planet = s.landing.planet;
+          s.rover = createInitialRoverState(startX, startZ, s.landing.planet);
+          s.objectives = clonePlanetObjectives(s.landing.planet);
+          activeAnomalyRef.current = null;
+          phaseTimerRef.current = 0;
           scienceMultRef.current = 1.0;
           s.phase = 'rover';
           syncUiNow();
@@ -326,29 +483,38 @@ export default function App() {
         }
       } else if (s.phase === 'rover') {
         soundSynth.setThrustVolume(0);
-        s.rover = stepRoverPhysics(s.rover, s.input, collidersRef.current, dt);
-        roverTimerRef.current += dt;
+        const colliders = sceneMgrRef.current?.getSurfaceColliders(s.rover.planet) || [];
+        s.rover = stepRoverPhysics(s.rover, s.input, colliders, dt);
+        phaseTimerRef.current += dt;
 
-        // Trigger Solar Flare Trade-Off Event once after 4 seconds on the Moon
-        if (!outpostEventRef.current && roverTimerRef.current > 4.0) {
-          outpostEventRef.current = cloneEvent();
-          soundSynth.playTone(440, 0.25, 'triangle', 0.16);
-          syncUiNow();
+        // Trigger Surface Applied Knowledge Anomaly after 4 seconds on Moon or Mars
+        if (!activeAnomalyRef.current && phaseTimerRef.current > 4.0) {
+          const missionKey: CampaignMissionId =
+            s.rover.planet === 'mars' ? 'mars-pathfinder' : 'artemis-3';
+          const anom = cloneAnomalyForMission(missionKey);
+          if (anom && !carryoverRef.current.solvedAnomalies.includes(anom.id)) {
+            activeAnomalyRef.current = anom;
+            soundSynth.playTone(440, 0.25, 'triangle', 0.16);
+            syncUiNow();
+          }
         }
 
-        // Gentle survival resource drain so trade-offs matter without stressing young players
-        const flareDrain = s.donkiFlareActive ? 0.45 : 0.2;
-        s.resources.oxygen = clamp(s.resources.oxygen - 0.55 * dt, 0, 100);
+        // Survival trade-offs: regolith berm cuts shield drain; Mars dust shades solar output
+        const bermFactor = Math.max(0.45, 1 - carryoverRef.current.regolithShieldLevel * 0.25);
+        const flareDrain = (s.donkiFlareActive ? 0.42 : 0.18) * bermFactor;
+        const dustPenalty = s.rover.planet === 'mars' ? (s.rover.dustAccumulationPct / 100) * 0.35 : 0;
+
+        s.resources.oxygen = clamp(s.resources.oxygen - 0.48 * dt, 0, 100);
         s.resources.power = clamp(
-          s.resources.power - (s.rover.headlightsOn ? 0.42 : 0.28) * dt,
+          s.resources.power - ((s.rover.headlightsOn ? 0.38 : 0.24) + dustPenalty) * dt,
           0,
           100
         );
         s.resources.shield = clamp(s.resources.shield - flareDrain * dt, 0, 100);
 
-        // Science Drilling Check
+        // Science Drilling / Coring Check
         const nearest = s.objectives.find(
-          (o) => !o.completed && Math.hypot(o.x - s.rover.x, o.z - s.rover.z) < 6.4
+          (o) => !o.completed && Math.hypot(o.x - s.rover.x, o.z - s.rover.z) < 6.8
         );
         if (nearest && s.input.action) {
           s.activeDrillingId = nearest.id;
@@ -370,12 +536,31 @@ export default function App() {
             s.resources.oxygen = clamp(s.resources.oxygen + (nearest.reward.oxygen || 0), 0, 100);
             s.resources.shield = clamp(s.resources.shield + (nearest.reward.shield || 0), 0, 100);
             scoreRef.current += 800;
+
+            // Persist ISRU + Field Note Reuse Carryover
+            carryoverRef.current = {
+              ...carryoverRef.current,
+              isruWaterKg: carryoverRef.current.isruWaterKg + (nearest.isruWaterGainKg || 0),
+              isruFuelBonusPct: Math.min(
+                45,
+                carryoverRef.current.isruFuelBonusPct + (nearest.isruFuelGainPct || 0)
+              ),
+              solarGridKw: carryoverRef.current.solarGridKw + (nearest.solarGainKw || 0),
+              regolithShieldLevel:
+                carryoverRef.current.regolithShieldLevel + (nearest.shieldLevelGain || 0),
+              marsSamplesCached:
+                carryoverRef.current.marsSamplesCached + (nearest.marsSamplesGain || 0),
+            };
+            unlockFieldNote(nearest.unlockNoteId);
             soundSynth.playSuccess();
 
             const allDone = s.objectives.every((o) => o.completed);
             if (allDone) {
               scoreRef.current += Math.round(
                 (s.resources.power + s.resources.oxygen + s.resources.shield) * 8
+              );
+              markMissionComplete(
+                s.rover.planet === 'mars' ? 'mars-pathfinder' : 'artemis-3'
               );
               s.phase = 'victory';
             } else {
@@ -392,9 +577,9 @@ export default function App() {
           soundSynth.playCrash();
           failReasonRef.current =
             s.resources.oxygen <= 0
-              ? 'Outpost Oxygen ran out! Complete Ice Drill objectives or boost life support.'
+              ? 'Outpost Oxygen ran out! Complete Ice/MOXIE objectives or manage O₂.'
               : s.resources.power <= 0
-                ? 'Outpost Power depleted! Survey the Solar Ridge to recharge.'
+                ? 'Outpost Power depleted! Survey ridges to recharge & clean dust.'
                 : 'Radiation Shield failed during solar activity!';
           s.phase = 'gameover';
           syncUiNow();
@@ -409,14 +594,14 @@ export default function App() {
       if (now - lastUiSyncRef.current > 100) {
         lastUiSyncRef.current = now;
         setLaunchUi({ ...s.launch });
-        setSpaceUi({ ...s.space });
+        setSpaceUi({ ...s.space, orbitalSat: { ...s.space.orbitalSat } });
         setLandingUi({ ...s.landing });
         setRoverUi({ ...s.rover });
         setResourcesUi({ ...s.resources });
         setObjectivesUi(s.objectives.map((o) => ({ ...o })));
       }
     },
-    [nasaModalOpen, syncUiNow]
+    [fieldNotebookOpen, markMissionComplete, nasaModalOpen, syncUiNow, unlockFieldNote]
   );
 
   // Mount Three.js Scene Manager
@@ -425,7 +610,6 @@ export default function App() {
     if (!el) return;
     const mgr = new SpaceSceneManager(el, simRef, onFrameTick);
     sceneMgrRef.current = mgr;
-    collidersRef.current = mgr.getLunarColliders();
 
     return () => {
       mgr.dispose();
@@ -445,13 +629,22 @@ export default function App() {
       if (code === 'KeyS' || code === 'ArrowDown') inp.backward = down;
       if (code === 'KeyA' || code === 'ArrowLeft') inp.left = down;
       if (code === 'KeyD' || code === 'ArrowRight') inp.right = down;
-      if (code === 'Space' || code === 'KeyE') inp.action = down;
+      if (code === 'Space' || code === 'KeyE') {
+        inp.action = down;
+        if (code === 'Space') {
+          inp.stabilize = down;
+        }
+      }
       if (code === 'ShiftLeft' || code === 'ShiftRight') inp.boost = down;
       if (code === 'KeyQ') inp.tiltForward = down;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+      if (!document.hasFocus()) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) {
         e.preventDefault();
       }
       soundSynth.init();
@@ -463,8 +656,19 @@ export default function App() {
         return;
       }
 
+      if (e.code === 'Tab' && !e.repeat && s.phase === 'rover') {
+        setMapExpanded((prev) => !prev);
+        return;
+      }
+
       if (e.code === 'Escape' || e.code === 'KeyP') {
-        if (s.phase !== 'title' && s.phase !== 'briefing' && s.phase !== 'inspector' && s.phase !== 'victory' && s.phase !== 'gameover') {
+        if (
+          s.phase !== 'title' &&
+          s.phase !== 'briefing' &&
+          s.phase !== 'inspector' &&
+          s.phase !== 'victory' &&
+          s.phase !== 'gameover'
+        ) {
           s.paused = !s.paused;
           syncUiNow();
         }
@@ -476,10 +680,28 @@ export default function App() {
         return;
       }
 
-      if (s.phase === 'launch' && e.code === 'Space' && !e.repeat) {
-        s.launch = separateLaunchStage(s.launch);
-        soundSynth.playStageSep();
+      if (s.phase === 'launch' && e.code === 'KeyR' && !e.repeat) {
+        s.input = { ...EMPTY_INPUT };
+        s.launch = createInitialLaunchState(s.launch.autoGuidance);
+        launchPrevCountdownDigitRef.current = 4;
+        soundSynth.setThrustVolume(0);
         syncUiNow();
+        return;
+      }
+
+      if (
+        s.phase === 'launch' &&
+        e.code === 'Space' &&
+        !e.repeat &&
+        s.launch.launchSequence === 'ASCENDING'
+      ) {
+        const prev = s.launch;
+        const next = separateLaunchStage(prev);
+        if (next.srbSeparated !== prev.srbSeparated || next.coreSeparated !== prev.coreSeparated) {
+          s.launch = next;
+          soundSynth.playStageSep();
+          syncUiNow();
+        }
       }
 
       if (e.code === 'KeyC' && !e.repeat && (s.phase === 'landing' || s.phase === 'rover')) {
@@ -567,7 +789,11 @@ export default function App() {
   }, [jumpToPhase, syncUiNow]);
 
   // Drag-to-orbit camera handler on canvas container
-  const dragStateRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+  const dragStateRef = useRef<{ active: boolean; x: number; y: number }>({
+    active: false,
+    x: 0,
+    y: 0,
+  });
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     dragStateRef.current = { active: true, x: e.clientX, y: e.clientY };
   };
@@ -597,12 +823,48 @@ export default function App() {
     setMuted(next);
   };
 
+  const handleResolveAnomaly = useCallback(
+    (anomalyId: string, choiceId: string) => {
+      const out = applyAnomalyDecision(
+        simRef.current.resources,
+        carryoverRef.current,
+        anomalyId,
+        choiceId
+      );
+      simRef.current.resources = out.resources;
+      carryoverRef.current = out.carryover;
+      scienceMultRef.current = out.scienceMultiplier;
+      if (out.isOptimal) {
+        scoreRef.current += 400;
+      }
+      if (activeAnomalyRef.current) {
+        activeAnomalyRef.current = {
+          ...activeAnomalyRef.current,
+          resolvedChoiceId: choiceId,
+          resolvedSummary: out.summary,
+        };
+      }
+      soundSynth.playSuccess();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
   const nearestObjective =
     phase === 'rover'
       ? objectivesUi.find(
-          (o) => !o.completed && Math.hypot(o.x - roverUi.x, o.z - roverUi.z) < 6.4
+          (o) => !o.completed && Math.hypot(o.x - roverUi.x, o.z - roverUi.z) < 6.8
         ) || null
       : null;
+
+  const activeIdx = CAMPAIGN_ORDER.indexOf(carryoverUi.activeMission);
+  const nextMissionId =
+    activeIdx >= 0 && activeIdx < CAMPAIGN_ORDER.length - 1
+      ? CAMPAIGN_ORDER[activeIdx + 1]
+      : null;
+  const nextMissionLabel = nextMissionId
+    ? `Next: ${CAMPAIGN_MISSIONS[nextMissionId].shortLabel}`
+    : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-950">
@@ -619,14 +881,16 @@ export default function App() {
       {phase === 'title' && (
         <TitleOverlay
           showcase={showcase}
+          carryover={carryoverUi}
           onSelectShowcase={(v) => {
             simRef.current.showcase = v;
             setShowcase(v);
           }}
+          onSelectCampaignMission={selectCampaignMission}
           onStartMission={() => jumpToPhase('briefing')}
-          onJumpToPhase={jumpToPhase}
+          onJumpToPhase={(p) => jumpToPhase(p)}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
           onOpenNasaModal={() => setNasaModalOpen(true)}
-          donki={donki}
           muted={muted}
           onToggleMute={toggleMute}
         />
@@ -636,51 +900,108 @@ export default function App() {
         <VehicleInspectorOverlay
           showcase={showcase}
           selectedPartId={highlightedPart}
+          unlockedNotes={carryoverUi.unlockedFieldNotes}
           onSelectVehicle={(v) => {
             simRef.current.showcase = v;
             simRef.current.orbitDistance =
               v === 'rocket' ? 35 : v === 'outpost' ? 24 : v === 'rover' ? 6.2 : 11;
+            const firstPart = VEHICLE_CATALOG[v].parts[0];
+            simRef.current.highlightedPart = firstPart.id;
+            unlockFieldNote(firstPart.unlockNoteId);
             setShowcase(v);
+            syncUiNow();
           }}
           onSelectPart={(id) => {
             simRef.current.highlightedPart = id;
+            const part = VEHICLE_CATALOG[showcase].parts.find((p) => p.id === id);
+            unlockFieldNote(part?.unlockNoteId);
             setHighlightedPart(id);
+            syncUiNow();
           }}
           onBackTitle={() => jumpToPhase('title')}
           onStartMission={() => jumpToPhase('briefing')}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
       {phase === 'briefing' && (
         <BriefingOverlay
           selectedPayload={selectedPayload}
+          carryover={carryoverUi}
+          onSelectCampaignMission={selectCampaignMission}
           onSelectPayload={(id) => {
             payloadRef.current = id;
             setSelectedPayload(id);
           }}
           resources={{ power: 75, oxygen: 75, shield: 70 }}
           donki={donki}
+          osdr={osdr}
           onBack={() => jumpToPhase('title')}
-          onLaunch={() => jumpToPhase('launch')}
+          onLaunch={startActiveMission}
           onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
       {phase === 'launch' && (
         <LaunchHUD
           launch={launchUi}
+          resources={resourcesUi}
           muted={muted}
           onToggleMute={toggleMute}
           onPause={() => {
             simRef.current.paused = true;
             syncUiNow();
           }}
+          onResetLaunch={() => {
+            soundSynth.init();
+            soundSynth.playClick();
+            soundSynth.setThrustVolume(0);
+            simRef.current.input = { ...EMPTY_INPUT };
+            simRef.current.launch = createInitialLaunchState(simRef.current.launch.autoGuidance);
+            launchPrevCountdownDigitRef.current = 4;
+            syncUiNow();
+          }}
+          onBeginSimulation={() => {
+            soundSynth.init();
+            soundSynth.playClick();
+            simRef.current.launch = beginLaunchCountdown(simRef.current.launch);
+            launchPrevCountdownDigitRef.current = 3;
+            soundSynth.playCountdownBeep(false);
+            syncUiNow();
+          }}
+          onStartLaunch={() => {
+            soundSynth.init();
+            const prev = simRef.current.launch;
+            if (prev.launchSequence === 'READY') {
+              simRef.current.launch = stepLaunchPhysics(
+                prev,
+                { ...EMPTY_INPUT, forward: true },
+                0.016
+              );
+              soundSynth.playIgnitionRoar();
+              syncUiNow();
+            }
+          }}
           onSeparateStage={() => {
-            simRef.current.launch = separateLaunchStage(simRef.current.launch);
-            soundSynth.playStageSep();
+            const prev = simRef.current.launch;
+            const next = separateLaunchStage(prev);
+            if (
+              next.srbSeparated !== prev.srbSeparated ||
+              next.coreSeparated !== prev.coreSeparated
+            ) {
+              simRef.current.launch = next;
+              soundSynth.playStageSep();
+              syncUiNow();
+            }
+          }}
+          onToggleAutoGuidance={() => {
+            simRef.current.launch.autoGuidance = !simRef.current.launch.autoGuidance;
             syncUiNow();
           }}
           onSkipToSpace={() => jumpToPhase('space')}
+          onJumpToPhase={(p) => jumpToPhase(p)}
+          onOpenNasaModal={() => setNasaModalOpen(true)}
         />
       )}
 
@@ -688,6 +1009,9 @@ export default function App() {
         <SpaceFlightHUD
           space={spaceUi}
           resources={resourcesUi}
+          campaignMission={carryoverUi.activeMission}
+          carryover={carryoverUi}
+          activeAnomaly={activeAnomalyUi}
           muted={muted}
           onToggleMute={toggleMute}
           onPause={() => {
@@ -706,13 +1030,33 @@ export default function App() {
             simRef.current.space.shieldBoostActive = !simRef.current.space.shieldBoostActive;
             syncUiNow();
           }}
-          onEnterLunarOrbit={() => jumpToPhase('landing')}
+          onCompleteSatelliteMission={() => {
+            soundSynth.setThrustVolume(0);
+            soundSynth.playSuccess();
+            scoreRef.current += 900;
+            markMissionComplete('artemis-2');
+            simRef.current.phase = 'victory';
+            syncUiNow();
+          }}
+          onCompleteGatewayMission={() => {
+            soundSynth.setThrustVolume(0);
+            soundSynth.playSuccess();
+            scoreRef.current += 1100;
+            markMissionComplete('artemis-4');
+            simRef.current.phase = 'victory';
+            syncUiNow();
+          }}
+          onEnterLunarOrbit={() => jumpToPhase('landing', 'moon')}
+          onEnterMarsOrbit={() => jumpToPhase('landing', 'mars')}
+          onResolveAnomaly={handleResolveAnomaly}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
       {phase === 'landing' && (
         <LandingHUD
           landing={landingUi}
+          isruFuelBonusPct={carryoverUi.isruFuelBonusPct}
           cameraMode={cameraMode}
           muted={muted}
           onToggleMute={toggleMute}
@@ -722,7 +1066,8 @@ export default function App() {
           }}
           onCycleCamera={() => {
             const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            simRef.current.cameraMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            simRef.current.cameraMode =
+              order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
             syncUiNow();
           }}
           onSelectZone={(id) => {
@@ -741,18 +1086,22 @@ export default function App() {
           rover={roverUi}
           resources={resourcesUi}
           objectives={objectivesUi}
-          activeEvent={activeEventUi}
+          carryover={carryoverUi}
+          activeAnomaly={activeAnomalyUi}
           nearestObjective={nearestObjective}
           cameraMode={cameraMode}
+          mapExpanded={mapExpanded}
           muted={muted}
           onToggleMute={toggleMute}
+          onToggleMap={() => setMapExpanded((prev) => !prev)}
           onPause={() => {
             simRef.current.paused = true;
             syncUiNow();
           }}
           onCycleCamera={() => {
             const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            simRef.current.cameraMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            simRef.current.cameraMode =
+              order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
             syncUiNow();
           }}
           onSetDriveMode={(mode: RoverDriveMode) => {
@@ -767,17 +1116,9 @@ export default function App() {
             simRef.current.rover.headlightsOn = !simRef.current.rover.headlightsOn;
             syncUiNow();
           }}
-          onResolveEvent={(choice: OutpostDecisionId) => {
-            const out = applyOutpostDecision(simRef.current.resources, choice);
-            simRef.current.resources = out.resources;
-            scienceMultRef.current = out.scienceMultiplier;
-            if (outpostEventRef.current) {
-              outpostEventRef.current.resolvedChoice = out.summary;
-            }
-            soundSynth.playSuccess();
-            syncUiNow();
-          }}
+          onResolveAnomaly={handleResolveAnomaly}
           onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
@@ -802,11 +1143,21 @@ export default function App() {
           reason={failReason}
           score={scoreUi}
           resources={resourcesUi}
+          carryover={carryoverUi}
+          nextMissionLabel={nextMissionLabel}
           onResume={
             paused
               ? () => {
                   simRef.current.paused = false;
                   syncUiNow();
+                }
+              : undefined
+          }
+          onNextMission={
+            nextMissionId
+              ? () => {
+                  selectCampaignMission(nextMissionId);
+                  jumpToPhase('briefing', CAMPAIGN_MISSIONS[nextMissionId].planet);
                 }
               : undefined
           }
@@ -821,7 +1172,18 @@ export default function App() {
         />
       )}
 
-      <NasaDataModal open={nasaModalOpen} donki={donki} onClose={() => setNasaModalOpen(false)} />
+      <NasaDataModal
+        open={nasaModalOpen}
+        donki={donki}
+        osdr={osdr}
+        onClose={() => setNasaModalOpen(false)}
+      />
+
+      <FieldNotebookModal
+        open={fieldNotebookOpen}
+        carryover={carryoverUi}
+        onClose={() => setFieldNotebookOpen(false)}
+      />
     </div>
   );
 }

@@ -1,13 +1,22 @@
-import { Compass, Database, MapPin, Play, Rocket, Shield, Volume2, VolumeX, Wrench } from 'lucide-react';
-import type { DonkiStatus, GamePhase, VehicleShowcaseId } from '../game/types';
+import { BookOpen, Compass, Database, Play, Rocket, Volume2, VolumeX, Wrench } from 'lucide-react';
+import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
+import type {
+  CampaignCarryoverState,
+  CampaignMissionId,
+  GamePhase,
+  VehicleShowcaseId,
+} from '../game/types';
+import { NASAInsignia } from './NASAInsignia';
 
 interface TitleOverlayProps {
   showcase: VehicleShowcaseId;
+  carryover: CampaignCarryoverState;
   onSelectShowcase: (v: VehicleShowcaseId) => void;
+  onSelectCampaignMission: (id: CampaignMissionId) => void;
   onStartMission: () => void;
   onJumpToPhase: (phase: GamePhase) => void;
+  onOpenNotebook: () => void;
   onOpenNasaModal: () => void;
-  donki: DonkiStatus;
   muted: boolean;
   onToggleMute: () => void;
 }
@@ -15,48 +24,57 @@ interface TitleOverlayProps {
 const SHOWCASE_OPTIONS: Array<{ id: VehicleShowcaseId; label: string }> = [
   { id: 'outpost', label: 'Moon Base' },
   { id: 'rocket', label: 'SLS Rocket' },
-  { id: 'lander', label: 'Lunar Lander' },
-  { id: 'rover', label: 'VIPER Rover' },
+  { id: 'satellite', label: 'HERMES Sat' },
+  { id: 'lander', label: 'Lander' },
+  { id: 'rover', label: 'Rover' },
 ];
 
 const QUICK_STAGES: Array<{ phase: GamePhase; label: string }> = [
   { phase: 'inspector', label: 'Inspect Parts' },
-  { phase: 'launch', label: 'Rocket Launch' },
-  { phase: 'space', label: 'Space Flight' },
-  { phase: 'landing', label: 'Moon Landing' },
-  { phase: 'rover', label: 'Rover & Base' },
+  { phase: 'launch', label: 'Pad 39B Launch' },
+  { phase: 'space', label: 'Orbital & Sat Ops' },
+  { phase: 'landing', label: 'Powered Descent' },
+  { phase: 'rover', label: 'Surface Rover' },
 ];
 
 export function TitleOverlay({
   showcase,
+  carryover,
   onSelectShowcase,
+  onSelectCampaignMission,
   onStartMission,
   onJumpToPhase,
+  onOpenNotebook,
   onOpenNasaModal,
-  donki,
   muted,
   onToggleMute,
 }: TitleOverlayProps) {
+  const activeMission = CAMPAIGN_MISSIONS[carryover.activeMission];
+
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between">
       {/* Subtle left calm scrim protecting title legibility over open 3D Moon/Rocket stage */}
       <div className="title-scrim pointer-events-none absolute inset-0" />
 
-      {/* Top minimal utility corner */}
-      <div className="relative z-10 flex items-center justify-between px-6 pt-5">
-        <div className="hud-panel pointer-events-auto flex items-center gap-3 rounded-lg px-3.5 py-2 text-xs text-slate-200">
-          <Shield className="h-4 w-4 text-amber-400" />
-          <span className="font-semibold text-amber-200">NASA Space Weather:</span>
-          <span className="font-mono-tech text-slate-100">{donki.classType}</span>
-          <button
-            type="button"
-            onClick={onOpenNasaModal}
-            className="ml-1 inline-flex items-center gap-1 rounded bg-sky-500/20 px-2 py-0.5 text-[11px] font-semibold text-sky-200 hover:bg-sky-500/35"
-          >
-            <Database className="h-3 w-3" />
-            NASA Data & Map
-          </button>
-        </div>
+      {/* Top right utility buttons (Field Notebook, NASA Data, Mute) */}
+      <div className="relative z-10 flex items-center justify-end gap-2 px-6 pt-5">
+        <button
+          type="button"
+          onClick={onOpenNotebook}
+          className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-amber-200 hover:border-amber-400/60"
+        >
+          <BookOpen className="h-3.5 w-3.5 text-amber-300" />
+          Field Notebook ({carryover.unlockedFieldNotes.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenNasaModal}
+          className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-300 hover:border-emerald-400/60"
+        >
+          <Database className="h-3.5 w-3.5" />
+          NASA OSDR & DONKI
+        </button>
 
         <button
           type="button"
@@ -64,21 +82,19 @@ export function TitleOverlay({
           title="Toggle Sound [M]"
           className="hud-panel pointer-events-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400/60"
         >
-          {muted ? <VolumeX className="h-4 w-4 text-slate-400" /> : <Volume2 className="h-4 w-4 text-sky-300" />}
+          {muted ? (
+            <VolumeX className="h-4 w-4 text-slate-400" />
+          ) : (
+            <Volume2 className="h-4 w-4 text-sky-300" />
+          )}
           <span className="keycap">M</span>
         </button>
       </div>
 
-      {/* Left-aligned Title Lockup & Mission Controls */}
+      {/* Left-aligned NASA Emblem + Title Lockup & Artemis II-IV -> Mars Campaign */}
       <div className="relative z-10 max-w-xl px-6 md:px-10">
-        {/* Custom Inline SVG Emblem Lockup */}
-        <div className="mb-3 flex items-center gap-3">
-          <svg width="44" height="44" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-            <circle cx="24" cy="24" r="22" stroke="#38BDF8" strokeWidth="2" strokeOpacity="0.65" />
-            <path d="M12 34L24 10L36 34H29L24 23L19 34H12Z" fill="#F8FAFC" />
-            <path d="M9 28C16 22 31 20 40 24" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="35" cy="14" r="3" fill="#38BDF8" />
-          </svg>
+        <div className="mb-2.5 flex items-center gap-3.5">
+          <NASAInsignia size={54} className="shrink-0" />
           <div>
             <p className="text-[11px] font-bold tracking-[0.22em] text-sky-300 uppercase">
               Junior Astronaut Mission Trainer
@@ -89,13 +105,56 @@ export function TitleOverlay({
           </div>
         </div>
 
-        <p className="mb-5 max-w-md text-sm leading-relaxed text-slate-200">
-          Launch from Pad 39B, fly past solar storms, land on the Moon’s South Pole, and drive the
-          VIPER rover — balancing real NASA trade-offs between Power, Oxygen, and Shielding.
+        <p className="mb-4 max-w-md text-sm leading-relaxed text-slate-200">
+          Fly NASA’s Artemis II–IV South Pole & Mars Jezero Campaign: deploy orbital satellites,
+          land across 0.165g & 0.38g worlds, and reuse ISRU ice, fuel, and OSDR radiation knowledge.
         </p>
 
+        {/* 4-Stage Campaign Selector */}
+        <div className="pointer-events-auto mb-4">
+          <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold tracking-wider text-sky-300 uppercase">
+            <span>Select NASA Campaign Mission</span>
+            {carryover.completedMissions.length > 0 && (
+              <span className="font-mono-tech text-emerald-300">
+                {carryover.completedMissions.length}/4 Completed · {carryover.isruWaterKg}kg H₂O
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 sm:max-w-lg">
+            {CAMPAIGN_ORDER.map((id) => {
+              const m = CAMPAIGN_MISSIONS[id];
+              const active = carryover.activeMission === id;
+              const done = carryover.completedMissions.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  data-testid={`campaign-btn-${id}`}
+                  onClick={() => onSelectCampaignMission(id)}
+                  className={`rounded-lg border px-2.5 py-2 text-left text-xs transition ${
+                    active
+                      ? 'border-amber-400 bg-amber-500/20 text-white'
+                      : done
+                        ? 'border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:border-emerald-300'
+                        : 'hud-panel text-slate-200 hover:border-sky-400/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 font-bold">
+                    <span>{m.shortLabel}</span>
+                    {done && <span className="font-mono-tech text-[10px] text-emerald-300">DONE</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 max-w-lg text-[11px] text-slate-300">
+            <strong className="text-amber-300">{activeMission.code}:</strong>{' '}
+            {activeMission.objectiveSummary}
+          </p>
+        </div>
+
         {/* Primary CTA */}
-        <div className="pointer-events-auto mb-5 flex flex-wrap items-center gap-3">
+        <div className="pointer-events-auto mb-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
             data-start="true"
@@ -103,7 +162,7 @@ export function TitleOverlay({
             className="inline-flex items-center gap-2.5 rounded-xl bg-amber-500 px-6 py-3.5 font-display text-base font-bold tracking-wide text-slate-950 shadow-lg transition hover:bg-amber-400 active:scale-[0.98]"
           >
             <Play className="h-5 w-5 fill-slate-950" />
-            START MISSION
+            BRIEF & LAUNCH MISSION
           </button>
 
           <button
@@ -112,23 +171,23 @@ export function TitleOverlay({
             className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold text-sky-100 hover:border-sky-400/70 hover:bg-slate-800/90"
           >
             <Wrench className="h-4 w-4 text-sky-300" />
-            Explore 3D Ship Parts
+            Explore 3D Hardware
           </button>
         </div>
 
-        {/* Direct Stage Jump Strip (for kids & hackathon judges) */}
+        {/* Direct Stage Jump Strip */}
         <div className="pointer-events-auto">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-bold tracking-wider text-slate-300 uppercase">
+          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold tracking-wider text-slate-300 uppercase">
             <Compass className="h-3.5 w-3.5 text-sky-300" />
-            Jump Directly To Any Stage
+            Jump Directly To Any Simulation Stage
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {QUICK_STAGES.map((stage) => (
               <button
                 key={stage.phase}
                 type="button"
                 onClick={() => onJumpToPhase(stage.phase)}
-                className="hud-panel rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-amber-400/70 hover:text-amber-200"
+                className="hud-panel rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-amber-400/70 hover:text-amber-200"
               >
                 {stage.label}
               </button>
@@ -147,14 +206,14 @@ export function TitleOverlay({
             <span className="keycap">WASD</span> Thrust / Steer / Drive
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">Space</span> Stage / Brake / Drill
+            <span className="keycap">E / Space</span> Deploy Sat / Drill / Stage
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">C</span> Camera
+            <span className="keycap">Tab</span> Surface Map
           </span>
         </div>
 
-        <div className="hud-panel pointer-events-auto flex items-center gap-1.5 rounded-lg p-1.5">
+        <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg p-1.5">
           <span className="px-2 text-[11px] font-bold text-slate-300 uppercase">
             <Rocket className="mr-1 inline h-3.5 w-3.5 text-sky-300" />
             3D View:

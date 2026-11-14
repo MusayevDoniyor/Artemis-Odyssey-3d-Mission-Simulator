@@ -1,5 +1,13 @@
-import { LANDING_ZONES, PAYLOADS, PHYSICS, SOLAR_TARGETS } from './constants';
+import {
+  CAMPAIGN_ANOMALIES,
+  PAYLOADS,
+  PHYSICS,
+  SOLAR_TARGETS,
+  getLandingZones,
+} from './constants';
 import type {
+  CampaignCarryoverState,
+  CampaignMissionId,
   InputState,
   LandingState,
   LaunchState,
@@ -8,6 +16,7 @@ import type {
   RoverState,
   SpaceFlightState,
   SpaceTargetId,
+  SurfacePlanet,
 } from './types';
 
 export function clamp(val: number, min: number, max: number): number {
@@ -15,44 +24,118 @@ export function clamp(val: number, min: number, max: number): number {
 }
 
 export function getLunarTerrainHeight(x: number, z: number): number {
+  return getSurfaceTerrainHeight('moon', x, z);
+}
+
+export function getSurfaceTerrainHeight(planet: SurfacePlanet, x: number, z: number): number {
   const distPad = Math.hypot(x, z);
   if (distPad < 15) return 0;
   const blend = clamp((distPad - 15) / 14, 0, 1);
 
+  if (planet === 'mars') {
+    // Jezero Crater sedimentary ripples + dry paleolake channel
+    let h =
+      Math.sin(x * 0.038 + 0.6) * Math.cos(z * 0.042) * 2.1 +
+      Math.sin(x * 0.095) * Math.cos(z * 0.08 + 1.2) * 0.85;
+
+    // Ancient Delta Fan Terraces near (54, -58)
+    const dDelta = Math.hypot(x - 54, z + 58);
+    if (dDelta < 24) {
+      h += Math.cos((dDelta / 24) * (Math.PI / 2)) * 3.4;
+    }
+
+    // Dry River Channel winding toward Base Delta
+    const channelDist = Math.abs(z + x * 0.65 - 12);
+    if (channelDist < 12 && distPad > 22) {
+      h -= Math.cos((channelDist / 12) * (Math.PI / 2)) * 2.1;
+    }
+
+    // Máaz Basalt Ridge at (-66, -42)
+    const dMaaz = Math.hypot(x + 66, z + 42);
+    if (dMaaz < 24) {
+      h += Math.cos((dMaaz / 24) * (Math.PI / 2)) * 5.2;
+    }
+
+    // Outer Jezero Crater Wall
+    if (distPad > 142) {
+      const rim = (distPad - 142) / 48;
+      h += Math.pow(rim, 1.35) * 20 * (0.72 + 0.28 * Math.sin(Math.atan2(z, x) * 5));
+    }
+
+    return h * blend;
+  }
+
+  // Moon South Pole: smooth undulating highlands + 4 named corridors across ±140m
   let h =
-    Math.sin(x * 0.045) * Math.cos(z * 0.045) * 2.4 +
-    Math.sin(x * 0.1 + 1.1) * Math.cos(z * 0.085) * 0.9;
+    Math.sin(x * 0.042) * Math.cos(z * 0.042) * 2.3 +
+    Math.sin(x * 0.095 + 1.1) * Math.cos(z * 0.082) * 0.85;
 
-  // Shackleton Ice Crater at (38, -42)
-  const dIce = Math.hypot(x - 38, z + 42);
-  if (dIce < 15) {
-    h -= Math.cos((dIce / 15) * (Math.PI / 2)) * 3.6;
-  } else if (dIce < 21) {
-    h += Math.sin(((dIce - 15) / 6) * Math.PI) * 1.6;
+  // Shackleton Cold Trap Crater at (56, -62)
+  const dIce = Math.hypot(x - 56, z + 62);
+  if (dIce < 18) {
+    h -= Math.cos((dIce / 18) * (Math.PI / 2)) * 4.1;
+  } else if (dIce < 25) {
+    h += Math.sin(((dIce - 18) / 7) * Math.PI) * 1.7;
   }
 
-  // Malapert Sunlit Ridge at (-40, -28)
-  const dRidge = Math.hypot(x + 40, z + 28);
-  if (dRidge < 20) {
-    h += Math.cos((dRidge / 20) * (Math.PI / 2)) * 4.2;
+  // Cabeus Secondary Shadow Basin at (-54, 66)
+  const dCabeus = Math.hypot(x + 54, z - 66);
+  if (dCabeus < 16) {
+    h -= Math.cos((dCabeus / 16) * (Math.PI / 2)) * 3.2;
   }
 
-  // Outer South Pole mountain rim
-  if (distPad > 125) {
-    const rim = (distPad - 125) / 45;
-    h += Math.pow(rim, 1.4) * 18 * (0.7 + 0.3 * Math.sin(Math.atan2(z, x) * 6));
+  // Malapert Sunlit Ridge at (-64, -48)
+  const dRidge = Math.hypot(x + 64, z + 48);
+  if (dRidge < 24) {
+    h += Math.cos((dRidge / 24) * (Math.PI / 2)) * 4.8;
+  }
+
+  // Nobile Highland Quarry Bench at (52, 58)
+  const dNobile = Math.hypot(x - 52, z - 58);
+  if (dNobile < 20) {
+    h += Math.cos((dNobile / 20) * (Math.PI / 2)) * 2.9;
+  }
+
+  // Outer South Pole mountain rim outside expanded ±140m perimeter
+  if (distPad > 142) {
+    const rim = (distPad - 142) / 48;
+    h += Math.pow(rim, 1.35) * 19 * (0.7 + 0.3 * Math.sin(Math.atan2(z, x) * 6));
   }
 
   return h * blend;
 }
 
-export function createInitialLaunchState(): LaunchState {
+export function createInitialCampaignCarryover(): CampaignCarryoverState {
   return {
+    activeMission: 'artemis-2',
+    completedMissions: [],
+    relaySatelliteOnline: false,
+    highResMapUnlocked: false,
+    isruWaterKg: 0,
+    isruFuelBonusPct: 0,
+    solarGridKw: 0,
+    regolithShieldLevel: 0,
+    radiationDoseMsv: 14, // Nominal LEO + Van Allen transit baseline
+    marsSamplesCached: 0,
+    unlockedFieldNotes: [],
+    solvedAnomalies: [],
+  };
+}
+
+export function createInitialLaunchState(autoGuidance = true): LaunchState {
+  return {
+    launchSequence: 'PRE_SIM',
+    countdownSec: 3,
+    autoGuidance,
     ignited: false,
     elapsed: 0,
     altitudeKm: 0,
     verticalSpeedMs: 0,
     horizontalSpeedMs: 0,
+    netAccelMs2: 0,
+    thrustKn: 0,
+    dragKn: 0,
+    massKg: PHYSICS.SLS_LIFTOFF_MASS_KG,
     dynamicPressureKpa: 0,
     pitchDeg: 0,
     throttle: 0,
@@ -62,6 +145,15 @@ export function createInitialLaunchState(): LaunchState {
     lasJettisoned: false,
     orbitReached: false,
     stagePrompt: null,
+  };
+}
+
+export function beginLaunchCountdown(L: LaunchState): LaunchState {
+  if (L.launchSequence !== 'PRE_SIM') return L;
+  return {
+    ...L,
+    launchSequence: 'COUNTDOWN',
+    countdownSec: 3,
   };
 }
 
@@ -84,15 +176,34 @@ export function separateLaunchStage(L: LaunchState): LaunchState {
 
 export function stepLaunchPhysics(
   state: LaunchState,
-  input: Pick<InputState, 'forward' | 'left' | 'right' | 'action'>,
+  input: Pick<InputState, 'forward' | 'left' | 'right' | 'action'> & { stabilize?: boolean },
   rawDt: number
 ): LaunchState {
   const dt = Math.min(rawDt, 0.05);
   let L: LaunchState = { ...state };
 
-  if ((input.forward || input.action) && !L.ignited) {
-    L.ignited = true;
-    L.throttle = 0.4;
+  if (L.launchSequence === 'PRE_SIM') {
+    return L;
+  }
+
+  if (L.launchSequence === 'COUNTDOWN') {
+    L.countdownSec = Math.max(0, L.countdownSec - dt);
+    if (L.countdownSec <= 0.001) {
+      L.countdownSec = 0;
+      L.launchSequence = 'READY';
+    }
+    // Critical: Never auto-launch after countdown reaches zero. Wait for player SPACE or W.
+    return L;
+  }
+
+  if (L.launchSequence === 'READY') {
+    if (input.forward || input.action) {
+      L.ignited = true;
+      L.launchSequence = 'ASCENDING';
+      L.throttle = 0.85;
+    } else {
+      return L;
+    }
   }
 
   if (!L.ignited) {
@@ -103,13 +214,17 @@ export function stepLaunchPhysics(
     L = separateLaunchStage(L);
   }
 
-  L.throttle = clamp(L.throttle + 2.8 * dt, 0, L.fuelPct > 0 ? 1 : 0);
+  L.throttle = clamp(L.throttle + 2.2 * dt, 0, L.fuelPct > 0 ? 1 : 0);
 
-  // Smooth gravity turn pitch (0° at pad -> up to 54° downrange)
-  const targetPitch = L.altitudeKm < 2.5 ? 0 : Math.min(54, (L.altitudeKm - 2.5) * 0.48);
-  L.pitchDeg += (targetPitch - L.pitchDeg) * Math.min(1, 1.2 * dt);
-  if (input.left) L.pitchDeg = clamp(L.pitchDeg - 26 * dt, -15, 68);
-  if (input.right) L.pitchDeg = clamp(L.pitchDeg + 26 * dt, -15, 68);
+  const nominalPitch = L.altitudeKm < 2.2 ? 0 : Math.min(54, (L.altitudeKm - 2.2) * 0.48);
+  if (L.autoGuidance) {
+    L.pitchDeg += (nominalPitch - L.pitchDeg) * Math.min(1, 1.35 * dt);
+  }
+  if (input.left) L.pitchDeg = clamp(L.pitchDeg - 26 * dt, -18, 68);
+  if (input.right) L.pitchDeg = clamp(L.pitchDeg + 26 * dt, -18, 68);
+  if (input.stabilize && !L.stagePrompt) {
+    L.pitchDeg += (nominalPitch - L.pitchDeg) * Math.min(1, 3.8 * dt);
+  }
 
   const simDt = dt * PHYSICS.LAUNCH_TIME_SCALE;
   L.elapsed += simDt;
@@ -133,35 +248,43 @@ export function stepLaunchPhysics(
         ? PHYSICS.SLS_CORE_THRUST_N
         : PHYSICS.SLS_LIFTOFF_THRUST_N) * L.throttle;
 
-  const thrustAccel = thrustN / Math.max(1, massKg);
   const pitchRad = (L.pitchDeg * Math.PI) / 180;
-  const gravity =
+  const gravityMs2 =
     PHYSICS.EARTH_GRAVITY *
     Math.pow(PHYSICS.EARTH_RADIUS_M / (PHYSICS.EARTH_RADIUS_M + altM), 2);
+  const gravityN = massKg * gravityMs2;
 
-  const dragAccel = (qPa * 22) / Math.max(1, massKg);
-  const vertDrag = speed > 0 ? dragAccel * (L.verticalSpeedMs / speed) : 0;
-  const horizDrag = speed > 0 ? dragAccel * (L.horizontalSpeedMs / speed) : 0;
+  const dragN = qPa * 22;
+  const vertDragN = speed > 0 ? dragN * (L.verticalSpeedMs / speed) : 0;
+  const horizDragN = speed > 0 ? dragN * (L.horizontalSpeedMs / speed) : 0;
 
-  const centrifugal = (L.horizontalSpeedMs * L.horizontalSpeedMs) / (PHYSICS.EARTH_RADIUS_M + altM);
-  const effGravity = L.coreSeparated ? gravity * 0.25 : gravity;
+  const centrifugalN =
+    massKg * ((L.horizontalSpeedMs * L.horizontalSpeedMs) / (PHYSICS.EARTH_RADIUS_M + altM));
+  const effGravityN = L.coreSeparated ? gravityN * 0.25 : gravityN;
 
-  const vertAccel = Math.max(
-    L.coreSeparated ? 6.5 : L.srbSeparated ? 4.8 : 0,
-    thrustAccel * Math.cos(pitchRad) + centrifugal - effGravity - vertDrag
-  );
-  const horizAccel = thrustAccel * Math.sin(pitchRad) - horizDrag;
+  const rawVertForceN = thrustN * Math.cos(pitchRad) + centrifugalN - effGravityN - vertDragN;
+  const onPad = altM <= 0.001 && L.verticalSpeedMs <= 0.001;
+  const minVertAccel = L.coreSeparated ? 6.5 : L.srbSeparated ? 4.8 : 0;
+  const vertAccel = onPad
+    ? Math.max(0, rawVertForceN / Math.max(1, massKg))
+    : Math.max(minVertAccel, rawVertForceN / Math.max(1, massKg));
+
+  const rawHorizForceN = thrustN * Math.sin(pitchRad) - horizDragN;
+  const horizAccel = L.verticalSpeedMs > 0.5 || !onPad ? rawHorizForceN / Math.max(1, massKg) : 0;
+
+  L.massKg = massKg;
+  L.thrustKn = thrustN / 1000;
+  L.dragKn = dragN / 1000;
+  L.netAccelMs2 = Math.hypot(vertAccel, horizAccel);
 
   const prevVy = L.verticalSpeedMs;
   L.verticalSpeedMs = Math.max(0, L.verticalSpeedMs + vertAccel * simDt);
   L.horizontalSpeedMs = Math.max(0, L.horizontalSpeedMs + horizAccel * simDt);
   L.altitudeKm = Math.max(0, L.altitudeKm + ((prevVy + L.verticalSpeedMs) * 0.5 * simDt) / 1000);
 
-  // Propellant consumption per stage (tuned for responsive ~20s ascent)
   const burnPctPerSec = L.coreSeparated ? 0.65 : L.srbSeparated ? 0.9 : 1.15;
   L.fuelPct = Math.max(0, L.fuelPct - burnPctPerSec * L.throttle * simDt);
 
-  // Automatic safety staging fallback if fuel reaches zero past altitude gate
   if (!L.srbSeparated && L.altitudeKm >= PHYSICS.SLS_SRB_SEP_ALT_KM && L.fuelPct <= 2) {
     L.srbSeparated = true;
     L.fuelPct = 100;
@@ -190,30 +313,69 @@ export function stepLaunchPhysics(
   return L;
 }
 
-export function createInitialSpaceFlightState(): SpaceFlightState {
+export function createInitialSpaceFlightState(
+  missionId: CampaignMissionId = 'artemis-2',
+  carryover?: Partial<CampaignCarryoverState>
+): SpaceFlightState {
+  const defaultTarget: SpaceTargetId =
+    missionId === 'artemis-4'
+      ? 'gateway'
+      : missionId === 'mars-pathfinder'
+        ? 'mars'
+        : carryover?.relaySatelliteOnline
+          ? 'moon'
+          : 'relay-orbit';
+
+  const target = SOLAR_TARGETS[defaultTarget];
+  const fuelStart = clamp(
+    (missionId === 'artemis-4' ? 76 : 92) + (carryover?.isruFuelBonusPct || 0),
+    45,
+    100
+  );
+
+  const satAlreadyOnline = Boolean(carryover?.relaySatelliteOnline);
+
   return {
-    shipX: -12,
-    shipZ: 18,
+    shipX: missionId === 'artemis-4' ? 22 : -14,
+    shipZ: missionId === 'artemis-4' ? -14 : 18,
     vx: 0,
     vz: 0,
-    headingRad: Math.atan2(24 - -12, -18 - 18),
-    targetId: 'moon',
+    headingRad: Math.atan2(
+      target.x - (missionId === 'artemis-4' ? 22 : -14),
+      target.z - (missionId === 'artemis-4' ? -14 : 18)
+    ),
+    targetId: defaultTarget,
     autoPilot: false,
     boostActive: false,
     shieldBoostActive: false,
-    fuelPct: 100,
+    fuelPct: fuelStart,
     elapsedDays: 0,
     inRadiationZone: false,
     arrivedMoon: false,
+    arrivedMars: false,
+    arrivedGateway: false,
+    inSatDeployZone: false,
     visitedTargets: [],
-    statusText: 'Point toward the glowing Moon beacon and hold [W] to thrust!',
+    orbitalSat: {
+      deployed: satAlreadyOnline,
+      satX: SOLAR_TARGETS['relay-orbit'].x,
+      satZ: SOLAR_TARGETS['relay-orbit'].z,
+      solarDeployedPct: satAlreadyOnline ? 100 : 0,
+      dishAlignedPct: satAlreadyOnline ? 100 : 0,
+      linkLocked: satAlreadyOnline,
+      rotationErrorDeg: satAlreadyOnline ? 0 : 42,
+      telemetrySignalPct: satAlreadyOnline ? 100 : 12,
+    },
+    statusText: satAlreadyOnline
+      ? `Course ready for ${target.name}. Fly cleanly to orbital capture!`
+      : 'Fly to HERMES Relay Orbit and hold [E / SPACE] to deploy & align the Orbital Satellite!',
   };
 }
 
 export function stepSpaceFlightPhysics(
   state: SpaceFlightState,
   resources: ResourceState,
-  input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right' | 'boost'>,
+  input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right' | 'boost' | 'action'>,
   donkiFlareActive: boolean,
   rawDt: number
 ): { space: SpaceFlightState; resources: ResourceState } {
@@ -221,6 +383,7 @@ export function stepSpaceFlightPhysics(
   const s: SpaceFlightState = {
     ...state,
     visitedTargets: [...state.visitedTargets],
+    orbitalSat: { ...state.orbitalSat },
   };
   const res: ResourceState = { ...resources };
 
@@ -240,11 +403,11 @@ export function stepSpaceFlightPhysics(
     s.headingRad += clamp(diff, -2.8 * dt, 2.8 * dt);
 
     const speed = Math.hypot(s.vx, s.vz);
-    if (distToTarget > 8) {
+    if (distToTarget > 6.5) {
       thrusting = speed < 14;
     } else {
-      braking = speed > 2.5;
-      thrusting = speed < 3.5;
+      braking = speed > 2.0;
+      thrusting = speed < 3.0;
     }
   } else {
     if (input.left) s.headingRad += 2.3 * dt;
@@ -260,15 +423,14 @@ export function stepSpaceFlightPhysics(
   if (thrusting && s.fuelPct > 0) {
     s.vx += fwdX * accel * dt;
     s.vz += fwdZ * accel * dt;
-    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 2.4 : 1.0) * dt);
+    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 2.1 : 0.85) * dt);
     if (s.boostActive) {
-      res.power = Math.max(0, res.power - 2.2 * dt);
+      res.power = Math.max(0, res.power - 2.0 * dt);
     }
   } else if (braking) {
-    s.vx *= Math.max(0, 1 - 3.2 * dt);
-    s.vz *= Math.max(0, 1 - 3.2 * dt);
+    s.vx *= Math.max(0, 1 - 3.4 * dt);
+    s.vz *= Math.max(0, 1 - 3.4 * dt);
   } else {
-    // Gentle space guidance damping so kids don't drift uncontrollably
     s.vx *= Math.max(0, 1 - 0.35 * dt);
     s.vz *= Math.max(0, 1 - 0.35 * dt);
   }
@@ -291,10 +453,52 @@ export function stepSpaceFlightPhysics(
 
   if (s.inRadiationZone) {
     if (s.shieldBoostActive && res.power > 2) {
-      res.power = Math.max(0, res.power - 3.5 * dt);
-      res.shield = Math.max(0, res.shield - 0.5 * dt);
+      res.power = Math.max(0, res.power - 3.2 * dt);
+      res.shield = Math.max(0, res.shield - 0.45 * dt);
     } else {
-      res.shield = Math.max(0, res.shield - (donkiFlareActive ? 4.2 : 2.2) * dt);
+      res.shield = Math.max(0, res.shield - (donkiFlareActive ? 4.0 : 2.1) * dt);
+    }
+  }
+
+  // Non-Landing Orbital Satellite Operations at Relay Orbit
+  const relayNode = SOLAR_TARGETS['relay-orbit'];
+  const distToSatZone = Math.hypot(s.shipX - relayNode.x, s.shipZ - relayNode.z);
+  const distToSat = Math.hypot(s.shipX - s.orbitalSat.satX, s.shipZ - s.orbitalSat.satZ);
+  s.inSatDeployZone = distToSatZone <= 9.5 || distToSat <= 9.5;
+
+  if (input.action && s.inSatDeployZone && !s.orbitalSat.linkLocked) {
+    // RCS station-keeping keeps Orion steady beside the satellite during deployment & dish lock
+    s.vx *= Math.max(0, 1 - 4.2 * dt);
+    s.vz *= Math.max(0, 1 - 4.2 * dt);
+    if (!s.orbitalSat.deployed) {
+      s.orbitalSat.deployed = true;
+      s.orbitalSat.satX = clamp(s.shipX + fwdX * 3.2, -85, 85);
+      s.orbitalSat.satZ = clamp(s.shipZ + fwdZ * 3.2, -85, 85);
+    }
+    s.orbitalSat.solarDeployedPct = clamp(s.orbitalSat.solarDeployedPct + 48 * dt, 0, 100);
+    if (s.orbitalSat.solarDeployedPct >= 50) {
+      s.orbitalSat.dishAlignedPct = clamp(s.orbitalSat.dishAlignedPct + 44 * dt, 0, 100);
+      s.orbitalSat.rotationErrorDeg = clamp(
+        42 * (1 - s.orbitalSat.dishAlignedPct / 100),
+        0,
+        42
+      );
+      s.orbitalSat.telemetrySignalPct = Math.round(
+        15 + s.orbitalSat.solarDeployedPct * 0.35 + s.orbitalSat.dishAlignedPct * 0.5
+      );
+    } else {
+      s.orbitalSat.telemetrySignalPct = Math.round(15 + s.orbitalSat.solarDeployedPct * 0.35);
+    }
+
+    if (s.orbitalSat.solarDeployedPct >= 99 && s.orbitalSat.dishAlignedPct >= 99) {
+      s.orbitalSat.solarDeployedPct = 100;
+      s.orbitalSat.dishAlignedPct = 100;
+      s.orbitalSat.rotationErrorDeg = 0;
+      s.orbitalSat.telemetrySignalPct = 100;
+      s.orbitalSat.linkLocked = true;
+      if (!s.visitedTargets.includes('relay-orbit')) {
+        s.visitedTargets.push('relay-orbit');
+      }
     }
   }
 
@@ -302,19 +506,30 @@ export function stepSpaceFlightPhysics(
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
     const planet = SOLAR_TARGETS[id];
     const d = Math.hypot(s.shipX - planet.x, s.shipZ - planet.z);
-    if (d <= planet.radius + 4.5 && !s.visitedTargets.includes(id)) {
+    if (id !== 'relay-orbit' && d <= planet.radius + 4.8 && !s.visitedTargets.includes(id)) {
       s.visitedTargets.push(id);
     }
   });
 
   const moon = SOLAR_TARGETS.moon;
-  const distMoon = Math.hypot(s.shipX - moon.x, s.shipZ - moon.z);
-  s.arrivedMoon = distMoon <= moon.radius + 4.5;
+  s.arrivedMoon = Math.hypot(s.shipX - moon.x, s.shipZ - moon.z) <= moon.radius + 4.8;
+  const gw = SOLAR_TARGETS.gateway;
+  s.arrivedGateway = Math.hypot(s.shipX - gw.x, s.shipZ - gw.z) <= gw.radius + 4.8;
+  const mars = SOLAR_TARGETS.mars;
+  s.arrivedMars = Math.hypot(s.shipX - mars.x, s.shipZ - mars.z) <= mars.radius + 5.2;
 
-  if (s.arrivedMoon) {
+  if (s.orbitalSat.linkLocked && s.arrivedGateway) {
+    s.statusText = 'Gateway NRHO Link Online! Ready to transfer ISRU payload.';
+  } else if (s.orbitalSat.linkLocked && s.targetId === 'relay-orbit') {
+    s.statusText = 'HERMES Relay Satellite Locked! High-Res Surface Maps Unlocked.';
+  } else if (s.inSatDeployZone && !s.orbitalSat.linkLocked) {
+    s.statusText = `In Relay Orbit — Hold [E / SPACE] to unfold wings & lock Dish (${Math.round(s.orbitalSat.dishAlignedPct)}%)`;
+  } else if (s.arrivedMoon) {
     s.statusText = 'Lunar Orbit Captured! Ready to begin South Pole Descent.';
+  } else if (s.arrivedMars) {
+    s.statusText = 'Jezero Capture Orbit Reached! Ready for 0.38g Mars Descent.';
   } else if (s.inRadiationZone) {
-    s.statusText = 'Solar Radiation Zone! Activate Storm Shield or steer clear of the Sun!';
+    s.statusText = 'Solar Radiation Zone! Activate Water-Wall Storm Shield or steer clear of the Sun!';
   } else {
     s.statusText = `Course set for ${target.name} (${Math.round(distToTarget * 10)}k sim-km remaining)`;
   }
@@ -322,19 +537,25 @@ export function stepSpaceFlightPhysics(
   return { space: s, resources: res };
 }
 
-export function createInitialLandingState(massMultiplier: number): LandingState {
+export function createInitialLandingState(
+  massMultiplier: number,
+  planet: SurfacePlanet = 'moon',
+  isruFuelBonusPct = 0
+): LandingState {
+  const startFuel = clamp(84 + isruFuelBonusPct, 70, 100);
   return {
+    planet,
     x: 0,
-    y: 165,
+    y: planet === 'mars' ? 172 : 165,
     z: -36,
     vx: 0,
-    vy: -3.2,
+    vy: planet === 'mars' ? -4.1 : -3.2,
     vz: 2.2,
     rollDeg: 0,
     pitchDeg: 0,
     tiltDeg: 0,
     throttle: 0,
-    fuelPct: 100,
+    fuelPct: startFuel,
     massMultiplier,
     twr: 0,
     targetZoneId: 0,
@@ -383,13 +604,17 @@ export function stepLandingPhysics(
   const f: LandingState = { ...state };
   if (f.landed) return f;
 
-  const zone = LANDING_ZONES[f.targetZoneId] || LANDING_ZONES[0];
-  const groundH = getLunarTerrainHeight(f.x, f.z);
+  const zones = getLandingZones(f.planet);
+  const zone = zones[f.targetZoneId] || zones[0];
+  const gravity = f.planet === 'mars' ? PHYSICS.MARS_GRAVITY : PHYSICS.MOON_GRAVITY;
+  const maxThrust = f.planet === 'mars' ? PHYSICS.LANDER_MARS_MAX_THRUST_N : PHYSICS.LANDER_MAX_THRUST_N;
+
+  const groundH = getSurfaceTerrainHeight(f.planet, f.x, f.z);
   const alt = Math.max(0, f.y - groundH);
 
   const propKg = (PHYSICS.LANDER_PROP_MASS_KG * f.fuelPct) / 100;
   const totalMass = (PHYSICS.LANDER_FIXED_MASS_KG + propKg) * f.massMultiplier;
-  const hoverThrottle = (totalMass * PHYSICS.MOON_GRAVITY) / PHYSICS.LANDER_MAX_THRUST_N;
+  const hoverThrottle = (totalMass * gravity) / maxThrust;
 
   if (f.guidanceMode === 'AUTOLAND' && f.fuelPct > 0) {
     const dx = zone.x - f.x;
@@ -427,25 +652,25 @@ export function stepLandingPhysics(
 
   f.tiltDeg = Math.hypot(f.rollDeg, f.pitchDeg);
 
-  const thrustForce = f.fuelPct > 0 ? PHYSICS.LANDER_MAX_THRUST_N * f.throttle : 0;
-  const lunarWeight = totalMass * PHYSICS.MOON_GRAVITY;
-  f.twr = lunarWeight > 0 ? thrustForce / lunarWeight : 0;
+  const thrustForce = f.fuelPct > 0 ? maxThrust * f.throttle : 0;
+  const weightN = totalMass * gravity;
+  f.twr = weightN > 0 ? thrustForce / weightN : 0;
 
   const rollRad = (f.rollDeg * Math.PI) / 180;
   const pitchRad = (f.pitchDeg * Math.PI) / 180;
   const tiltRad = (f.tiltDeg * Math.PI) / 180;
 
-  const ay = (thrustForce * Math.cos(tiltRad)) / totalMass - PHYSICS.MOON_GRAVITY;
+  // Mild thin-air drag on Mars vs vacuum on Moon
+  const atmoDragY = f.planet === 'mars' ? -f.vy * 0.045 : 0;
+  const ay = (thrustForce * Math.cos(tiltRad)) / totalMass - gravity + atmoDragY;
   let ax = -(thrustForce * Math.sin(rollRad)) / totalMass;
   let az = (thrustForce * Math.sin(pitchRad)) / totalMass;
 
-  // Responsive RCS translation assist
   if (input.left) ax -= 1.8;
   if (input.right) ax += 1.8;
   if (input.backward) az -= 1.8;
   if (input.tiltForward) az += 1.8;
 
-  // Gentle horizontal drift damper near the pad when manual keys are released
   if (f.guidanceMode !== 'AUTOLAND') {
     if (!input.left && !input.right && Math.abs(f.vx) > 0.08) {
       ax -= Math.sign(f.vx) * 0.9;
@@ -472,7 +697,7 @@ export function stepLandingPhysics(
     f.fuelPct = Math.max(0, f.fuelPct - (kgBurned / PHYSICS.LANDER_PROP_MASS_KG) * 100);
   }
 
-  const nextGroundH = getLunarTerrainHeight(f.x, f.z);
+  const nextGroundH = getSurfaceTerrainHeight(f.planet, f.x, f.z);
   const nextAlt = Math.max(0, f.y - nextGroundH);
   f.contactLight = nextAlt <= 1.75;
   f.distToPad = Math.hypot(f.x - zone.x, f.z - zone.z);
@@ -508,10 +733,15 @@ export function stepLandingPhysics(
   return f;
 }
 
-export function createInitialRoverState(startX = 6, startZ = 6): RoverState {
+export function createInitialRoverState(
+  startX = 6,
+  startZ = 6,
+  planet: SurfacePlanet = 'moon'
+): RoverState {
   return {
+    planet,
     x: startX,
-    y: getLunarTerrainHeight(startX, startZ),
+    y: getSurfaceTerrainHeight(planet, startX, startZ),
     z: startZ,
     headingRad: 0,
     speed: 0,
@@ -525,7 +755,8 @@ export function createInitialRoverState(startX = 6, startZ = 6): RoverState {
     highClearance: false,
     headlightsOn: true,
     wheelSlipPct: 0,
-    hydrogenSignal: 15,
+    hydrogenSignal: 18,
+    dustAccumulationPct: planet === 'mars' ? 8 : 0,
     collisionLabel: '',
   };
 }
@@ -542,6 +773,7 @@ export function stepRoverPhysics(
     wheelOffsets: [...state.wheelOffsets] as [number, number, number, number],
   };
 
+  const gravity = r.planet === 'mars' ? PHYSICS.MARS_GRAVITY : PHYSICS.MOON_GRAVITY;
   const fwdX = Math.sin(r.headingRad);
   const fwdZ = Math.cos(r.headingRad);
   const rightX = Math.cos(r.headingRad);
@@ -549,7 +781,7 @@ export function stepRoverPhysics(
 
   const isWalker = r.driveMode === 'WALKER';
   const maxSpeed = isWalker ? PHYSICS.ROVER_WALKER_SPEED : PHYSICS.ROVER_MAX_SPEED;
-  const slopeGravity = Math.sin(r.pitchRad) * PHYSICS.MOON_GRAVITY * 0.45;
+  const slopeGravity = Math.sin(r.pitchRad) * gravity * 0.42;
 
   if (r.driveMode === 'SPIN') {
     r.speed *= Math.max(0, 1 - 6 * dt);
@@ -590,13 +822,11 @@ export function stepRoverPhysics(
   let nextX = r.x + vx * dt;
   let nextZ = r.z + vz * dt;
 
-  // Smooth tangent-sliding collider resolution (prevents jarring backward bounces)
-  // In WALKER mode with high clearance, rover steps cleanly over small rocks (< 0.72m radius)!
   const roverRadius = isWalker ? 0.95 : 1.18;
   let collisionLabel = '';
   for (let i = 0; i < colliders.length; i++) {
     const col = colliders[i];
-    if (isWalker && col.type === 'rock' && col.r < 0.75) {
+    if (isWalker && col.type === 'rock' && col.r < 0.78) {
       continue;
     }
     const dx = nextX - col.x;
@@ -611,7 +841,6 @@ export function stepRoverPhysics(
       nextX += nx * overlap;
       nextZ += nz * overlap;
 
-      // Project velocity onto tangent instead of bouncing backwards!
       const dot = vx * nx + vz * nz;
       if (dot < 0) {
         vx -= dot * nx;
@@ -624,13 +853,13 @@ export function stepRoverPhysics(
   }
 
   r.collisionLabel = collisionLabel;
-  r.x = clamp(nextX, -115, 115);
-  r.z = clamp(nextZ, -115, 115);
+  const bound = PHYSICS.SURFACE_BOUND_M;
+  r.x = clamp(nextX, -bound, bound);
+  r.z = clamp(nextZ, -bound, bound);
 
-  const centerGround = getLunarTerrainHeight(r.x, r.z);
+  const centerGround = getSurfaceTerrainHeight(r.planet, r.x, r.z);
   r.y = centerGround;
 
-  // 4-wheel terrain contact sampling (FL, FR, RL, RR)
   const wheelCoords: [number, number][] = [
     [-0.78, 0.95],
     [0.78, 0.95],
@@ -640,7 +869,7 @@ export function stepRoverPhysics(
   const wheelGrounds = wheelCoords.map(([lx, lz]) => {
     const wx = r.x + rightX * lx + fwdX * lz;
     const wz = r.z + rightZ * lx + fwdZ * lz;
-    return getLunarTerrainHeight(wx, wz);
+    return getSurfaceTerrainHeight(r.planet, wx, wz);
   });
 
   const avgFront = (wheelGrounds[0] + wheelGrounds[1]) * 0.5;
@@ -657,7 +886,6 @@ export function stepRoverPhysics(
     r.wheelAngle += (r.speed * dt) / 0.25;
   }
 
-  // Alternating diagonal 4-leg articulated stepping gait in WALKER mode!
   const diagonalPhases = [0, Math.PI, Math.PI, 0];
   for (let i = 0; i < 4; i++) {
     const terrainFollow = clamp(wheelGrounds[i] - centerGround, -0.22, 0.28);
@@ -667,14 +895,88 @@ export function stepRoverPhysics(
     r.wheelOffsets[i] = terrainFollow + stepLift;
   }
 
-  const distIce = Math.hypot(r.x - 38, r.z + 42);
-  r.hydrogenSignal = Math.round(Math.max(12, 240 * Math.exp(-distIce / 22)));
+  if (r.planet === 'mars') {
+    // Signal tracks organic/clay delta & carbonate shelves; high wind near Máaz clears dust
+    const distDelta = Math.hypot(r.x - 54, r.z + 58);
+    const distCarb = Math.hypot(r.x - 48, r.z - 62);
+    const nearestSig = Math.min(distDelta, distCarb);
+    r.hydrogenSignal = Math.round(Math.max(14, 220 * Math.exp(-nearestSig / 26)));
+
+    const dMaaz = Math.hypot(r.x + 66, r.z + 42);
+    if (dMaaz < 22) {
+      r.dustAccumulationPct = clamp(r.dustAccumulationPct - 6.5 * dt, 2, 65);
+    } else if (Math.abs(r.speed) > 0.5) {
+      r.dustAccumulationPct = clamp(r.dustAccumulationPct + 0.45 * dt, 2, 65);
+    }
+  } else {
+    const distShack = Math.hypot(r.x - 56, r.z + 62);
+    const distCabeus = Math.hypot(r.x + 54, r.z - 66);
+    const nearestIce = Math.min(distShack, distCabeus);
+    r.hydrogenSignal = Math.round(Math.max(12, 240 * Math.exp(-nearestIce / 26)));
+    r.dustAccumulationPct = 0;
+  }
+
   const slopeRatio = Math.abs(Math.sin(r.pitchRad)) + Math.abs(Math.sin(r.rollRad));
+  const gravSlipFactor = r.planet === 'mars' ? 0.88 : 1.0;
   r.wheelSlipPct = isWalker
-    ? Math.min(12, Math.round(slopeRatio * 18))
-    : Math.min(42, Math.round(slopeRatio * 48 + Math.abs(r.speed) * 1.4));
+    ? Math.min(12, Math.round(slopeRatio * 18 * gravSlipFactor))
+    : Math.min(44, Math.round((slopeRatio * 48 + Math.abs(r.speed) * 1.35) * gravSlipFactor));
 
   return r;
+}
+
+export function applyAnomalyDecision(
+  resources: ResourceState,
+  carryover: CampaignCarryoverState,
+  anomalyId: string,
+  choiceId: string
+): {
+  resources: ResourceState;
+  carryover: CampaignCarryoverState;
+  scienceMultiplier: number;
+  summary: string;
+  isOptimal: boolean;
+} {
+  const anomaly = CAMPAIGN_ANOMALIES.find((a) => a.id === anomalyId);
+  const choice = anomaly?.choices.find((c) => c.id === choiceId);
+  if (!anomaly || !choice) {
+    return {
+      resources,
+      carryover,
+      scienceMultiplier: 1.0,
+      summary: 'Telemetry acknowledged.',
+      isOptimal: false,
+    };
+  }
+
+  // Carryover bonus: regolith berms cut SPE radiation dose
+  const bermReduction = clamp(carryover.regolithShieldLevel * 0.25, 0, 0.5);
+  const effectiveDose = Math.round(choice.doseDeltaMsv * (1 - bermReduction));
+
+  const nextResources: ResourceState = {
+    power: clamp(resources.power + (choice.deltaResources.power || 0), 0, 100),
+    oxygen: clamp(resources.oxygen + (choice.deltaResources.oxygen || 0), 0, 100),
+    shield: clamp(resources.shield + (choice.deltaResources.shield || 0), 0, 100),
+  };
+
+  const nextCarryover: CampaignCarryoverState = {
+    ...carryover,
+    radiationDoseMsv: Math.max(0, carryover.radiationDoseMsv + effectiveDose),
+    solvedAnomalies: carryover.solvedAnomalies.includes(anomalyId)
+      ? carryover.solvedAnomalies
+      : [...carryover.solvedAnomalies, anomalyId],
+    unlockedFieldNotes: carryover.unlockedFieldNotes.includes(anomaly.requiredNoteId)
+      ? carryover.unlockedFieldNotes
+      : [...carryover.unlockedFieldNotes, anomaly.requiredNoteId],
+  };
+
+  return {
+    resources: nextResources,
+    carryover: nextCarryover,
+    scienceMultiplier: choice.scienceMultiplier,
+    summary: `${choice.rationale} (Crew dose +${effectiveDose} mSv · Total ${nextCarryover.radiationDoseMsv} mSv)`,
+    isOptimal: choice.isOptimal,
+  };
 }
 
 export type OutpostDecisionId = 'boost-shield' | 'life-support' | 'push-science';
@@ -706,7 +1008,6 @@ export function applyOutpostDecision(
     };
   }
 
-  // push-science
   next.power = clamp(next.power - 14, 0, 100);
   next.shield = clamp(next.shield - 15, 0, 100);
   return {

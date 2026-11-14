@@ -3,6 +3,8 @@ import * as THREE from 'three';
 export interface ProceduralTextureSet {
   moonAlbedo: THREE.CanvasTexture;
   moonBump: THREE.CanvasTexture;
+  marsAlbedo: THREE.CanvasTexture;
+  marsBump: THREE.CanvasTexture;
   foilAlbedo: THREE.CanvasTexture;
   foilBump: THREE.CanvasTexture;
   solarPanel: THREE.CanvasTexture;
@@ -11,8 +13,11 @@ export interface ProceduralTextureSet {
   slsCore: THREE.CanvasTexture;
   slsSrb: THREE.CanvasTexture;
   orionTile: THREE.CanvasTexture;
+  nasaDecal: THREE.CanvasTexture;
   kscGround: THREE.CanvasTexture;
   duskSky: THREE.CanvasTexture;
+  cloudPuff: THREE.CanvasTexture;
+  towerSteel: THREE.CanvasTexture;
 }
 
 function finalizeColorTex(
@@ -49,81 +54,104 @@ function finalizeDataTex(
 }
 
 export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTextureSet {
-  // 1. Lunar Regolith Albedo & Micro-Relief Bump
+  // 1. Organic Lunar Silicate Regolith Albedo & Micro-Relief Bump (no repetitive flat circle stamps)
   const moonCanvas = document.createElement('canvas');
   moonCanvas.width = 512;
   moonCanvas.height = 512;
   const mCtx = moonCanvas.getContext('2d')!;
-  mCtx.fillStyle = '#68707d';
+  mCtx.fillStyle = '#6c737f';
   mCtx.fillRect(0, 0, 512, 512);
 
-  for (let i = 0; i < 140; i++) {
+  // Broad highland/mare mineral variation
+  for (let i = 0; i < 220; i++) {
     const gx = Math.random() * 512;
     const gy = Math.random() * 512;
-    const gr = 20 + Math.random() * 64;
+    const gr = 24 + Math.random() * 88;
     const g = mCtx.createRadialGradient(gx, gy, 2, gx, gy, gr);
-    g.addColorStop(0, i % 2 === 0 ? 'rgba(136,144,158,0.14)' : 'rgba(72,78,89,0.14)');
-    g.addColorStop(1, 'rgba(104,112,125,0)');
+    const bright = i % 2 === 0;
+    g.addColorStop(0, bright ? 'rgba(148,156,170,0.12)' : 'rgba(54,60,70,0.14)');
+    g.addColorStop(1, 'rgba(108,115,127,0)');
     mCtx.fillStyle = g;
     mCtx.beginPath();
     mCtx.arc(gx, gy, gr, 0, Math.PI * 2);
     mCtx.fill();
   }
-  for (let i = 0; i < 9000; i++) {
-    const v = 86 + Math.floor(Math.random() * 44);
-    mCtx.fillStyle = `rgb(${v},${v + 2},${v + 4})`;
-    mCtx.fillRect(Math.random() * 512, Math.random() * 512, 1.6, 1.6);
-  }
-  for (let c = 0; c < 36; c++) {
-    const cx = 20 + Math.random() * 472;
-    const cy = 20 + Math.random() * 472;
-    const r = 4 + Math.random() * 14;
-    mCtx.strokeStyle = 'rgba(175, 184, 198, 0.34)';
-    mCtx.lineWidth = 1.4;
-    mCtx.beginPath();
-    mCtx.arc(cx - 1, cy - 1, r, 0, Math.PI * 2);
-    mCtx.stroke();
-    const grad = mCtx.createRadialGradient(cx + r * 0.15, cy + r * 0.15, 1, cx, cy, r);
-    grad.addColorStop(0, 'rgba(56, 62, 72, 0.38)');
-    grad.addColorStop(1, 'rgba(104, 112, 125, 0)');
-    mCtx.fillStyle = grad;
-    mCtx.beginPath();
-    mCtx.arc(cx, cy, r, 0, Math.PI * 2);
-    mCtx.fill();
+
+  // Fine basalt/anorthosite regolith grit
+  for (let i = 0; i < 16000; i++) {
+    const v = 78 + Math.floor(Math.random() * 58);
+    mCtx.fillStyle = `rgb(${v},${v + 2},${v + 5})`;
+    mCtx.fillRect(Math.random() * 512, Math.random() * 512, 1.5, 1.5);
   }
 
-  // 2. Crinkled Gold Kapton Foil
+  // Soft shaded micro-craters with subtle highlight lip & shadowed bowl
+  for (let c = 0; c < 48; c++) {
+    const cx = Math.random() * 512;
+    const cy = Math.random() * 512;
+    const r = 3 + Math.random() * 11;
+    // Wrap seamlessly at edges
+    for (const ox of [-512, 0, 512]) {
+      for (const oy of [-512, 0, 512]) {
+        const px = cx + ox;
+        const py = cy + oy;
+        if (px + r < 0 || px - r > 512 || py + r < 0 || py - r > 512) continue;
+        const rimGrad = mCtx.createRadialGradient(px - r * 0.15, py - r * 0.15, r * 0.4, px, py, r * 1.15);
+        rimGrad.addColorStop(0, 'rgba(42,47,56,0.45)');
+        rimGrad.addColorStop(0.68, 'rgba(165,174,188,0.22)');
+        rimGrad.addColorStop(1, 'rgba(108,115,127,0)');
+        mCtx.fillStyle = rimGrad;
+        mCtx.beginPath();
+        mCtx.arc(px, py, r * 1.15, 0, Math.PI * 2);
+        mCtx.fill();
+      }
+    }
+  }
+
+  // 2. Crinkled Gold Kapton Multi-Layer Insulation (LM-2 & VIPER)
   const foilCanvas = document.createElement('canvas');
   foilCanvas.width = 256;
   foilCanvas.height = 256;
   const fCtx = foilCanvas.getContext('2d')!;
-  fCtx.fillStyle = '#d97706';
+  const foilGrad = fCtx.createLinearGradient(0, 0, 256, 256);
+  foilGrad.addColorStop(0, '#b45309');
+  foilGrad.addColorStop(0.5, '#f59e0b');
+  foilGrad.addColorStop(1, '#92400e');
+  fCtx.fillStyle = foilGrad;
   fCtx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 500; i++) {
-    fCtx.fillStyle = i % 2 === 0 ? 'rgba(254, 240, 138, 0.38)' : 'rgba(120, 53, 15, 0.36)';
+  for (let i = 0; i < 850; i++) {
+    const tone = i % 3;
+    fCtx.fillStyle =
+      tone === 0
+        ? 'rgba(254, 240, 138, 0.44)'
+        : tone === 1
+          ? 'rgba(120, 53, 15, 0.42)'
+          : 'rgba(245, 158, 11, 0.32)';
     const x = Math.random() * 256;
     const y = Math.random() * 256;
     fCtx.beginPath();
     fCtx.moveTo(x, y);
-    fCtx.lineTo(x + (Math.random() - 0.5) * 24, y + (Math.random() - 0.5) * 24);
-    fCtx.lineTo(x + (Math.random() - 0.5) * 24, y + (Math.random() - 0.5) * 24);
+    fCtx.lineTo(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20);
+    fCtx.lineTo(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20);
     fCtx.fill();
   }
 
-  // 3. Photovoltaic Solar Array Grid
+  // 3. High-Efficiency Photovoltaic Solar Cell Grid
   const solarCanvas = document.createElement('canvas');
   solarCanvas.width = 256;
   solarCanvas.height = 256;
   const sCtx = solarCanvas.getContext('2d')!;
-  sCtx.fillStyle = '#0f172a';
+  sCtx.fillStyle = '#0b1324';
   sCtx.fillRect(0, 0, 256, 256);
-  sCtx.fillStyle = '#1d4ed8';
+  sCtx.fillStyle = '#1e40af';
   for (let x = 4; x < 256; x += 32) {
     for (let y = 4; y < 256; y += 16) {
       sCtx.fillRect(x, y, 26, 12);
+      sCtx.fillStyle = 'rgba(96, 165, 250, 0.25)';
+      sCtx.fillRect(x, y, 26, 2);
+      sCtx.fillStyle = '#1e40af';
     }
   }
-  sCtx.strokeStyle = '#38bdf8';
+  sCtx.strokeStyle = '#60a5fa';
   sCtx.lineWidth = 1;
   for (let x = 0; x <= 256; x += 32) {
     sCtx.beginPath();
@@ -177,19 +205,29 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     cCtx.fill();
   }
 
-  // 5. SLS SOFI Orange Core Stage
+  // 5. SLS Block 1 Core Stage Texture (Blueprint Accurate: SOFI Orange + Corrugated Intertank + Engine Shroud)
   const coreCanvas = document.createElement('canvas');
   coreCanvas.width = 512;
   coreCanvas.height = 1024;
   const scCtx = coreCanvas.getContext('2d')!;
   const coreGrad = scCtx.createLinearGradient(0, 0, 512, 0);
   coreGrad.addColorStop(0, '#c2410c');
-  coreGrad.addColorStop(0.5, '#f97316');
+  coreGrad.addColorStop(0.5, '#ea580c');
   coreGrad.addColorStop(1, '#c2410c');
   scCtx.fillStyle = coreGrad;
   scCtx.fillRect(0, 0, 512, 1024);
-  scCtx.fillStyle = 'rgba(154, 52, 18, 0.45)';
-  scCtx.fillRect(0, 170, 512, 145);
+
+  // Intertank vertical stringer ribs & weld rings
+  scCtx.fillStyle = 'rgba(124, 45, 18, 0.55)';
+  scCtx.fillRect(0, 155, 512, 150);
+  scCtx.fillStyle = 'rgba(253, 186, 116, 0.25)';
+  for (let rx = 8; rx < 512; rx += 16) {
+    scCtx.fillRect(rx, 155, 4, 150);
+  }
+  scCtx.fillStyle = 'rgba(154, 52, 18, 0.5)';
+  scCtx.fillRect(0, 620, 512, 14);
+
+  // White Aft Engine Section + Roll Pattern
   scCtx.fillStyle = '#f8fafc';
   scCtx.fillRect(0, 868, 512, 156);
   scCtx.fillStyle = '#0f172a';
@@ -198,13 +236,13 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     scCtx.fillRect(x + 20, 965, 18, 38);
   }
   scCtx.fillStyle = '#ffffff';
-  scCtx.font = 'bold 52px sans-serif';
+  scCtx.font = 'bold 54px sans-serif';
   scCtx.textAlign = 'center';
-  scCtx.fillText('U', 256, 480);
-  scCtx.fillText('S', 256, 555);
-  scCtx.fillText('A', 256, 630);
+  scCtx.fillText('U', 256, 465);
+  scCtx.fillText('S', 256, 540);
+  scCtx.fillText('A', 256, 615);
 
-  // 6. 5-Segment Solid Rocket Booster
+  // 6. 5-Segment Solid Rocket Booster Texture (Blueprint Accurate)
   const srbCanvas = document.createElement('canvas');
   srbCanvas.width = 256;
   srbCanvas.height = 1024;
@@ -212,8 +250,15 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   srCtx.fillStyle = '#f8fafc';
   srCtx.fillRect(0, 0, 256, 1024);
   srCtx.fillStyle = '#0f172a';
-  srCtx.fillRect(0, 120, 256, 26);
-  srCtx.fillRect(0, 855, 256, 22);
+  srCtx.fillRect(0, 110, 256, 28);
+  srCtx.fillRect(0, 855, 256, 24);
+  // US Flag & NASA stripe band
+  srCtx.fillStyle = '#1d4ed8';
+  srCtx.fillRect(92, 230, 32, 24);
+  srCtx.fillStyle = '#dc2626';
+  for (let sy = 230; sy < 270; sy += 8) {
+    srCtx.fillRect(124, sy, 42, 4);
+  }
   srCtx.strokeStyle = '#64748b';
   srCtx.lineWidth = 4;
   [290, 435, 580, 725, 855].forEach((y) => {
@@ -223,14 +268,14 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     srCtx.stroke();
   });
 
-  // 7. Orion Capsule Tiles
+  // 7. Orion Capsule Tiles + Windows + Hatch
   const orionCanvas = document.createElement('canvas');
   orionCanvas.width = 512;
   orionCanvas.height = 256;
   const oCtx = orionCanvas.getContext('2d')!;
   oCtx.fillStyle = '#f1f5f9';
   oCtx.fillRect(0, 0, 512, 256);
-  oCtx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+  oCtx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
   for (let x = 0; x < 512; x += 32) {
     oCtx.beginPath();
     oCtx.moveTo(x, 0);
@@ -241,43 +286,167 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   oCtx.fillRect(216, 68, 80, 52);
   oCtx.fillStyle = '#1e3a8a';
   oCtx.fillRect(222, 74, 68, 40);
-  oCtx.fillStyle = '#1d4ed8';
+  oCtx.fillStyle = '#0b3d91';
   oCtx.beginPath();
-  oCtx.arc(256, 172, 22, 0, Math.PI * 2);
+  oCtx.arc(256, 174, 22, 0, Math.PI * 2);
   oCtx.fill();
 
-  // 8. KSC Ground Coastal Plain
+  // 8. NASA Meatball Insignia Decal Texture
+  const nasaCanvas = document.createElement('canvas');
+  nasaCanvas.width = 256;
+  nasaCanvas.height = 256;
+  const nCtx = nasaCanvas.getContext('2d')!;
+  nCtx.clearRect(0, 0, 256, 256);
+  nCtx.fillStyle = '#0B3D91';
+  nCtx.beginPath();
+  nCtx.arc(128, 128, 96, 0, Math.PI * 2);
+  nCtx.fill();
+  nCtx.strokeStyle = '#FC3D21';
+  nCtx.lineWidth = 14;
+  nCtx.beginPath();
+  nCtx.moveTo(28, 165);
+  nCtx.lineTo(132, 90);
+  nCtx.lineTo(234, 54);
+  nCtx.stroke();
+  nCtx.fillStyle = '#FFFFFF';
+  nCtx.font = 'bold 52px Georgia, serif';
+  nCtx.textAlign = 'center';
+  nCtx.fillText('NASA', 128, 146);
+
+  // 9. KSC Ground Coastal Plain & Tarmac Apron
   const kscCanvas = document.createElement('canvas');
   kscCanvas.width = 512;
   kscCanvas.height = 512;
   const kCtx = kscCanvas.getContext('2d')!;
-  kCtx.fillStyle = '#1d362e';
+  kCtx.fillStyle = '#182b27';
   kCtx.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 12000; i++) {
-    const shade = 28 + Math.floor(Math.random() * 40);
-    kCtx.fillStyle = `rgba(${shade}, ${shade + 28}, ${shade - 4}, 0.28)`;
+  for (let i = 0; i < 14000; i++) {
+    const shade = 24 + Math.floor(Math.random() * 34);
+    kCtx.fillStyle = `rgba(${shade}, ${shade + 22}, ${shade + 10}, 0.32)`;
     kCtx.fillRect(Math.random() * 512, Math.random() * 512, 2.5, 2.5);
   }
+  kCtx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+  kCtx.lineWidth = 2;
+  for (let g = 0; g < 512; g += 64) {
+    kCtx.beginPath();
+    kCtx.moveTo(g, 0);
+    kCtx.lineTo(g, 512);
+    kCtx.stroke();
+    kCtx.beginPath();
+    kCtx.moveTo(0, g);
+    kCtx.lineTo(512, g);
+    kCtx.stroke();
+  }
 
-  // 9. Florida Dusk Sky Dome
+  // 10. Florida Space Coast Sunset-to-Twilight Atmospheric Sky Dome
   const skyCanvas = document.createElement('canvas');
-  skyCanvas.width = 512;
+  skyCanvas.width = 1024;
   skyCanvas.height = 512;
   const skCtx = skyCanvas.getContext('2d')!;
   const skGrad = skCtx.createLinearGradient(0, 0, 0, 512);
   skGrad.addColorStop(0.0, '#020617');
-  skGrad.addColorStop(0.32, '#0f172a');
-  skGrad.addColorStop(0.45, '#1e3a5f');
-  skGrad.addColorStop(0.50, '#ea580c');
-  skGrad.addColorStop(0.54, '#f59e0b');
-  skGrad.addColorStop(0.62, '#1e293b');
-  skGrad.addColorStop(1.0, '#0f172a');
+  skGrad.addColorStop(0.24, '#071330');
+  skGrad.addColorStop(0.38, '#173461');
+  skGrad.addColorStop(0.455, '#3b5f8c');
+  skGrad.addColorStop(0.485, '#ea7b35');
+  skGrad.addColorStop(0.505, '#fbbf24');
+  skGrad.addColorStop(0.53, '#7c3f2e');
+  skGrad.addColorStop(0.60, '#162238');
+  skGrad.addColorStop(1.0, '#070b14');
   skCtx.fillStyle = skGrad;
-  skCtx.fillRect(0, 0, 512, 512);
+  skCtx.fillRect(0, 0, 1024, 512);
+
+  // Subtle distant twilight cirrus bands near horizon
+  for (let i = 0; i < 65; i++) {
+    const cx = Math.random() * 1024;
+    const cy = 195 + Math.random() * 56;
+    const w = 55 + Math.random() * 130;
+    const cg = skCtx.createRadialGradient(cx, cy, 4, cx, cy, w);
+    const warm = cy > 230;
+    cg.addColorStop(0, warm ? 'rgba(253, 186, 116, 0.24)' : 'rgba(147, 197, 253, 0.16)');
+    cg.addColorStop(1, 'rgba(0,0,0,0)');
+    skCtx.fillStyle = cg;
+    skCtx.beginPath();
+    skCtx.ellipse(cx, cy, w, 9, 0, 0, Math.PI * 2);
+    skCtx.fill();
+  }
+
+  // 11. Volumetric Cloud Puff Sprite Texture
+  const puffCanvas = document.createElement('canvas');
+  puffCanvas.width = 128;
+  puffCanvas.height = 128;
+  const pCtx = puffCanvas.getContext('2d')!;
+  pCtx.clearRect(0, 0, 128, 128);
+  const pGrad = pCtx.createRadialGradient(64, 58, 6, 64, 64, 60);
+  pGrad.addColorStop(0, 'rgba(241, 245, 249, 0.72)');
+  pGrad.addColorStop(0.45, 'rgba(203, 213, 225, 0.36)');
+  pGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+  pCtx.fillStyle = pGrad;
+  pCtx.fillRect(0, 0, 128, 128);
+
+  // 12. LC-39B Structural Steel & Concrete Grit Texture
+  const steelCanvas = document.createElement('canvas');
+  steelCanvas.width = 256;
+  steelCanvas.height = 256;
+  const stCtx = steelCanvas.getContext('2d')!;
+  stCtx.fillStyle = '#475569';
+  stCtx.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 16) {
+    stCtx.fillStyle = y % 32 === 0 ? 'rgba(15, 23, 42, 0.28)' : 'rgba(226, 232, 240, 0.12)';
+    stCtx.fillRect(0, y, 256, 3);
+  }
+  for (let i = 0; i < 1200; i++) {
+    stCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
+    stCtx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+  }
+
+  // 13. Mars Jezero Iron-Oxide & Sedimentary Clay Regolith Albedo & Bump
+  const marsCanvas = document.createElement('canvas');
+  marsCanvas.width = 512;
+  marsCanvas.height = 512;
+  const maCtx = marsCanvas.getContext('2d')!;
+  maCtx.fillStyle = '#a44a2a';
+  maCtx.fillRect(0, 0, 512, 512);
+
+  for (let i = 0; i < 180; i++) {
+    const gx = Math.random() * 512;
+    const gy = Math.random() * 512;
+    const gr = 20 + Math.random() * 82;
+    const g = maCtx.createRadialGradient(gx, gy, 2, gx, gy, gr);
+    const tone = i % 3 === 0 ? 'rgba(217, 119, 68, 0.14)' : i % 3 === 1 ? 'rgba(92, 42, 28, 0.16)' : 'rgba(180, 92, 52, 0.12)';
+    g.addColorStop(0, tone);
+    g.addColorStop(1, 'rgba(164, 74, 42, 0)');
+    maCtx.fillStyle = g;
+    maCtx.beginPath();
+    maCtx.arc(gx, gy, gr, 0, Math.PI * 2);
+    maCtx.fill();
+  }
+  for (let i = 0; i < 14000; i++) {
+    const r = 135 + Math.floor(Math.random() * 68);
+    const g = Math.floor(r * 0.45 + Math.random() * 14);
+    const b = Math.floor(r * 0.25 + Math.random() * 10);
+    maCtx.fillStyle = `rgb(${r},${g},${b})`;
+    maCtx.fillRect(Math.random() * 512, Math.random() * 512, 1.8, 1.8);
+  }
+  for (let c = 0; c < 34; c++) {
+    const cx = Math.random() * 512;
+    const cy = Math.random() * 512;
+    const r = 4 + Math.random() * 12;
+    const rimGrad = maCtx.createRadialGradient(cx - r * 0.15, cy - r * 0.15, r * 0.35, cx, cy, r * 1.15);
+    rimGrad.addColorStop(0, 'rgba(72, 28, 18, 0.38)');
+    rimGrad.addColorStop(0.7, 'rgba(224, 142, 92, 0.18)');
+    rimGrad.addColorStop(1, 'rgba(164, 74, 42, 0)');
+    maCtx.fillStyle = rimGrad;
+    maCtx.beginPath();
+    maCtx.arc(cx, cy, r * 1.15, 0, Math.PI * 2);
+    maCtx.fill();
+  }
 
   return {
-    moonAlbedo: finalizeColorTex(moonCanvas, maxAnisotropy, 10, 10),
-    moonBump: finalizeDataTex(moonCanvas, maxAnisotropy, 10, 10),
+    moonAlbedo: finalizeColorTex(moonCanvas, maxAnisotropy, 12, 12),
+    moonBump: finalizeDataTex(moonCanvas, maxAnisotropy, 12, 12),
+    marsAlbedo: finalizeColorTex(marsCanvas, maxAnisotropy, 12, 12),
+    marsBump: finalizeDataTex(marsCanvas, maxAnisotropy, 12, 12),
     foilAlbedo: finalizeColorTex(foilCanvas, maxAnisotropy, 3, 3),
     foilBump: finalizeDataTex(foilCanvas, maxAnisotropy, 3, 3),
     solarPanel: finalizeColorTex(solarCanvas, maxAnisotropy),
@@ -286,7 +455,10 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     slsCore: finalizeColorTex(coreCanvas, maxAnisotropy),
     slsSrb: finalizeColorTex(srbCanvas, maxAnisotropy),
     orionTile: finalizeColorTex(orionCanvas, maxAnisotropy),
+    nasaDecal: finalizeColorTex(nasaCanvas, maxAnisotropy),
     kscGround: finalizeColorTex(kscCanvas, maxAnisotropy, 16, 16),
     duskSky: finalizeColorTex(skyCanvas, maxAnisotropy),
+    cloudPuff: finalizeColorTex(puffCanvas, maxAnisotropy),
+    towerSteel: finalizeColorTex(steelCanvas, maxAnisotropy, 2, 4),
   };
 }
