@@ -1,0 +1,8 @@
+{
+  "name": "Artemis Odyssey — Junior Astronaut Mission Trainer",
+  "description": "Interactive 3D NASA Space Apps Challenge mission trainer teaching real spaceflight engineering trade-offs across rocket launch, solar system flight, lunar landing, and VIPER rover operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
