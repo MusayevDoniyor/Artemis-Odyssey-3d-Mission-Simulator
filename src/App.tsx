@@ -3,6 +3,7 @@ import { BriefingOverlay } from './components/BriefingOverlay';
 import { FieldNotebookModal } from './components/FieldNotebookModal';
 import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
+import { MobileAcademyView } from './components/MobileAcademyView';
 import { NasaDataModal } from './components/NasaDataModal';
 import { OutcomeModal } from './components/OutcomeModal';
 import { RoverHUD } from './components/RoverHUD';
@@ -86,6 +87,7 @@ const EMPTY_INPUT: InputState = {
   stabilize: false,
   throttleDown: false,
   cutoff: false,
+  killDrift: false,
 };
 
 function clonePlanetObjectives(planet: SurfacePlanet): RoverObjective[] {
@@ -164,6 +166,27 @@ export default function App() {
   const [nasaModalOpen, setNasaModalOpen] = useState<boolean>(false);
   const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
   const [mapExpanded, setMapExpanded] = useState<boolean>(false);
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 1024
+  );
+  const modalOpenRef = useRef<boolean>(false);
+  const prevGatesPassedRef = useRef<number>(0);
+
+  useEffect(() => {
+    modalOpenRef.current = nasaModalOpen || fieldNotebookOpen;
+  }, [nasaModalOpen, fieldNotebookOpen]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const nextDesktop = window.innerWidth >= 1024;
+      setIsDesktop(nextDesktop);
+      if (!nextDesktop) {
+        soundSynth.setThrustVolume(0);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [carryoverUi, setCarryoverUi] = useState<CampaignCarryoverState>(carryoverRef.current);
   const [launchUi, setLaunchUi] = useState<LaunchState>(simRef.current.launch);
@@ -223,12 +246,16 @@ export default function App() {
 
   // Update body[data-state] for deterministic automation/accessibility state checks
   useEffect(() => {
+    if (!isDesktop) {
+      document.body.dataset.state = 'mobile-academy';
+      return;
+    }
     let bodyState = 'playing';
     if (phase === 'title') bodyState = 'title';
     else if (phase === 'gameover' || phase === 'victory') bodyState = 'gameover';
     else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi) bodyState = 'paused';
     document.body.dataset.state = bodyState;
-  }, [phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi]);
+  }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi]);
 
   // Fetch live NASA DONKI + OSDR telemetry
   useEffect(() => {
@@ -350,6 +377,7 @@ export default function App() {
           targetPlanet,
           carryoverRef.current.isruFuelBonusPct
         );
+        prevGatesPassedRef.current = 0;
       } else if (targetPhase === 'rover') {
         s.phase = 'rover';
         s.cameraMode = 'chase';
@@ -376,7 +404,7 @@ export default function App() {
   const onFrameTick = useCallback(
     (dt: number) => {
       const s = simRef.current;
-      if (s.paused || nasaModalOpen || fieldNotebookOpen || discoveryObjRef.current) {
+      if (s.paused || modalOpenRef.current || discoveryObjRef.current) {
         soundSynth.setThrustVolume(0);
         return;
       }
@@ -475,9 +503,14 @@ export default function App() {
           syncUiNow();
         }
 
+        const atSpaceTarget =
+          (s.space.targetId === 'relay-orbit' &&
+            (s.space.inSatDeployZone || s.space.orbitalSat.linkLocked)) ||
+          (s.space.targetId === 'moon' && s.space.arrivedMoon) ||
+          (s.space.targetId === 'gateway' && s.space.arrivedGateway) ||
+          (s.space.targetId === 'mars' && s.space.arrivedMars);
         const thrustOn =
-          (s.input.forward ||
-            (s.space.autoPilot && !s.space.arrivedMoon && !s.space.arrivedMars && !s.space.arrivedGateway)) &&
+          (s.input.forward || (s.space.autoPilot && !atSpaceTarget)) &&
           s.space.fuelPct > 0;
         soundSynth.setThrustVolume(thrustOn ? (s.space.boostActive ? 0.75 : 0.45) : 0);
 
@@ -498,6 +531,10 @@ export default function App() {
           return;
         }
       } else if (s.phase === 'landing') {
+        if (s.landing.gatesPassed > prevGatesPassedRef.current) {
+          prevGatesPassedRef.current = s.landing.gatesPassed;
+          soundSynth.playTone(987.77, 0.16, 'triangle', 0.14);
+        }
         const payload = PAYLOADS[payloadRef.current];
         s.landing = stepLandingPhysics(s.landing, s.input, dt, payload.fragile);
         soundSynth.setThrustVolume(!s.landing.landed && s.landing.fuelPct > 0 ? s.landing.throttle : 0);
@@ -676,21 +713,26 @@ export default function App() {
         setObjectivesUi(s.objectives.map((o) => ({ ...o })));
       }
     },
-    [fieldNotebookOpen, markMissionComplete, nasaModalOpen, syncUiNow, unlockFieldNote]
+    [markMissionComplete, syncUiNow, unlockFieldNote]
   );
 
-  // Mount Three.js Scene Manager
+  const onFrameTickRef = useRef(onFrameTick);
+  onFrameTickRef.current = onFrameTick;
+
+  // Mount Three.js Scene Manager only on desktop (>=1024px); never tear down WebGL on modal open/close
   useEffect(() => {
+    if (!isDesktop) return;
     const el = containerRef.current;
     if (!el) return;
-    const mgr = new SpaceSceneManager(el, simRef, onFrameTick);
+    const mgr = new SpaceSceneManager(el, simRef, (dt) => onFrameTickRef.current(dt));
     sceneMgrRef.current = mgr;
 
     return () => {
+      soundSynth.setThrustVolume(0);
       mgr.dispose();
       sceneMgrRef.current = null;
     };
-  }, [onFrameTick]);
+  }, [isDesktop]);
 
   // Unified Keyboard + Pointer + Hold-Button Input Hub
   useEffect(() => {
@@ -714,9 +756,11 @@ export default function App() {
       if (code === 'KeyQ') inp.tiltForward = down;
       if (code === 'KeyZ') inp.throttleDown = down;
       if (code === 'KeyX') inp.cutoff = down;
+      if (code === 'KeyB') inp.killDrift = down;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (window.innerWidth < 1024) return;
       if (!document.hasFocus()) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -819,6 +863,9 @@ export default function App() {
           const pct = clamp(s.landing.hoverThrottlePct / 100, 0.1, 1);
           s.landing.targetThrottle = pct;
           s.landing.throttle = pct;
+          syncUiNow();
+        } else if (e.code === 'KeyK') {
+          s.landing.autoCutoff = !s.landing.autoCutoff;
           syncUiNow();
         }
       }
@@ -1004,6 +1051,24 @@ export default function App() {
   const nextMissionLabel = nextMissionId
     ? `Next: ${CAMPAIGN_MISSIONS[nextMissionId].shortLabel}`
     : null;
+
+  if (!isDesktop) {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-slate-950">
+        <MobileAcademyView
+          donki={donki}
+          osdr={osdr}
+          onOpenNasaModal={() => setNasaModalOpen(true)}
+        />
+        <NasaDataModal
+          open={nasaModalOpen}
+          donki={donki}
+          osdr={osdr}
+          onClose={() => setNasaModalOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-950">
@@ -1256,6 +1321,10 @@ export default function App() {
             const hoverNorm = clamp(simRef.current.landing.hoverThrottlePct / 100, 0.1, 1);
             simRef.current.landing.targetThrottle = hoverNorm;
             simRef.current.landing.throttle = hoverNorm;
+            syncUiNow();
+          }}
+          onToggleAutoCutoff={() => {
+            simRef.current.landing.autoCutoff = !simRef.current.landing.autoCutoff;
             syncUiNow();
           }}
         />

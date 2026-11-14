@@ -234,6 +234,10 @@ export interface LandingState {
   distToPad: number;
   gatesPassed: number;
   gateBonusScore: number;
+  slopeDeg: number;
+  tGoSec: number;
+  windSpeedMs: number;
+  autoCutoff: boolean;
   landed: boolean;
   result: LandingResult;
   score: number;
@@ -319,6 +323,7 @@ export interface InputState {
   stabilize: boolean;
   throttleDown?: boolean;
   cutoff?: boolean;
+  killDrift?: boolean;
 }
 
 export interface CrashFxState {

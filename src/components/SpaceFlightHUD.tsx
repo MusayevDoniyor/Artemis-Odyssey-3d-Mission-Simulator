@@ -1,5 +1,6 @@
 import { BookOpen, Navigation, Pause, Radio, Satellite, Shield, Volume2, VolumeX } from 'lucide-react';
 import { CAMPAIGN_MISSIONS, SOLAR_TARGETS } from '../game/constants';
+import { getSpaceMissionProgress } from '../game/missionProgress';
 import type {
   CampaignCarryoverState,
   CampaignMissionId,
@@ -8,6 +9,7 @@ import type {
   SpaceFlightState,
   SpaceTargetId,
 } from '../game/types';
+import { MissionProgressBar } from './MissionProgressBar';
 
 interface SpaceFlightHUDProps {
   space: SpaceFlightState;
@@ -126,11 +128,15 @@ export function SpaceFlightHUD({
   const distToTarget = Math.hypot(activeTarget.x - space.shipX, activeTarget.z - space.shipZ);
   const missionSpec = CAMPAIGN_MISSIONS[campaignMission];
   const sat = space.orbitalSat;
+  const missionProgress = getSpaceMissionProgress(space, campaignMission);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
-      {/* Top Bar: Destination Selector + Ecliptic Radar + Resources */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-2.5">
+        <MissionProgressBar info={missionProgress} />
+
+        {/* Top Bar: Destination Selector + Ecliptic Radar + Resources */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="hud-panel pointer-events-auto flex items-center gap-3 rounded-xl p-2.5">
           <EclipticMiniRadar space={space} satLocked={sat.linkLocked} />
 
@@ -326,6 +332,7 @@ export function SpaceFlightHUD({
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
 

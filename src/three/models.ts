@@ -167,7 +167,7 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   });
   const padRing = new THREE.Mesh(new THREE.RingGeometry(6.2, 6.65, 36), ringMat);
   padRing.rotation.x = -Math.PI / 2;
-  padRing.position.y = 0.39;
+  padRing.position.y = 0.385;
   padGroup.add(padRing);
 
   const padInner = new THREE.Mesh(
@@ -175,19 +175,19 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
   );
   padInner.rotation.x = -Math.PI / 2;
-  padInner.position.y = 0.4;
+  padInner.position.y = 0.405;
   padGroup.add(padInner);
 
   // Landing Pad 'H' markings
   const hMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
   const hBarL = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 2.8), hMat);
   hBarL.rotation.x = -Math.PI / 2;
-  hBarL.position.set(-0.95, 0.41, 0);
+  hBarL.position.set(-0.95, 0.425, 0);
   const hBarR = hBarL.clone();
   hBarR.position.x = 0.95;
   const hCross = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.45), hMat);
   hCross.rotation.x = -Math.PI / 2;
-  hCross.position.set(0, 0.41, 0);
+  hCross.position.set(0, 0.425, 0);
   padGroup.add(hBarL, hBarR, hCross);
 
   for (let i = 0; i < 8; i++) {
@@ -368,6 +368,41 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
 
   tagPart(commsGroup, 'base-comms');
   habGroup.add(commsGroup);
+
+  // Exterior ISRU / MOXIE Electrolysis Skid & Compacted Regolith Berm Arc
+  const isruSkid = new THREE.Group();
+  isruSkid.position.set(5.4, 0, -6.2);
+  const skidBase = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.25, 2.2), hullDark);
+  skidBase.position.y = 0.125;
+  isruSkid.add(skidBase);
+  [-0.75, 0.75].forEach((tx, idx) => {
+    const cryoTank = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.44, 0.44, 2.1, 14),
+      idx === 0 ? hullWhite : new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.65, roughness: 0.25 })
+    );
+    cryoTank.position.set(tx, 1.25, 0);
+    cryoTank.castShadow = true;
+    isruSkid.add(cryoTank);
+  });
+  isruSkid.add(createStrutBetween(new THREE.Vector3(-0.75, 1.95, 0), new THREE.Vector3(0.75, 1.95, 0), 0.08, 0.08, hullDark));
+  isruSkid.add(createStrutBetween(new THREE.Vector3(0, 0.5, 0.8), new THREE.Vector3(-2.6, 1.1, 3.2), 0.07, 0.07, hullWhite));
+  tagPart(isruSkid, 'base-power');
+  habGroup.add(isruSkid);
+
+  // Compacted Regolith Radiation Berm Arc (OSDR OSD-489 shelter wall)
+  const bermGroup = new THREE.Group();
+  const bermMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.94, metalness: 0.06, flatShading: true });
+  for (let b = 0; b < 7; b++) {
+    const ang = -Math.PI * 0.85 + (b / 6) * Math.PI * 0.7;
+    const mound = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.9, 1.85, 6), bermMat);
+    mound.position.set(Math.cos(ang) * 10.6, 0.8, Math.sin(ang) * 10.6);
+    mound.rotation.y = ang;
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    bermGroup.add(mound);
+  }
+  tagPart(bermGroup, 'base-habitat');
+  habGroup.add(bermGroup);
 
   group.add(habGroup);
   moonColliders.push({ x: -15, z: -13, r: 9.6, type: 'habitat', label: 'Artemis Base Camp' });
@@ -674,14 +709,19 @@ export interface LunarLanderHandles {
   group: THREE.Group;
   descentStage: THREE.Group;
   ascentStage: THREE.Group;
+  marsTrim: THREE.Group;
   legs: THREE.Group[];
+  probes: THREE.Mesh[];
   nozzleGroup: THREE.Group;
   flameMesh: THREE.Mesh;
   flameInner: THREE.Mesh;
   machDiamond: THREE.Mesh;
   engineLight: THREE.PointLight;
+  landingSpot: THREE.SpotLight;
   rcsLeft: THREE.Mesh;
   rcsRight: THREE.Mesh;
+  rcsFwd: THREE.Mesh;
+  rcsBack: THREE.Mesh;
   legsGroup: THREE.Group;
 }
 
@@ -729,9 +769,10 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
     descentStage.add(tank);
   }
 
-  // 4 Articulated Tripod Landing Legs + Boarding Ladder on Front Leg (+Z)
+  // 4 Articulated Tripod Landing Legs + Retractable Contact Probes + Front Boarding Ladder (+Z)
   const legsGroup = new THREE.Group();
   const legs: THREE.Group[] = [];
+  const probes: THREE.Mesh[] = [];
   for (let i = 0; i < 4; i++) {
     const a = (i * Math.PI) / 2;
     const legRoot = new THREE.Group();
@@ -755,18 +796,23 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
     legRoot.add(createStrutBetween(new THREE.Vector3(-0.66, 1.05, 2.08), pAnkle, 0.042, 0.04, strutMat));
     legRoot.add(createStrutBetween(new THREE.Vector3(0.66, 1.05, 2.08), pAnkle, 0.042, 0.04, strutMat));
 
-    // Dish Footpad + Ankle Collar + Contact Probe
+    // Dish Footpad + Ankle Collar + Telescoping Surface Contact Probe
     const footpad = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 0.14, 18), strutMat);
     footpad.position.set(0, 0.07, 3.24);
     legRoot.add(footpad);
 
+    const ankleCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.18, 10), cabinDarkMat);
+    ankleCollar.position.set(0, 0.22, 3.24);
+    legRoot.add(ankleCollar);
+
     if (i !== 0) {
       const probe = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.015, 1.05, 6),
+        new THREE.CylinderGeometry(0.022, 0.015, 0.72, 6),
         new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.15 })
       );
-      probe.position.set(0, -0.46, 3.24);
+      probe.position.set(0, -0.24, 3.24);
       legRoot.add(probe);
+      probes.push(probe);
     } else {
       // Front Astronaut Boarding Ladder cleanly parallel along the +Z primary strut
       const lTop = new THREE.Vector3(-0.21, 2.38, 2.26);
@@ -788,6 +834,33 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
     legs.push(legRoot);
   }
   descentStage.add(legsGroup);
+
+  // Mars 0.38g EDL Trim Package (Aeroshell Thermal Flange + 4 Canted Quad-MLE Pods)
+  const marsTrim = new THREE.Group();
+  const aeroshellRing = new THREE.Mesh(
+    new THREE.TorusGeometry(2.38, 0.16, 10, 24),
+    new THREE.MeshStandardMaterial({ color: 0x451a12, metalness: 0.35, roughness: 0.65 })
+  );
+  aeroshellRing.rotation.x = Math.PI / 2;
+  aeroshellRing.position.y = 0.98;
+  marsTrim.add(aeroshellRing);
+  [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].forEach((ma) => {
+    const pod = new THREE.Group();
+    pod.position.set(Math.sin(ma) * 2.32, 1.32, Math.cos(ma) * 2.32);
+    pod.rotation.y = ma;
+    const fairing = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.62, 0.44), cabinDarkMat);
+    pod.add(fairing);
+    const mleNoz = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.2, 0.42, 12, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.22, side: THREE.DoubleSide })
+    );
+    mleNoz.position.set(0, -0.38, 0.12);
+    mleNoz.rotation.x = -0.22;
+    pod.add(mleNoz);
+    marsTrim.add(pod);
+  });
+  marsTrim.visible = false;
+  descentStage.add(marsTrim);
 
   // Gimbaled Variable-Thrust Descent Engine Bell
   const nozzleGroup = new THREE.Group();
@@ -832,6 +905,12 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
   const engineLight = new THREE.PointLight(0xf97316, 0, 28);
   engineLight.position.set(0, -0.5, 0);
   descentStage.add(engineLight);
+
+  const landingSpot = new THREE.SpotLight(0xe0f2fe, 0, 56, Math.PI / 5, 0.55, 1.2);
+  landingSpot.position.set(0, 1.15, 1.65);
+  landingSpot.target.position.set(0, -14, 1.65);
+  descentStage.add(landingSpot);
+  descentStage.add(landingSpot.target);
   tagPart(descentStage, 'lm-descent');
 
   // Faceted Ascent Stage Crew Cabin (LM-2 Blueprint Accurate)
@@ -948,6 +1027,18 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
   rcsRight.visible = false;
   rcsGroup.add(rcsRight);
 
+  const rcsFwd = new THREE.Mesh(rcsGeo, rcsMat);
+  rcsFwd.position.set(0, 3.65, 2.05);
+  rcsFwd.rotation.x = Math.PI / 2;
+  rcsFwd.visible = false;
+  rcsGroup.add(rcsFwd);
+
+  const rcsBack = new THREE.Mesh(rcsGeo, rcsMat);
+  rcsBack.position.set(0, 3.65, -2.05);
+  rcsBack.rotation.x = -Math.PI / 2;
+  rcsBack.visible = false;
+  rcsGroup.add(rcsBack);
+
   tagPart(rcsGroup, 'lm-rcs');
   tagPart(nozzleGroup, 'lm-rcs');
 
@@ -956,14 +1047,19 @@ export function createLunarLander(tex: ProceduralTextureSet): LunarLanderHandles
     group,
     descentStage,
     ascentStage,
+    marsTrim,
     legs,
+    probes,
     nozzleGroup,
     flameMesh,
     flameInner,
     machDiamond,
     engineLight,
+    landingSpot,
     rcsLeft,
     rcsRight,
+    rcsFwd,
+    rcsBack,
     legsGroup,
   };
 }
@@ -984,6 +1080,8 @@ export interface ViperRoverHandles {
   drillBit: THREE.Mesh;
   dish: THREE.Mesh;
   camHead: THREE.Group;
+  panelMat: THREE.MeshStandardMaterial;
+  strobeMesh: THREE.Mesh;
   headlight: THREE.SpotLight;
 }
 
@@ -1023,22 +1121,44 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     new THREE.PlaneGeometry(0.38, 0.38),
     new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
   );
-  nasaFront.position.set(-0.18, 0.88, 0.96);
+  nasaFront.position.set(-0.18, 0.88, 0.965);
   bodyGroup.add(nasaFront);
 
   const nasaRear = nasaFront.clone();
-  nasaRear.position.set(0, 0.88, -0.96);
+  nasaRear.position.set(0, 0.88, -1.135);
   nasaRear.rotation.y = Math.PI;
   bodyGroup.add(nasaRear);
 
-  // Aft Battery Pack Module
+  // Aft Battery Pack Module + Under-Chassis Neutron Spectrometer Housing
   const batteryBox = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.44, 0.34), darkMetal);
   batteryBox.position.set(0, 0.86, -0.95);
   bodyGroup.add(batteryBox);
 
+  const neutronSpec = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.22, 0.56), darkMetal);
+  neutronSpec.position.set(-0.12, 0.52, -0.15);
+  bodyGroup.add(neutronSpec);
+
+  // Front & Rear Stereo Hazcam Pods
+  const hazLensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  [
+    [-0.44, 0.7, 0.96, 0],
+    [0.44, 0.7, 0.96, 0],
+    [-0.36, 0.7, -1.12, Math.PI],
+    [0.36, 0.7, -1.12, Math.PI],
+  ].forEach(([hx, hy, hz, ry]) => {
+    const pod = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.08), darkMetal);
+    pod.position.set(hx, hy, hz);
+    pod.rotation.y = ry;
+    const hLens = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.05, 8), hazLensMat);
+    hLens.rotation.x = Math.PI / 2;
+    hLens.position.set(0, 0, 0.04);
+    pod.add(hLens);
+    bodyGroup.add(pod);
+  });
+
   tagPart(bodyGroup, 'rover-mobility');
 
-  // High-Efficiency Twin Wing Top-Mounted Solar Array (mounted cleanly aft of camera mast)
+  // High-Efficiency Twin Wing Top-Mounted Solar Array + Hinge Brackets
   const solarGroup = new THREE.Group();
   const panelMat = new THREE.MeshStandardMaterial({
     map: tex.solarPanel,
@@ -1052,6 +1172,12 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     wing.rotation.z = -Math.sign(px) * 0.06;
     wing.castShadow = true;
     solarGroup.add(wing);
+
+    [-0.65, 0.25].forEach((hz) => {
+      const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.1), darkMetal);
+      hinge.position.set(Math.sign(px) * 0.42, 1.24, hz);
+      solarGroup.add(hinge);
+    });
   });
   [-0.72, 0.72].forEach((sx) => {
     const sideWing = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 1.62), panelMat);
@@ -1104,10 +1230,17 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
   whip.position.set(-0.42, 1.82, -0.78);
   commsGroup.add(whip);
 
+  const strobeMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.055, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+  );
+  strobeMesh.position.set(0, 0.16, 0);
+  camHead.add(strobeMesh);
+
   tagPart(commsGroup, 'rover-comms');
   bodyGroup.add(commsGroup);
 
-  // Forward 2-Segment Articulated TRIDENT Ice Drill Arm (right-front mount, metallic steel & gold collar)
+  // Forward 2-Segment Articulated TRIDENT Ice Drill Arm + Helical Auger Spiral Collars
   const drillArm = new THREE.Group();
   drillArm.position.set(0.46, 0.88, 0.9);
   const boom1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.62), frameMat);
@@ -1131,6 +1264,17 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
   );
   drillBit.position.set(0, -0.78, 0.62);
   drillBit.rotation.x = Math.PI;
+  for (let f = 0; f < 5; f++) {
+    const t = -0.14 + f * 0.072;
+    const flute = new THREE.Mesh(
+      new THREE.TorusGeometry(0.072 - f * 0.008, 0.012, 6, 12),
+      foilMat
+    );
+    flute.position.y = t;
+    flute.rotation.x = Math.PI / 2 + 0.36;
+    flute.rotation.z = f * 0.65;
+    drillBit.add(flute);
+  }
   drillArm.add(drillBit);
   tagPart(drillArm, 'rover-science');
   bodyGroup.add(drillArm);
@@ -1213,7 +1357,7 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     wheelModules.push({ pivot, spin, arm, knuckle, side, forward, baseY: 0.34 });
   });
 
-  return { group, bodyGroup, wheelModules, drillArm, drillBit, dish, camHead, headlight };
+  return { group, bodyGroup, wheelModules, drillArm, drillBit, dish, camHead, panelMat, strobeMesh, headlight };
 }
 
 export interface LaunchComplexHandles {
@@ -1792,6 +1936,7 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     side: THREE.DoubleSide,
   });
   const collarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
+  const throatMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
   rs25Positions.forEach(([px, py, pz]) => {
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.28, 14), collarMat);
     collar.position.set(px, py + 0.16, pz);
@@ -1799,6 +1944,10 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.44, 0.95, 22, 1, true), bellMat);
     bell.position.set(px, py - 0.34, pz);
     coreGroup.add(bell);
+    const throat = new THREE.Mesh(new THREE.CircleGeometry(0.16, 14), throatMat);
+    throat.rotation.x = Math.PI / 2;
+    throat.position.set(px, py - 0.05, pz);
+    coreGroup.add(throat);
   });
   tagPart(coreGroup, 'sls-core');
 
@@ -1924,13 +2073,27 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   stageAdapter.position.y = 21.26;
   orionStack.add(stageAdapter);
 
-  // European Service Module (ESM) cylindrical bus + folded solar bay ribs
+  // European Service Module (ESM) cylindrical bus + folded solar bay ribs & RCS quads
   const esmBody = new THREE.Mesh(
     new THREE.CylinderGeometry(0.67, 0.67, 0.72, 24),
     new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.32, metalness: 0.65 })
   );
   esmBody.position.y = 21.82;
   orionStack.add(esmBody);
+
+  [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((ea) => {
+    const solarRib = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.56, 0.08),
+      new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xbfdbfe, metalness: 0.55, roughness: 0.2 })
+    );
+    solarRib.position.set(Math.sin(ea) * 0.68, 21.82, Math.cos(ea) * 0.68);
+    solarRib.rotation.y = ea;
+    orionStack.add(solarRib);
+
+    const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), collarMat);
+    rcsPod.position.set(Math.sin(ea + Math.PI / 4) * 0.7, 21.95, Math.cos(ea + Math.PI / 4) * 0.7);
+    orionStack.add(rcsPod);
+  });
 
   const heatshieldRing = new THREE.Mesh(
     new THREE.CylinderGeometry(0.68, 0.67, 0.14, 28),
@@ -1977,6 +2140,13 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   );
   lasCollar.position.y = 1.32;
   abortTower.add(lasCollar);
+  [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((na) => {
+    const abortNoz = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 8), bellMat);
+    abortNoz.position.set(Math.sin(na) * 0.18, 1.24, Math.cos(na) * 0.18);
+    abortNoz.rotation.x = Math.cos(na) * 0.45;
+    abortNoz.rotation.z = -Math.sin(na) * 0.45;
+    abortTower.add(abortNoz);
+  });
   const lasTip = new THREE.Mesh(
     new THREE.ConeGeometry(0.15, 1.25, 18),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
@@ -2186,6 +2356,11 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
     const outer = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.05, 0.96), solarMat);
     outer.position.set(dir * 2.98, 0, 0);
     pivot.add(outer);
+    const tipCap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.0), frameMat);
+    tipCap.position.set(dir * 3.83, 0, 0);
+    pivot.add(tipCap);
+    pivot.add(createStrutBetween(new THREE.Vector3(0, 0.06, 0), new THREE.Vector3(dir * 0.45, 0.02, 0.16), 0.018, 0.018, frameMat));
+    pivot.add(createStrutBetween(new THREE.Vector3(0, 0.06, 0), new THREE.Vector3(dir * 0.45, 0.02, -0.16), 0.018, 0.018, frameMat));
     tagPart(pivot, 'sat-solar');
     return pivot;
   };
@@ -2243,7 +2418,7 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
   const umbrellaRight = buildUmbrellaDish(1);
   group.add(umbrellaLeft, umbrellaRight);
 
-  // 4. Central Gimbaled Ka-Band & Optical Laser Dish + Link Beam
+  // 4. Central Gimbaled Ka-Band & Optical Laser Dish + Tripod Struts + Link Beam
   const dishPivot = new THREE.Group();
   dishPivot.position.set(0, 0.96, 0.14);
   const dishBowl = new THREE.Mesh(
@@ -2257,6 +2432,17 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
   feedHorn.position.set(0, 0.24, 0.32);
   feedHorn.rotation.x = Math.PI * 0.28;
   dishPivot.add(feedHorn);
+  [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].forEach((ta) => {
+    dishPivot.add(
+      createStrutBetween(
+        new THREE.Vector3(Math.cos(ta) * 0.46, Math.sin(ta) * 0.34 + 0.12, 0.12),
+        new THREE.Vector3(0, 0.38, 0.48),
+        0.012,
+        0.012,
+        frameMat
+      )
+    );
+  });
 
   const linkBeam = new THREE.Mesh(
     new THREE.CylinderGeometry(0.06, 0.42, 18, 12, 1, true),

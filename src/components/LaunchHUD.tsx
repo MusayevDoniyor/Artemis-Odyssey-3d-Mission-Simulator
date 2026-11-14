@@ -13,7 +13,9 @@ import {
   X,
 } from 'lucide-react';
 import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
+import { getLaunchMissionProgress } from '../game/missionProgress';
 import type { GamePhase, LaunchState, ResourceState } from '../game/types';
+import { MissionProgressBar } from './MissionProgressBar';
 import { NASAInsignia } from './NASAInsignia';
 
 interface LaunchHUDProps {
@@ -175,10 +177,13 @@ export function LaunchHUD({
           },
         ];
 
+  const missionProgress = getLaunchMissionProgress(launch);
+
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between px-4 py-3">
-      {/* TOP BAR: NASA Insignia + Stage Tabs + Quick Controls */}
-      <header className="pointer-events-auto flex flex-wrap items-center justify-between gap-2.5">
+      {/* TOP BAR: NASA Insignia + Stage Tabs + Quick Controls + Mission Progress */}
+      <div className="flex flex-col gap-2">
+        <header className="pointer-events-auto flex flex-wrap items-center justify-between gap-2.5">
         <div className="hud-panel flex items-center gap-3 rounded-xl px-3.5 py-2">
           <NASAInsignia size={36} className="shrink-0" />
           <div className="leading-tight">
@@ -263,7 +268,10 @@ export function LaunchHUD({
             )}
           </button>
         </div>
-      </header>
+        </header>
+
+        <MissionProgressBar info={missionProgress} />
+      </div>
 
       {/* MIDDLE ROW */}
       <div className="relative my-auto flex items-start justify-between gap-4 py-2">

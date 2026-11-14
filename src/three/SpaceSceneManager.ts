@@ -958,9 +958,12 @@ export class SpaceSceneManager {
     ss.shipGroup.position.set(sp.shipX, 0, sp.shipZ);
     ss.shipGroup.rotation.set(0, sp.headingRad, 0);
 
-    const thrusting =
-      (s.input.forward || (sp.autoPilot && !sp.arrivedMoon && !sp.arrivedGateway && !sp.arrivedMars)) &&
-      sp.fuelPct > 0;
+    const atSpaceTarget =
+      (sp.targetId === 'relay-orbit' && (sp.inSatDeployZone || sp.orbitalSat.linkLocked)) ||
+      (sp.targetId === 'moon' && sp.arrivedMoon) ||
+      (sp.targetId === 'gateway' && sp.arrivedGateway) ||
+      (sp.targetId === 'mars' && sp.arrivedMars);
+    const thrusting = (s.input.forward || (sp.autoPilot && !atSpaceTarget)) && sp.fuelPct > 0;
     ss.shipFlame.visible = thrusting;
     if (thrusting) {
       const fScale = (sp.boostActive ? 1.7 : 1.0) * (0.85 + Math.sin(elapsedSec * 40) * 0.15);
@@ -1070,11 +1073,22 @@ export class SpaceSceneManager {
     });
 
     // Showcase / Inspector Camera Modes
+    this.lander.marsTrim.visible = activePlanet === 'mars';
+    this.lander.landingSpot.intensity = 0;
+    this.lander.rcsLeft.visible = false;
+    this.lander.rcsRight.visible = false;
+    this.lander.rcsFwd.visible = false;
+    this.lander.rcsBack.visible = false;
+
     if (s.phase === 'title' || s.phase === 'inspector') {
       this.lander.group.position.set(0, 0.36, 0);
       this.lander.group.rotation.set(0, 0, 0);
       this.lander.flameMesh.visible = false;
       this.lander.engineLight.intensity = 0;
+      this.lander.probes.forEach((p) => {
+        p.position.y = 0.32;
+        p.scale.y = 0.42;
+      });
 
       const rx = 6;
       const rz = 6;
@@ -1126,6 +1140,10 @@ export class SpaceSceneManager {
 
     if (s.phase === 'briefing') {
       this.lander.group.position.set(0, 0.36, 0);
+      this.lander.probes.forEach((p) => {
+        p.position.y = 0.32;
+        p.scale.y = 0.42;
+      });
       this.roverModel.group.position.set(6, getSurfaceTerrainHeight(activePlanet, 6, 6), 6);
       if (s.userOrbitActive) {
         const dist = Math.min(68, Math.max(6, s.orbitDistance));
@@ -1169,6 +1187,16 @@ export class SpaceSceneManager {
 
     lm.flameMesh.visible = firing;
     lm.engineLight.intensity = firing ? 3.5 + f.throttle * 14 : 0;
+    lm.landingSpot.intensity = !f.landed && alt < 44 ? 1.2 + (1 - alt / 44) * 3.8 : 0;
+    lm.probes.forEach((p) => {
+      if (f.landed) {
+        p.position.y = 0.32;
+        p.scale.y = 0.42;
+      } else {
+        p.position.y = -0.24;
+        p.scale.y = 1.0;
+      }
+    });
     if (firing) {
       const flick = 0.9 + Math.sin(elapsedSec * 46) * 0.12;
       const outerMat = lm.flameMesh.material as THREE.MeshBasicMaterial;
@@ -1224,8 +1252,14 @@ export class SpaceSceneManager {
       }
     }
 
-    lm.rcsLeft.visible = !f.landed && s.input.right;
-    lm.rcsRight.visible = !f.landed && s.input.left;
+    const rcsKillActive = !f.landed && Boolean(s.input.killDrift);
+    const autoRollThr = f.guidanceMode === 'AUTOLAND' && Math.abs(f.rollDeg) > 2.2;
+    const autoPitchThr = f.guidanceMode === 'AUTOLAND' && Math.abs(f.pitchDeg) > 2.2;
+    lm.rcsLeft.visible = !f.landed && (s.input.right || (rcsKillActive && f.vx < -0.25) || (autoRollThr && f.rollDeg < -2.2));
+    lm.rcsRight.visible = !f.landed && (s.input.left || (rcsKillActive && f.vx > 0.25) || (autoRollThr && f.rollDeg > 2.2));
+    lm.rcsFwd.visible = !f.landed && (s.input.backward || (rcsKillActive && f.vz < -0.25) || (autoPitchThr && f.pitchDeg < -2.2));
+    lm.rcsBack.visible = !f.landed && (s.input.tiltForward || (rcsKillActive && f.vz > 0.25) || (autoPitchThr && f.pitchDeg > 2.2));
+
     const guideAttr = this.guideLine.geometry.attributes.position as THREE.BufferAttribute;
     guideAttr.setXYZ(0, f.x, f.y, f.z);
     guideAttr.setXYZ(1, f.x, groundY + 0.25, f.z);
@@ -1264,14 +1298,30 @@ export class SpaceSceneManager {
       zm.ring.scale.setScalar(zm.id === zone.id ? 1 + Math.sin(elapsedSec * 4) * 0.04 : 1);
     });
 
+    // Reset gates on fresh descent and align dynamically along active zone glideslope
+    if (!f.landed && f.gatesPassed === 0) {
+      this.lunarEnv.approachGates.forEach((gate) => {
+        gate.passed = false;
+      });
+    }
+    const zoneGround = getSurfaceTerrainHeight(f.planet, zone.x, zone.z);
+    const entryY = f.planet === 'mars' ? 172 : 165;
+    const gateT = [0.22, 0.44, 0.66, 0.85];
     this.lunarEnv.approachGates.forEach((gate, idx) => {
-      gate.group.visible = true;
+      const t = gateT[idx] ?? 0.5;
+      const gx = zone.x * t;
+      const gy = entryY * (1 - t) + (zoneGround + 8) * t;
+      const gz = -36 * (1 - t) + zone.z * t;
+      gate.group.visible = !f.landed;
+      gate.group.position.set(gx, gy, gz);
+      gate.group.lookAt(zone.x, zoneGround + 4, zone.z);
+
       const distGate = Math.hypot(
-        f.x - gate.group.position.x,
-        f.y - gate.group.position.y,
-        f.z - gate.group.position.z
+        f.x - gx,
+        f.y - gy,
+        f.z - gz
       );
-      if (distGate < 9.5 && !gate.passed) {
+      if (distGate < 10.5 && !gate.passed) {
         gate.passed = true;
         f.gatesPassed++;
         f.gateBonusScore += 150;
@@ -1311,11 +1361,15 @@ export class SpaceSceneManager {
     const r = s.rover;
     const rm = this.roverModel;
 
-    // Keep lander parked on Pad Alpha
+    // Keep lander parked on Pad Alpha with retracted contact probes
     this.lander.group.position.set(0, 0.36, 0);
     this.lander.group.rotation.set(0, 0, 0);
     this.lander.flameMesh.visible = false;
     this.lander.engineLight.intensity = 0;
+    this.lander.probes.forEach((p) => {
+      p.position.y = 0.32;
+      p.scale.y = 0.42;
+    });
 
     const clearanceLift = r.highClearance || r.driveMode === 'WALKER' ? 0.34 : 0;
     rm.group.position.set(r.x, r.y + clearanceLift, r.z);
@@ -1338,9 +1392,13 @@ export class SpaceSceneManager {
       wm.arm.rotation.x = -wm.forward * (lift - clearanceLift * 0.45) * 0.85;
     });
 
-    // Headlight + Comms dish sweep
+    // Headlight, Comms Dish Sweep, Mast Strobe Beacon & Mars Dust Shading on Solar Array
     rm.headlight.intensity = r.headlightsOn ? 2.4 : 0;
     rm.dish.rotation.y = Math.sin(elapsedSec * 0.7) * 0.25;
+    const pulse = 0.55 + 0.55 * Math.max(0, Math.sin(elapsedSec * 5.2));
+    rm.strobeMesh.scale.setScalar(pulse);
+    this.scratchColor.setHex(0xbfe3ff).lerp(new THREE.Color(0xc27850), Math.min(1, r.dustAccumulationPct / 65));
+    rm.panelMat.color.copy(this.scratchColor);
 
     // TRIDENT Drill animation when drilling
     if (s.activeDrillingId) {
@@ -1466,8 +1524,11 @@ export class SpaceSceneManager {
       const lm = this.lander;
       lm.flameMesh.visible = false;
       lm.engineLight.intensity = 0;
+      lm.landingSpot.intensity = 0;
       lm.rcsLeft.visible = false;
       lm.rcsRight.visible = false;
+      lm.rcsFwd.visible = false;
+      lm.rcsBack.visible = false;
       this.guideLine.visible = false;
       this.bullseyeRing.visible = false;
       this.predRing.visible = false;

@@ -1,4 +1,5 @@
 import { BookOpen, Camera, CheckCircle2, Database, Pause, Volume2, VolumeX } from 'lucide-react';
+import { getRoverMissionProgress } from '../game/missionProgress';
 import type {
   CameraMode,
   CampaignCarryoverState,
@@ -8,6 +9,8 @@ import type {
   RoverObjective,
   RoverState,
 } from '../game/types';
+import { MissionProgressBar } from './MissionProgressBar';
+import { RoverSpeedometer } from './RoverSpeedometer';
 import { SurfaceMapPanel } from './SurfaceMapPanel';
 
 interface RoverHUDProps {
@@ -61,11 +64,15 @@ export function RoverHUD({
   onOpenNotebook,
 }: RoverHUDProps) {
   const isMars = rover.planet === 'mars';
+  const missionProgress = getRoverMissionProgress(rover, objectives);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
-      {/* Top Bar: Science Checklist + Interactive Topographic Map (Left) | Resources & Anomaly (Right) */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-2.5">
+        <MissionProgressBar info={missionProgress} />
+
+        {/* Top Bar: Science Checklist + Interactive Topographic Map (Left) | Resources & Anomaly (Right) */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col items-start gap-2.5">
           {/* Science Mission Checklist */}
           <div className="hud-panel pointer-events-auto max-w-xs rounded-xl p-3">
@@ -244,10 +251,11 @@ export function RoverHUD({
             </div>
           )}
         </div>
+        </div>
       </div>
 
-      {/* Bottom: Drill Prompt + Mobility & Driving Dock */}
-      <div className="mx-auto flex flex-col items-center gap-2.5">
+      {/* Bottom: Drill Prompt + Center-Bottom VIPER Speedometer + Mobility & Driving Dock */}
+      <div className="mx-auto flex flex-col items-center gap-2">
         {nearestObjective && !nearestObjective.completed && (
           <div className="hud-panel pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-2.5">
             <button
@@ -271,6 +279,8 @@ export function RoverHUD({
             </div>
           </div>
         )}
+
+        <RoverSpeedometer rover={rover} />
 
         <div className="hud-panel pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs">
           {/* 4 Rover/Walker Drive Modes */}
@@ -346,10 +356,6 @@ export function RoverHUD({
           >
             Lights [L]
           </button>
-
-          <span className="font-mono-tech pl-1 text-xs font-bold text-sky-300">
-            {Math.abs(rover.speed).toFixed(1)} m/s
-          </span>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   createInitialSpaceFlightState,
   evaluateTouchdown,
   getLunarTerrainHeight,
+  getSurfaceSlopeDeg,
   getSurfaceTerrainHeight,
   separateLaunchStage,
   stepLandingPhysics,
@@ -18,7 +19,7 @@ import {
   stepRoverPhysics,
   stepSpaceFlightPhysics,
 } from './physics';
-import { PAYLOADS, PHYSICS } from './constants';
+import { PAYLOADS, PHYSICS, SOLAR_TARGETS } from './constants';
 
 test('SLS launch countdown waits at READY without auto-launch, ignites on player input, and stages at 45 km & 110 km', () => {
   let L = createInitialLaunchState();
@@ -242,3 +243,118 @@ test('Applied Knowledge anomaly decisions reward learned OSDR notes and regolith
   const trade = applyOutpostDecision(baseRes, 'boost-shield');
   assert.ok(trade.resources.shield > baseRes.shield);
 });
+
+test('AUTOLAND lands softly on all 3 Moon and all 3 Mars zones even with heavy 1.4x payload', () => {
+  const heavyMass = PAYLOADS['heavy-shield'].massMultiplier;
+  for (const planet of ['moon', 'mars'] as const) {
+    for (const zoneId of [0, 1, 2] as const) {
+      let L = createInitialLandingState(heavyMass, planet, 0);
+      L.targetZoneId = zoneId;
+      L.guidanceMode = 'AUTOLAND';
+      for (let i = 0; i < 2400; i++) {
+        L = stepLandingPhysics(
+          L,
+          { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false },
+          0.05,
+          false
+        );
+        if (L.landed) break;
+      }
+      assert.equal(L.landed, true, `${planet} zone ${zoneId} should land before step limit`);
+      assert.equal(L.result, 'perfect', `${planet} zone ${zoneId} with 1.4x payload should achieve perfect touchdown`);
+      assert.ok(L.distToPad <= 8.5, `${planet} zone ${zoneId} should land near pad center (got ${L.distToPad.toFixed(2)}m)`);
+    }
+  }
+});
+
+test('RATE_ASSIST lateral damping, killDrift [B] braking, Contact Light autoCutoff, and getSurfaceSlopeDeg work accurately', () => {
+  assert.equal(Math.round(getSurfaceSlopeDeg('moon', 0, 0) * 10) / 10, 0);
+  assert.equal(Math.round(getSurfaceSlopeDeg('mars', 0, 0) * 10) / 10, 0);
+  // Check sloped terrain away from pad flat circle (e.g. crater/ridge flank)
+  const roughSlope = Math.max(
+    getSurfaceSlopeDeg('moon', 48, 38),
+    getSurfaceSlopeDeg('moon', -52, 42),
+    getSurfaceSlopeDeg('mars', 55, -45)
+  );
+  assert.ok(roughSlope > 0.5, `Off-pad lunar/mars flank should have non-zero terrain slope (got ${roughSlope})`);
+
+  // RATE_ASSIST damps horizontal velocity automatically when no lateral input is pressed
+  let rateLander = createInitialLandingState(1.2, 'moon', 0);
+  rateLander.guidanceMode = 'RATE_ASSIST';
+  rateLander.vx = 6.0;
+  rateLander.vz = -5.0;
+  for (let i = 0; i < 40; i++) {
+    rateLander = stepLandingPhysics(
+      rateLander,
+      { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false },
+      0.05,
+      false
+    );
+  }
+  assert.ok(Math.hypot(rateLander.vx, rateLander.vz) < 2.2, 'RATE_ASSIST should damp lateral drift');
+
+  // killDrift [B] rapidly cancels horizontal drift in MANUAL mode
+  let manualDrift = createInitialLandingState(1.2, 'moon', 0);
+  manualDrift.guidanceMode = 'MANUAL';
+  manualDrift.vx = 8.0;
+  manualDrift.vz = 6.0;
+  for (let i = 0; i < 30; i++) {
+    manualDrift = stepLandingPhysics(
+      manualDrift,
+      { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false, killDrift: true },
+      0.05,
+      false
+    );
+  }
+  assert.ok(Math.hypot(manualDrift.vx, manualDrift.vz) < 1.2, 'killDrift [B] should rapidly cancel horizontal drift');
+
+  // Contact Light Apollo autoCutoff shuts down throttle when contact probe touches <= 1.75m softly
+  let contactLander = createInitialLandingState(1.0, 'moon', 0);
+  contactLander.y = getSurfaceTerrainHeight('moon', 0, 0) + 1.4;
+  contactLander.x = 0;
+  contactLander.z = 0;
+  contactLander.vx = 0.2;
+  contactLander.vz = 0.2;
+  contactLander.vy = -0.8;
+  contactLander.throttle = 0.6;
+  contactLander.targetThrottle = 0.6;
+  contactLander.contactLight = true;
+  contactLander.autoCutoff = true;
+  contactLander = stepLandingPhysics(
+    contactLander,
+    { forward: false, backward: false, left: false, right: false, action: false, tiltForward: false },
+    0.05,
+    false
+  );
+  assert.equal(contactLander.throttle, 0, 'Contact Light autoCutoff should zero throttle during soft touchdown');
+  assert.equal(contactLander.targetThrottle, 0);
+});
+
+test('Space Autopilot enters zero-fuel-drain station-keeping after arriving at target', () => {
+  for (const targetId of ['relay-orbit', 'moon', 'mars'] as const) {
+    const t = SOLAR_TARGETS[targetId];
+    let space = createInitialSpaceFlightState('artemis-2');
+    space.targetId = targetId;
+    space.autoPilot = true;
+    space.shipX = t.x + 0.5;
+    space.shipZ = t.z + 0.5;
+    space.vx = 0.1;
+    space.vz = 0.1;
+    const startFuel = space.fuelPct;
+    let res = { power: 80, oxygen: 80, shield: 80 };
+
+    for (let i = 0; i < 60; i++) {
+      const out = stepSpaceFlightPhysics(
+        space,
+        res,
+        { forward: false, backward: false, left: false, right: false, boost: false, action: false },
+        false,
+        0.05
+      );
+      space = out.space;
+      res = out.resources;
+    }
+    assert.equal(space.fuelPct, startFuel, `Space Autopilot should not burn fuel while station-keeping at ${targetId}`);
+  }
+});
+
