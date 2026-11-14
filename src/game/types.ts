@@ -312,3 +312,14 @@ export interface InputState {
   tiltForward: boolean;
   stabilize: boolean;
 }
+
+export interface CrashFxState {
+  active: boolean;
+  kind: 'landing' | 'space' | 'rover' | 'launch';
+  elapsed: number;
+  x: number;
+  y: number;
+  z: number;
+  planet: SurfacePlanet;
+}
+

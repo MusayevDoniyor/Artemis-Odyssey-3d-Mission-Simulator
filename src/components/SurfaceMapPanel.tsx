@@ -43,9 +43,9 @@ export function SurfaceMapPanel({
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <Map className={`h-3.5 w-3.5 ${isMars ? 'text-amber-400' : 'text-sky-300'}`} />
+          <Map className={`h-3.5 w-3.5 ${isMars ? 'text-amber-400' : 'text-cyan-300'}`} />
           <span className="font-display text-[11px] font-bold tracking-wider text-white uppercase">
-            {isMars ? 'Jezero Topographic Map' : 'South Pole Map'}
+            {isMars ? 'Jezero Topo Map' : 'South Pole Map'}
           </span>
         </div>
 
@@ -54,7 +54,7 @@ export function SurfaceMapPanel({
           data-testid="toggle-surface-map-btn"
           onClick={onToggleExpand}
           title="Expand / Collapse Map [Tab]"
-          className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-slate-200 hover:border-sky-400"
+          className="inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-slate-900 px-1.5 py-0.5 font-hud text-[10px] font-bold text-slate-200 hover:border-cyan-400"
         >
           {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           <span className="keycap">Tab</span>

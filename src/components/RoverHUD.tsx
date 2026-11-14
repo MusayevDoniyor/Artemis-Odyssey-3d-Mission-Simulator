@@ -1,16 +1,4 @@
-import {
-  BookOpen,
-  Camera,
-  CheckCircle2,
-  Circle,
-  Database,
-  Lightbulb,
-  Pause,
-  Pickaxe,
-  ShieldAlert,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { BookOpen, Camera, CheckCircle2, Database, Pause, Volume2, VolumeX } from 'lucide-react';
 import type {
   CameraMode,
   CampaignCarryoverState,
@@ -48,7 +36,7 @@ const DRIVE_MODES: Array<{ id: RoverDriveMode; keyHint: string; label: string }>
   { id: 'DRIVE', keyHint: '1', label: 'Drive' },
   { id: 'CRAB', keyHint: '2', label: 'Crab' },
   { id: 'SPIN', keyHint: '3', label: 'Spin' },
-  { id: 'WALKER', keyHint: '4', label: 'Walker Step' },
+  { id: 'WALKER', keyHint: '4', label: 'Walker' },
 ];
 
 export function RoverHUD({
@@ -82,33 +70,35 @@ export function RoverHUD({
           {/* Science Mission Checklist */}
           <div className="hud-panel pointer-events-auto max-w-xs rounded-xl p-3">
             <p
-              className={`mb-2 text-[10px] font-bold tracking-wider uppercase ${
-                isMars ? 'text-orange-300' : 'text-sky-300'
+              className={`mb-2 font-hud text-[10px] font-bold tracking-wider uppercase ${
+                isMars ? 'text-orange-300' : 'text-cyan-300'
               }`}
             >
-              {isMars
-                ? 'Mars Jezero Crater Science · 0.38g'
-                : 'Lunar South Pole Science · 0.165g'}
+              {isMars ? 'Jezero Crater · 0.38g' : 'South Pole · 0.165g'}
             </p>
             <div className="flex flex-col gap-1.5">
               {objectives.map((obj) => {
                 const dist = Math.round(Math.hypot(obj.x - rover.x, obj.z - rover.z));
+                const hex = `#${obj.color.toString(16).padStart(6, '0')}`;
                 return (
                   <div
                     key={obj.id}
-                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-xs ${
+                    className={`flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-xs ${
                       obj.completed
                         ? 'bg-emerald-500/15 text-emerald-200'
                         : 'bg-slate-900/80 text-slate-100'
                     }`}
                   >
-                    <span className="inline-flex items-center gap-1.5 font-medium">
+                    <span className="inline-flex items-center gap-2 font-hud font-semibold">
                       {obj.completed ? (
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                       ) : (
-                        <Circle className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+                        <span
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: hex }}
+                        />
                       )}
-                      {obj.title}
+                      {obj.siteName}
                     </span>
                     {!obj.completed && (
                       <span className="font-mono-tech text-[11px] font-bold text-amber-300">
@@ -137,26 +127,26 @@ export function RoverHUD({
           <div className="flex flex-wrap items-center gap-2">
             <div className="hud-panel pointer-events-auto flex items-center gap-3.5 rounded-xl px-4 py-2 text-xs">
               <div>
-                <span className="block text-[10px] text-slate-400 uppercase">Power</span>
+                <span className="block font-hud text-[10px] text-slate-400 uppercase">Power</span>
                 <span className="font-mono-tech text-sm font-bold text-amber-300">
                   {Math.round(resources.power)}%
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 uppercase">Oxygen</span>
+                <span className="block font-hud text-[10px] text-slate-400 uppercase">Oxygen</span>
                 <span className="font-mono-tech text-sm font-bold text-sky-300">
                   {Math.round(resources.oxygen)}%
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 uppercase">Shield</span>
+                <span className="block font-hud text-[10px] text-slate-400 uppercase">Shield</span>
                 <span className="font-mono-tech text-sm font-bold text-emerald-300">
                   {Math.round(resources.shield)}%
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-400 uppercase">
-                  {isMars ? 'Biosig Signal' : 'H₂ Ice Signal'}
+                <span className="block font-hud text-[10px] text-slate-400 uppercase">
+                  {isMars ? 'Biosig' : 'H₂ Ice'}
                 </span>
                 <span className="font-mono-tech text-sm font-bold text-white">
                   {rover.hydrogenSignal} ppm
@@ -164,7 +154,7 @@ export function RoverHUD({
               </div>
               {isMars && (
                 <div>
-                  <span className="block text-[10px] text-slate-400 uppercase">Dust</span>
+                  <span className="block font-hud text-[10px] text-slate-400 uppercase">Dust</span>
                   <span className="font-mono-tech text-sm font-bold text-orange-300">
                     {Math.round(rover.dustAccumulationPct)}%
                   </span>
@@ -175,16 +165,16 @@ export function RoverHUD({
             <button
               type="button"
               onClick={onOpenNotebook}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-amber-200 hover:border-amber-400"
+              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold text-amber-200 hover:border-amber-400"
             >
               <BookOpen className="h-4 w-4 text-amber-300" />
-              Notes ({carryover.unlockedFieldNotes.length})
+              Ledger ({carryover.unlockedFieldNotes.length})
             </button>
 
             <button
               type="button"
               onClick={onOpenNasaModal}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-sky-200 hover:border-sky-400"
+              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold text-sky-200 hover:border-sky-400"
             >
               <Database className="h-4 w-4 text-sky-300" />
               NASA Data
@@ -193,7 +183,7 @@ export function RoverHUD({
             <button
               type="button"
               onClick={onCycleCamera}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400"
+              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold text-slate-200 hover:border-sky-400"
             >
               <Camera className="h-4 w-4 text-sky-300" />
               <span className="capitalize">{cameraMode}</span>
@@ -225,23 +215,27 @@ export function RoverHUD({
           {activeAnomaly && !activeAnomaly.resolvedChoiceId && (
             <div
               data-testid="rover-anomaly-card"
-              className="hud-panel-amber pointer-events-auto max-w-sm rounded-xl p-3.5"
+              className="hud-panel-amber tactical-frame animate-modal-enter pointer-events-auto max-w-sm rounded-xl p-3.5"
             >
-              <div className="mb-1 flex items-center gap-2 text-xs font-bold text-amber-300">
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                {activeAnomaly.title}
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-display text-xs font-bold text-amber-300 uppercase">
+                  {activeAnomaly.title}
+                </span>
+                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono-tech text-[9px] font-bold text-amber-200">
+                  ALERT
+                </span>
               </div>
-              <p className="mb-1 text-[10px] font-semibold text-sky-300">{activeAnomaly.nasaRef}</p>
-              <p className="mb-2.5 text-xs leading-relaxed text-slate-200">
-                {activeAnomaly.context}
+              <p className="mb-1 font-mono-tech text-[10px] font-semibold text-cyan-300">
+                {activeAnomaly.nasaRef}
               </p>
+              <p className="mb-2.5 text-xs text-slate-200">{activeAnomaly.context}</p>
               <div className="flex flex-col gap-1.5">
                 {activeAnomaly.choices.map((choice) => (
                   <button
                     key={choice.id}
                     type="button"
                     onClick={() => onResolveAnomaly(activeAnomaly.id, choice.id)}
-                    className="rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-left text-xs font-semibold text-slate-100 hover:border-amber-400"
+                    className="rounded-lg border border-cyan-500/25 bg-slate-950/85 px-3 py-1.5 text-left text-xs font-semibold text-slate-100 transition hover:border-amber-400"
                   >
                     {choice.label}
                   </button>
@@ -259,14 +253,13 @@ export function RoverHUD({
             <button
               type="button"
               data-hold-keys="action"
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 font-display text-xs font-bold text-slate-950 hover:bg-amber-400"
+              className="rounded-lg bg-amber-500 px-4 py-2 font-display text-xs font-bold whitespace-nowrap text-slate-950 uppercase hover:bg-amber-400"
             >
-              <Pickaxe className="h-4 w-4" />
-              HOLD [E / SPACE] TO SAMPLE {nearestObjective.siteName.toUpperCase()}
+              HOLD [E / SPACE] · SAMPLE {nearestObjective.siteName.toUpperCase()}
             </button>
             <div className="w-28">
               <div className="mb-1 flex justify-between font-mono-tech text-[11px] font-bold text-sky-200">
-                <span>Core Sample</span>
+                <span>Core</span>
                 <span>{Math.round(nearestObjective.progress * 100)}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-800">
@@ -345,14 +338,13 @@ export function RoverHUD({
           <button
             type="button"
             onClick={onToggleHeadlights}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-semibold ${
+            className={`rounded-lg px-2.5 py-1.5 font-semibold ${
               rover.headlightsOn
                 ? 'bg-amber-400 text-slate-950'
                 : 'border border-slate-700 bg-slate-900 text-slate-200'
             }`}
           >
-            <Lightbulb className="h-3.5 w-3.5" />
-            [L]
+            Lights [L]
           </button>
 
           <span className="font-mono-tech pl-1 text-xs font-bold text-sky-300">

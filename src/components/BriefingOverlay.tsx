@@ -1,12 +1,4 @@
-import {
-  ArrowLeft,
-  BookOpen,
-  Database,
-  Recycle,
-  Rocket,
-  ShieldAlert,
-  Zap,
-} from 'lucide-react';
+import { ArrowLeft, BookOpen, Database, Rocket } from 'lucide-react';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER, PAYLOADS } from '../game/constants';
 import type {
   CampaignCarryoverState,
@@ -29,6 +21,172 @@ interface BriefingOverlayProps {
   onLaunch: () => void;
   onOpenNasaModal: () => void;
   onOpenNotebook: () => void;
+}
+
+const MISSION_NODES: Record<CampaignMissionId, { steps: string[]; accent: string }> = {
+  'artemis-2': {
+    steps: ['Pad 39B', '165 km LEO', 'HERMES Sat', 'Laser Link'],
+    accent: '#22d3ee',
+  },
+  'artemis-3': {
+    steps: ['Moon Orbit', '0.165g Land', 'Shackleton Ice', 'Berm & Solar'],
+    accent: '#38bdf8',
+  },
+  'artemis-4': {
+    steps: ['Lunar Orbit', 'NRHO Dock', 'ISRU Fuel', 'Storm Shield'],
+    accent: '#facc15',
+  },
+  'mars-pathfinder': {
+    steps: ['0.38g Entry', 'Jezero Pad', 'Delta Cores', 'MOXIE O₂'],
+    accent: '#fb923c',
+  },
+};
+
+function MissionProfileDiagram({
+  missionId,
+  planet,
+}: {
+  missionId: CampaignMissionId;
+  planet: 'moon' | 'mars';
+}) {
+  const { steps, accent } = MISSION_NODES[missionId];
+  const nodeXs = [28, 128, 232, 332];
+  const nodeYs = [38, 16, 18, 36];
+
+  return (
+    <svg
+      viewBox="0 0 360 62"
+      className="h-14 w-full"
+      aria-label="Mission flight profile diagram"
+    >
+      <defs>
+        <linearGradient id="trajGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.4" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0.95" />
+        </linearGradient>
+      </defs>
+
+      {/* Flight trajectory arc */}
+      <path
+        d={`M ${nodeXs[0]} ${nodeYs[0]} Q 85 10, ${nodeXs[1]} ${nodeYs[1]} T ${nodeXs[2]} ${nodeYs[2]} T ${nodeXs[3]} ${nodeYs[3]}`}
+        fill="none"
+        stroke="url(#trajGrad)"
+        strokeWidth="2"
+        strokeDasharray="4 3"
+      />
+
+      {/* Origin & Target body hints */}
+      <circle cx={nodeXs[0]} cy={nodeYs[0]} r="9" fill="#0ea5e9" fillOpacity="0.16" />
+      <circle
+        cx={nodeXs[3]}
+        cy={nodeYs[3]}
+        r="10"
+        fill={planet === 'mars' ? '#f97316' : '#cbd5e1'}
+        fillOpacity="0.18"
+      />
+
+      {/* Nodes & crisp labels */}
+      {steps.map((label, idx) => (
+        <g key={label}>
+          <circle
+            cx={nodeXs[idx]}
+            cy={nodeYs[idx]}
+            r={idx === 0 || idx === 3 ? 4.5 : 3.5}
+            fill={idx === 3 ? accent : '#0f172a'}
+            stroke={accent}
+            strokeWidth="1.6"
+          />
+          <text
+            x={nodeXs[idx]}
+            y={idx === 1 || idx === 2 ? 35 : 56}
+            textAnchor="middle"
+            fill={idx === 3 ? '#f8fafc' : '#cbd5e1'}
+            fontSize="8.5"
+            fontWeight="700"
+            fontFamily="Chakra Petch, sans-serif"
+          >
+            {label}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function PayloadBlueprintIcon({ id, active }: { id: PayloadId; active: boolean }) {
+  const stroke = active ? '#fbbf24' : '#38bdf8';
+  const muted = active ? '#fde68a' : '#94a3b8';
+
+  if (id === 'heavy-shield') {
+    return (
+      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
+        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
+        {/* Layered water shield arcs + deflected proton arrow */}
+        <path d="M 14 11 C 22 14, 22 30, 14 33" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M 20 13 C 26 16, 26 28, 20 31" fill="none" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" />
+        <line x1="35" y1="22" x2="25" y2="22" stroke="#f43f5e" strokeWidth="1.8" />
+        <polygon points="25,22 29,19.5 29,24.5" fill="#f43f5e" />
+        <circle cx="10" cy="22" r="3" fill={muted} />
+      </svg>
+    );
+  }
+
+  if (id === 'oxygen-tanks') {
+    return (
+      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
+        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
+        {/* Twin cryo O2 spheres + manifold */}
+        <circle cx="15" cy="24" r="6" fill="none" stroke="#22d3ee" strokeWidth="2" />
+        <circle cx="29" cy="24" r="6" fill="none" stroke={stroke} strokeWidth="2" />
+        <path d="M 15 18 V 13 H 29 V 18" fill="none" stroke={muted} strokeWidth="1.6" />
+        <circle cx="22" cy="13" r="2.2" fill="#34d399" />
+      </svg>
+    );
+  }
+
+  if (id === 'solar-panels') {
+    return (
+      <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
+        <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
+        {/* Twin photovoltaic wings + central bus */}
+        <rect x="6" y="16" width="12" height="12" rx="1.5" fill="#1e3a8a" stroke={stroke} strokeWidth="1.5" />
+        <rect x="26" y="16" width="12" height="12" rx="1.5" fill="#1e3a8a" stroke={stroke} strokeWidth="1.5" />
+        <line x1="12" y1="16" x2="12" y2="28" stroke="#60a5fa" strokeWidth="1" />
+        <line x1="32" y1="16" x2="32" y2="28" stroke="#60a5fa" strokeWidth="1" />
+        <rect x="19.5" y="18" width="5" height="8" rx="1" fill={muted} />
+      </svg>
+    );
+  }
+
+  // water-drill
+  return (
+    <svg viewBox="0 0 44 44" className="h-10 w-10 shrink-0" aria-hidden="true">
+      <rect x="2" y="2" width="40" height="40" rx="8" fill="#091224" stroke={stroke} strokeOpacity="0.45" />
+      {/* TRIDENT auger biting ice layer */}
+      <rect x="19" y="8" width="6" height="7" rx="1" fill={muted} />
+      <path d="M 22 15 L 22 33 M 19 19 L 25 21 M 19 23 L 25 25 M 19 27 L 25 29" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+      <line x1="10" y1="33" x2="34" y2="33" stroke="#22d3ee" strokeWidth="1.6" strokeDasharray="3 2" />
+    </svg>
+  );
+}
+
+function MassPips({ massMultiplier }: { massMultiplier: number }) {
+  const pips = massMultiplier >= 1.35 ? 4 : massMultiplier >= 1.24 ? 3 : massMultiplier >= 1.15 ? 2 : 1;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="font-hud text-[10px] font-bold text-slate-400 uppercase">Mass</span>
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4].map((idx) => (
+          <span
+            key={idx}
+            className={`h-1.5 w-3 rounded-sm ${
+              idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-cyan-400') : 'bg-slate-800'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function BriefingOverlay({
@@ -61,24 +219,32 @@ export function BriefingOverlay({
         ? 'UNDOCK TO ORBITAL TRANSIT'
         : `BEGIN ${mission.planet === 'mars' ? 'MARS JEZERO' : 'SOUTH POLE'} DESCENT`;
 
+  const nasaBadgeText =
+    osdr.studies.length > 0
+      ? `DONKI ${donki.classType} · ${osdr.studies.length} OSDR`
+      : `Space Weather · ${donki.classType}`;
+
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
-      <div className="hud-panel my-auto w-full max-w-4xl rounded-2xl p-5 md:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/70 pb-3.5">
+      <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-4xl rounded-2xl p-5 md:p-6">
+        {/* Top Bar */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-cyan-500/20 pb-3.5">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400"
+              className="rounded-lg border border-cyan-500/30 bg-slate-900 px-3 py-2 font-hud text-xs font-bold text-slate-200 uppercase transition hover:border-cyan-400"
             >
-              <ArrowLeft className="mr-1 inline h-3.5 w-3.5" />
-              Title
+              <ArrowLeft className="mr-1 inline h-3.5 w-3.5 text-cyan-300" />
+              Command Deck
             </button>
             <div>
-              <p className="text-[11px] font-bold tracking-wider text-sky-300 uppercase">
+              <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
                 {mission.code} · {mission.planet === 'mars' ? 'MARS 0.38g' : 'MOON 0.165g'}
               </p>
-              <h2 className="font-display text-2xl font-bold text-white">{mission.title}</h2>
+              <h2 className="font-display text-2xl font-bold text-white uppercase">
+                {mission.title}
+              </h2>
             </div>
           </div>
 
@@ -86,26 +252,26 @@ export function BriefingOverlay({
             <button
               type="button"
               onClick={onOpenNotebook}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/25"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-500/12 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-cyan-200 uppercase hover:bg-cyan-500/25"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Notes ({carryover.unlockedFieldNotes.length})
+              Ledger ({carryover.unlockedFieldNotes.length})
             </button>
 
             <button
               type="button"
               onClick={onOpenNasaModal}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/25"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-amber-200 uppercase hover:bg-amber-500/25"
             >
-              <Database className="h-4 w-4" />
-              DONKI {donki.classType} · {osdr.studies.length} OSDR
+              <Database className="h-3.5 w-3.5" />
+              {nasaBadgeText}
             </button>
           </div>
         </div>
 
-        {/* Campaign Stage Selector + Reuse Summary */}
-        <div className="mb-4 grid gap-3 md:grid-cols-[1.25fr_1fr]">
-          <div className="rounded-xl border border-slate-700/80 bg-slate-900/75 p-3">
+        {/* Mission Flight Profile Diagram + Carryover Loop Schematic */}
+        <div className="mb-4 grid gap-3 md:grid-cols-[1.3fr_1fr]">
+          <div className="rounded-xl border border-cyan-500/20 bg-slate-900/75 p-3">
             <div className="mb-2 flex flex-wrap gap-1.5">
               {CAMPAIGN_ORDER.map((id) => {
                 const m = CAMPAIGN_MISSIONS[id];
@@ -116,9 +282,9 @@ export function BriefingOverlay({
                     key={id}
                     type="button"
                     onClick={() => onSelectCampaignMission(id)}
-                    className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
+                    className={`rounded-md px-2.5 py-1 font-hud text-[11px] font-bold whitespace-nowrap transition ${
                       active
-                        ? 'bg-sky-500 text-slate-950'
+                        ? 'bg-cyan-400 text-slate-950'
                         : done
                           ? 'border border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
                           : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
@@ -129,26 +295,70 @@ export function BriefingOverlay({
                 );
               })}
             </div>
-            <p className="text-xs leading-relaxed text-slate-200">{mission.objectiveSummary}</p>
-            <p className="mt-1 text-[11px] font-semibold text-sky-300">{mission.nasaGrounding}</p>
+
+            {/* Visual Mission Profile Arc */}
+            <div className="rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1">
+              <MissionProfileDiagram missionId={mission.id} planet={mission.planet} />
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-slate-200">{mission.objectiveSummary}</span>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 p-3 text-xs">
-            <div className="mb-1 flex items-center gap-1.5 font-bold text-emerald-300 uppercase">
-              <Recycle className="h-3.5 w-3.5" />
-              Reuse & Knowledge Loop
+          {/* Carryover Flow Diagram */}
+          <div className="flex flex-col justify-between rounded-xl border border-emerald-400/30 bg-emerald-500/8 p-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-hud text-[11px] font-bold tracking-wider text-emerald-300 uppercase">
+                Campaign Carryover Link
+              </span>
+              <span className="font-mono-tech text-[10px] text-slate-400">
+                {carryover.completedMissions.length}/4 CLEARED
+              </span>
             </div>
-            <p className="text-[11px] leading-snug text-slate-100">
-              <strong className="text-amber-300">Inputs Used:</strong> {mission.reuseInput}
-            </p>
-            <p className="mt-1 text-[11px] leading-snug text-slate-100">
-              <strong className="text-emerald-300">Unlocks Next:</strong> {mission.reuseOutput}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2 border-t border-emerald-400/20 pt-1.5 font-mono-tech text-[10px] text-emerald-200">
-              <span>Relay: {carryover.relaySatelliteOnline ? 'ON' : 'OFF'}</span>
-              <span>H₂O: {carryover.isruWaterKg}kg</span>
-              <span>Fuel: +{carryover.isruFuelBonusPct}%</span>
-              <span>Dose: {carryover.radiationDoseMsv} mSv</span>
+
+            {/* 3-Node Visual Resource Transfer Diagram */}
+            <div className="my-2 grid grid-cols-3 gap-1.5 text-center">
+              <div
+                className={`rounded-lg border px-2 py-2 ${
+                  carryover.relaySatelliteOnline
+                    ? 'border-emerald-400/50 bg-emerald-500/15'
+                    : 'border-slate-700 bg-slate-950/75'
+                }`}
+              >
+                <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
+                  HERMES Sat
+                </span>
+                <span
+                  className={`font-mono-tech text-xs font-bold ${
+                    carryover.relaySatelliteOnline ? 'text-emerald-300' : 'text-slate-400'
+                  }`}
+                >
+                  {carryover.relaySatelliteOnline ? 'ONLINE' : 'STOWED'}
+                </span>
+              </div>
+
+              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/75 px-2 py-2">
+                <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
+                  ISRU H₂O / Fuel
+                </span>
+                <span className="font-mono-tech text-xs font-bold text-cyan-300">
+                  {carryover.isruWaterKg}kg · +{carryover.isruFuelBonusPct}%
+                </span>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/25 bg-slate-950/75 px-2 py-2">
+                <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
+                  Crew Dose
+                </span>
+                <span className="font-mono-tech text-xs font-bold text-amber-300">
+                  {carryover.radiationDoseMsv}/150 mSv
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-emerald-400/20 pt-2 text-[11px]">
+              <span className="text-emerald-200">{mission.reuseOutput}</span>
             </div>
           </div>
         </div>
@@ -157,16 +367,16 @@ export function BriefingOverlay({
         <div className="mb-4 grid grid-cols-3 gap-3">
           {[
             {
-              label: 'Power',
+              label: 'Power Bus',
               val: previewResources.power,
               color: 'bg-amber-400',
               text: 'text-amber-300',
             },
             {
-              label: 'Oxygen',
+              label: 'O₂ Reserve',
               val: previewResources.oxygen,
-              color: 'bg-sky-400',
-              text: 'text-sky-300',
+              color: 'bg-cyan-400',
+              text: 'text-cyan-300',
             },
             {
               label: 'Radiation Shield',
@@ -175,9 +385,12 @@ export function BriefingOverlay({
               text: 'text-emerald-300',
             },
           ].map((r) => (
-            <div key={r.label} className="rounded-xl border border-slate-700/70 bg-slate-900/80 p-2.5">
+            <div
+              key={r.label}
+              className="rounded-xl border border-cyan-500/20 bg-slate-900/80 p-2.5"
+            >
               <div className="mb-1 flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-200">{r.label}</span>
+                <span className="font-hud text-slate-200 uppercase">{r.label}</span>
                 <span className={`font-mono-tech ${r.text}`}>{Math.round(r.val)}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-800">
@@ -187,7 +400,7 @@ export function BriefingOverlay({
           ))}
         </div>
 
-        {/* 4 Cargo Cards with Clear NASA Trade-Offs */}
+        {/* 4 Blueprint Payload Cards (Zero Repeated Warning Icons, Scannable Visual Meters) */}
         <div className="mb-4 grid gap-2.5 sm:grid-cols-2">
           {payloadList.map((p) => {
             const active = p.id === selectedPayload;
@@ -196,43 +409,62 @@ export function BriefingOverlay({
                 key={p.id}
                 type="button"
                 onClick={() => onSelectPayload(p.id)}
-                className={`rounded-xl border p-3.5 text-left transition ${
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
                   active
-                    ? 'border-amber-400 bg-amber-500/15 shadow-md'
-                    : 'border-slate-700/80 bg-slate-900/75 hover:border-sky-400/60'
+                    ? 'border-amber-400 bg-amber-500/15 shadow-[0_0_24px_rgba(245,158,11,0.16)]'
+                    : 'border-cyan-500/20 bg-slate-900/75 hover:border-cyan-400/60'
                 }`}
               >
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="font-display text-sm font-bold text-white">{p.name}</span>
-                  <span
-                    className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                      p.fragile ? 'bg-rose-500/20 text-rose-200' : 'bg-sky-500/20 text-sky-200'
-                    }`}
-                  >
-                    {p.shortTag}
-                  </span>
-                </div>
-                <p className="mb-1.5 text-xs leading-relaxed text-slate-200">{p.description}</p>
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-200">
-                  <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                  Trade-off: {p.tradeoffHint}
+                <PayloadBlueprintIcon id={p.id} active={active} />
+
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="truncate font-display text-sm font-bold text-white">
+                      {p.name}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded px-2 py-0.5 font-mono-tech text-[10px] font-bold uppercase ${
+                        p.fragile ? 'bg-rose-500/20 text-rose-200' : 'bg-cyan-500/20 text-cyan-200'
+                      }`}
+                    >
+                      {p.shortTag}
+                    </span>
+                  </div>
+
+                  <p className="mb-2 text-xs text-slate-300">{p.description}</p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-1.5">
+                    <MassPips massMultiplier={p.massMultiplier} />
+                    <span
+                      className={`font-hud text-[11px] font-bold ${
+                        p.fragile
+                          ? 'text-rose-300'
+                          : p.drillBoost > 1
+                            ? 'text-emerald-300'
+                            : 'text-amber-300'
+                      }`}
+                    >
+                      {p.tradeoffHint}
+                    </span>
+                  </div>
                 </div>
               </button>
             );
           })}
         </div>
 
+        {/* Clean Action Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-200">
-            <Zap className="h-4 w-4 text-sky-300" />
-            <span>Every choice shifts spacecraft weight, fragility, or drill speed.</span>
+          <div className="font-mono-tech text-xs text-slate-300">
+            LOADOUT: <span className="font-bold text-amber-300">{chosen.name}</span> ·{' '}
+            {chosen.massMultiplier.toFixed(2)}× Mass
           </div>
 
           <button
             type="button"
             data-testid="briefing-launch-btn"
             onClick={onLaunch}
-            className="inline-flex items-center gap-2.5 rounded-xl bg-amber-500 px-6 py-3 font-display text-sm font-bold tracking-wide text-slate-950 transition hover:bg-amber-400"
+            className="inline-flex items-center gap-2.5 rounded-xl bg-amber-500 px-6 py-3 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-amber-400"
           >
             <Rocket className="h-4 w-4" />
             {launchCtaLabel}

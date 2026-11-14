@@ -18,6 +18,9 @@ export interface ProceduralTextureSet {
   duskSky: THREE.CanvasTexture;
   cloudPuff: THREE.CanvasTexture;
   towerSteel: THREE.CanvasTexture;
+  sunAlbedo: THREE.CanvasTexture;
+  moonSphereAlbedo: THREE.CanvasTexture;
+  marsSphereAlbedo: THREE.CanvasTexture;
 }
 
 function finalizeColorTex(
@@ -442,6 +445,132 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     maCtx.fill();
   }
 
+  // 14. Solar Granulation & Sunspot Corona Albedo
+  const sunCanvas = document.createElement('canvas');
+  sunCanvas.width = 512;
+  sunCanvas.height = 256;
+  const suCtx = sunCanvas.getContext('2d')!;
+  const suGrad = suCtx.createLinearGradient(0, 0, 0, 256);
+  suGrad.addColorStop(0, '#f59e0b');
+  suGrad.addColorStop(0.5, '#fbbf24');
+  suGrad.addColorStop(1, '#ea580c');
+  suCtx.fillStyle = suGrad;
+  suCtx.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 320; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 256;
+    const r = 6 + Math.random() * 24;
+    const cell = suCtx.createRadialGradient(x, y, 1, x, y, r);
+    cell.addColorStop(0, i % 4 === 0 ? 'rgba(254,249,195,0.62)' : 'rgba(234,88,12,0.45)');
+    cell.addColorStop(1, 'rgba(251,191,36,0)');
+    suCtx.fillStyle = cell;
+    suCtx.beginPath();
+    suCtx.arc(x, y, r, 0, Math.PI * 2);
+    suCtx.fill();
+  }
+  for (let sp = 0; sp < 9; sp++) {
+    const sx = 40 + Math.random() * 432;
+    const sy = 45 + Math.random() * 166;
+    const sr = 5 + Math.random() * 9;
+    const spot = suCtx.createRadialGradient(sx, sy, 1, sx, sy, sr);
+    spot.addColorStop(0, 'rgba(124,45,18,0.85)');
+    spot.addColorStop(0.55, 'rgba(194,65,12,0.45)');
+    spot.addColorStop(1, 'rgba(245,158,11,0)');
+    suCtx.fillStyle = spot;
+    suCtx.beginPath();
+    suCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+    suCtx.fill();
+  }
+
+  // 15. Global Lunar Sphere Albedo (Maria Basins + Highland Rays + Tycho Ejecta)
+  const moonSphCanvas = document.createElement('canvas');
+  moonSphCanvas.width = 512;
+  moonSphCanvas.height = 256;
+  const msCtx = moonSphCanvas.getContext('2d')!;
+  msCtx.fillStyle = '#9ca3af';
+  msCtx.fillRect(0, 0, 512, 256);
+  [
+    [135, 95, 52],
+    [195, 118, 38],
+    [250, 88, 44],
+    [320, 128, 35],
+    [95, 138, 32],
+    [390, 102, 42],
+  ].forEach(([mx, my, mr]) => {
+    const mare = msCtx.createRadialGradient(mx, my, 4, mx, my, mr);
+    mare.addColorStop(0, 'rgba(55,65,81,0.72)');
+    mare.addColorStop(0.75, 'rgba(75,85,99,0.42)');
+    mare.addColorStop(1, 'rgba(156,163,175,0)');
+    msCtx.fillStyle = mare;
+    msCtx.beginPath();
+    msCtx.arc(mx, my, mr, 0, Math.PI * 2);
+    msCtx.fill();
+  });
+  for (let c = 0; c < 85; c++) {
+    const cx = Math.random() * 512;
+    const cy = 18 + Math.random() * 220;
+    const cr = 3 + Math.random() * 11;
+    const g = msCtx.createRadialGradient(cx - cr * 0.2, cy - cr * 0.2, cr * 0.25, cx, cy, cr);
+    g.addColorStop(0, 'rgba(51,65,85,0.55)');
+    g.addColorStop(0.75, 'rgba(226,232,240,0.45)');
+    g.addColorStop(1, 'rgba(156,163,175,0)');
+    msCtx.fillStyle = g;
+    msCtx.beginPath();
+    msCtx.arc(cx, cy, cr, 0, Math.PI * 2);
+    msCtx.fill();
+  }
+
+  // 16. Global Mars Sphere Albedo (Iron Oxide Plains + Syrtis Major + Valles Marineris + Polar Ice Caps)
+  const marsSphCanvas = document.createElement('canvas');
+  marsSphCanvas.width = 512;
+  marsSphCanvas.height = 256;
+  const maSphCtx = marsSphCanvas.getContext('2d')!;
+  const maSphGrad = maSphCtx.createLinearGradient(0, 0, 0, 256);
+  maSphGrad.addColorStop(0, '#c25934');
+  maSphGrad.addColorStop(0.5, '#d96b38');
+  maSphGrad.addColorStop(1, '#9a3c22');
+  maSphCtx.fillStyle = maSphGrad;
+  maSphCtx.fillRect(0, 0, 512, 256);
+  // Dark basaltic albedo features (Syrtis Major & Acidalia)
+  [
+    [150, 92, 48],
+    [285, 134, 56],
+    [395, 108, 42],
+    [82, 146, 36],
+  ].forEach(([bx, by, br]) => {
+    const dark = maSphCtx.createRadialGradient(bx, by, 4, bx, by, br);
+    dark.addColorStop(0, 'rgba(76,29,21,0.68)');
+    dark.addColorStop(1, 'rgba(164,74,42,0)');
+    maSphCtx.fillStyle = dark;
+    maSphCtx.beginPath();
+    maSphCtx.ellipse(bx, by, br * 1.25, br * 0.78, 0.25, 0, Math.PI * 2);
+    maSphCtx.fill();
+  });
+  // Valles Marineris canyon scar
+  maSphCtx.strokeStyle = 'rgba(69,26,18,0.75)';
+  maSphCtx.lineWidth = 5;
+  maSphCtx.beginPath();
+  maSphCtx.moveTo(190, 128);
+  maSphCtx.bezierCurveTo(235, 122, 275, 138, 325, 130);
+  maSphCtx.stroke();
+  // Dust storms & crater speckles
+  for (let i = 0; i < 65; i++) {
+    const dx = Math.random() * 512;
+    const dy = 24 + Math.random() * 208;
+    const dr = 8 + Math.random() * 24;
+    const dust = maSphCtx.createRadialGradient(dx, dy, 1, dx, dy, dr);
+    dust.addColorStop(0, 'rgba(251,146,60,0.34)');
+    dust.addColorStop(1, 'rgba(217,107,56,0)');
+    maSphCtx.fillStyle = dust;
+    maSphCtx.beginPath();
+    maSphCtx.arc(dx, dy, dr, 0, Math.PI * 2);
+    maSphCtx.fill();
+  }
+  // White North & South CO2 Polar Ice Caps
+  maSphCtx.fillStyle = '#f8fafc';
+  maSphCtx.fillRect(0, 0, 512, 16);
+  maSphCtx.fillRect(0, 238, 512, 18);
+
   return {
     moonAlbedo: finalizeColorTex(moonCanvas, maxAnisotropy, 12, 12),
     moonBump: finalizeDataTex(moonCanvas, maxAnisotropy, 12, 12),
@@ -460,5 +589,8 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     duskSky: finalizeColorTex(skyCanvas, maxAnisotropy),
     cloudPuff: finalizeColorTex(puffCanvas, maxAnisotropy),
     towerSteel: finalizeColorTex(steelCanvas, maxAnisotropy, 2, 4),
+    sunAlbedo: finalizeColorTex(sunCanvas, maxAnisotropy),
+    moonSphereAlbedo: finalizeColorTex(moonSphCanvas, maxAnisotropy),
+    marsSphereAlbedo: finalizeColorTex(marsSphCanvas, maxAnisotropy),
   };
 }

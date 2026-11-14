@@ -5,6 +5,7 @@ import { getSurfaceTerrainHeight } from '../game/physics';
 import type {
   CameraMode,
   CampaignMissionId,
+  CrashFxState,
   GamePhase,
   InputState,
   LandingState,
@@ -18,12 +19,14 @@ import type {
   VehicleShowcaseId,
 } from '../game/types';
 import {
+  createCrashFxSystem,
   createLaunchComplexAndSLS,
   createLunarEnvironment,
   createLunarLander,
   createOrbitalSatellite,
   createSolarSystemScene,
   createViperRover,
+  type CrashFxHandles,
   type LaunchComplexHandles,
   type LunarEnvironmentHandles,
   type LunarLanderHandles,
@@ -45,7 +48,9 @@ export interface SceneSimulationBridge {
   orbitYaw: number;
   orbitPitch: number;
   orbitDistance: number;
+  userOrbitActive: boolean;
   activeDrillingId: string | null;
+  crashFx: CrashFxState;
   launch: LaunchState;
   space: SpaceFlightState;
   landing: LandingState;
@@ -77,6 +82,7 @@ export class SpaceSceneManager {
   private launchComplex: LaunchComplexHandles;
   private solarSystem: SolarSystemHandles;
   private showcaseSatellite: OrbitalSatelliteHandles;
+  private crashFxSys: CrashFxHandles;
 
   private sunLight: THREE.DirectionalLight;
   private ambientLight: THREE.HemisphereLight;
@@ -95,16 +101,18 @@ export class SpaceSceneManager {
   private particleColors: Float32Array;
   private particleIdx = 0;
 
-  // SRB separation visual timers
+  // SRB / Core / LAS separation visual timers
   private srbDetachedTime = -1;
   private coreDetachedTime = -1;
+  private lasDetachedTime = -1;
 
-  // Camera smoothing scratch vectors
+  // Camera smoothing & debris scratch objects (zero per-frame GC)
   private camPosTarget = new THREE.Vector3(0, 12, 28);
   private camLookCurrent = new THREE.Vector3(0, 2, 0);
   private camLookTarget = new THREE.Vector3(0, 2, 0);
   private scratchVec = new THREE.Vector3();
   private scratchColor = new THREE.Color();
+  private crashDummy = new THREE.Object3D();
 
   // Original emissive storage for part inspector highlight
   private emissiveOriginal = new WeakMap<THREE.MeshStandardMaterial, { hex: number; intensity: number }>();
@@ -207,6 +215,9 @@ export class SpaceSceneManager {
     this.showcaseSatellite.group.visible = false;
     this.showcaseSatellite.beaconMesh.visible = false;
     this.scene.add(this.showcaseSatellite.group);
+
+    this.crashFxSys = createCrashFxSystem(this.textures);
+    this.scene.add(this.crashFxSys.group);
 
     // Landing Guide Line & Surface Markers
     const guideGeo = new THREE.BufferGeometry();
@@ -500,12 +511,13 @@ export class SpaceSceneManager {
     if (phase !== 'launch' || s.launch.launchSequence === 'PRE_SIM') {
       this.srbDetachedTime = -1;
       this.coreDetachedTime = -1;
+      this.lasDetachedTime = -1;
     }
 
     // Visibility matrix per phase
     const showLaunch = phase === 'launch' || ((phase === 'title' || phase === 'inspector') && s.showcase === 'rocket');
     const showSatelliteShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'satellite';
-    const showSpace = phase === 'space';
+    const showSpace = phase === 'space' || (phase === 'gameover' && s.crashFx.active && s.crashFx.kind === 'space');
     const showLunar = !showLaunch && !showSpace && !showSatelliteShowcase;
 
     this.launchComplex.group.visible = showLaunch;
@@ -518,7 +530,7 @@ export class SpaceSceneManager {
       phase === 'landing' ||
       phase === 'rover' ||
       phase === 'victory' ||
-      phase === 'gameover' ||
+      (phase === 'gameover' && s.crashFx.kind !== 'space') ||
       phase === 'briefing' ||
       (phase === 'title' && s.showcase !== 'rocket' && s.showcase !== 'satellite') ||
       (phase === 'inspector' && (s.showcase === 'lander' || s.showcase === 'outpost'));
@@ -526,6 +538,7 @@ export class SpaceSceneManager {
     this.roverModel.group.visible =
       phase === 'rover' ||
       phase === 'victory' ||
+      (phase === 'gameover' && s.crashFx.kind === 'rover') ||
       phase === 'briefing' ||
       (phase === 'title' && (s.showcase === 'rover' || s.showcase === 'outpost')) ||
       (phase === 'inspector' && (s.showcase === 'rover' || s.showcase === 'outpost'));
@@ -557,6 +570,7 @@ export class SpaceSceneManager {
       this.syncLunarScene(s, dt, elapsedSec);
     }
 
+    this.syncCrashFxVisuals(s, dt, elapsedSec);
     this.updateParticles(dt);
   }
 
@@ -564,16 +578,23 @@ export class SpaceSceneManager {
     (this.scene.background as THREE.Color).setHex(0x020617);
     const sat = this.showcaseSatellite;
     sat.group.position.set(0, 0, 0);
-    sat.group.rotation.set(0.18, elapsedSec * 0.25, 0);
+    // Keep satellite steady when user is orbiting/inspecting so 360° view stays intuitive
+    sat.group.rotation.set(
+      0.18,
+      s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.25 : 0.35,
+      0
+    );
     sat.solarLeftPivot.scale.x = 1;
     sat.solarRightPivot.scale.x = 1;
+    sat.umbrellaLeft.scale.setScalar(1);
+    sat.umbrellaRight.scale.setScalar(1);
     sat.linkBeam.visible = false;
 
-    if (s.phase === 'title') {
-      this.camera.position.set(4.5, 2.6, 6.2);
+    if (s.phase === 'title' && !s.userOrbitActive) {
+      this.camera.position.set(4.8, 2.7, 6.6);
       this.camera.lookAt(-1.4, 0, 0);
     } else {
-      const dist = Math.min(18, Math.max(5.5, s.orbitDistance * 0.45));
+      const dist = Math.min(28, Math.max(3.2, s.orbitDistance));
       this.camera.position.set(
         Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
         Math.sin(s.orbitPitch) * dist,
@@ -598,7 +619,7 @@ export class SpaceSceneManager {
       lc.cloudLayer.visible = true;
       lc.crewAccessArm.rotation.y = 0;
       lc.rocketFull.position.set(0, 2.5, 0);
-      lc.rocketFull.rotation.set(0, s.phase === 'inspector' ? elapsedSec * 0.16 : 0, 0);
+      lc.rocketFull.rotation.set(0, 0, 0);
       lc.srbLeft.visible = true;
       lc.srbLeft.position.set(0, 0, 0);
       lc.srbLeft.rotation.set(0, 0, 0);
@@ -608,19 +629,27 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.abortTower.visible = true;
+      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.rotation.set(0, 0, 0);
+      lc.lasFlame.visible = false;
+      lc.srbLeftBsm.visible = false;
+      lc.srbRightBsm.visible = false;
+      lc.icpsFlame.visible = false;
+      lc.machCone.visible = false;
       lc.flameGroup.visible = false;
       lc.trenchLight.intensity = 0;
       (this.scene.background as THREE.Color).setHex(0x0b132b);
 
-      if (s.phase === 'title') {
+      if (s.phase === 'title' && !s.userOrbitActive) {
         // Frame rocket nicely on the right half so left title scrim never overlaps
         this.camera.position.set(22, 16, 30);
         this.camera.lookAt(-6.5, 13.0, 0);
       } else {
-        const dist = s.orbitDistance;
+        const dist = Math.min(85, Math.max(8, s.orbitDistance));
+        const camY = Math.max(1.2, 12.0 + Math.sin(s.orbitPitch) * dist);
         this.camera.position.set(
           Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-          12.0 + Math.sin(s.orbitPitch) * dist,
+          camY,
           Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
         );
         this.camera.lookAt(0, 12.0, 0);
@@ -647,6 +676,13 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.abortTower.visible = true;
+      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.rotation.set(0, 0, 0);
+      lc.lasFlame.visible = false;
+      lc.srbLeftBsm.visible = false;
+      lc.srbRightBsm.visible = false;
+      lc.icpsFlame.visible = false;
+      lc.machCone.visible = false;
       lc.flameGroup.visible = false;
       lc.trenchLight.intensity = 0;
       (this.scene.background as THREE.Color).setHex(0x0b132b);
@@ -684,6 +720,21 @@ export class SpaceSceneManager {
         }
       }
 
+      if (s.userOrbitActive) {
+        const dist = Math.min(85, Math.max(9, s.orbitDistance));
+        const lookY = 14.5;
+        this.camPosTarget.set(
+          Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+          Math.max(1.2, lookY + Math.sin(s.orbitPitch) * dist),
+          Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        );
+        this.camLookTarget.set(0, lookY, 0);
+        this.camera.position.lerp(this.camPosTarget, Math.min(1, 14 * dt));
+        this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 14 * dt));
+        this.camera.lookAt(this.camLookCurrent);
+        return;
+      }
+
       const camAlpha = 1 - Math.exp(-3.6 * dt);
       const lookAlpha = 1 - Math.exp(-4.2 * dt);
       this.camera.position.lerp(this.camPosTarget, camAlpha);
@@ -715,14 +766,25 @@ export class SpaceSceneManager {
     lc.rocketFull.position.set(0, liftY, 0);
     lc.rocketFull.rotation.set(0, 0, -pitchRad);
 
-    // Flame + trench fire + deluge steam cloud on pad clearance
+    // Flame + trench fire + deluge steam cloud on pad clearance + Transonic Mach Cone
     const thrusting = L.ignited && L.throttle > 0.05 && L.fuelPct > 0;
-    lc.flameGroup.visible = thrusting;
+    lc.flameGroup.visible = thrusting && !L.coreSeparated;
+    lc.icpsFlame.visible = thrusting && L.coreSeparated;
+    if (lc.icpsFlame.visible) {
+      const flicker = 0.85 + Math.sin(elapsedSec * 38) * 0.16;
+      lc.icpsFlame.scale.set(1, Math.max(0.45, L.throttle) * flicker, 1);
+    }
+    lc.machCone.visible = thrusting && alt >= 7 && alt <= 19;
+    if (lc.machCone.visible) {
+      const pulse = 0.94 + Math.sin(elapsedSec * 28) * 0.07;
+      lc.machCone.scale.set(pulse, 1, pulse);
+    }
+
     if (thrusting) {
       const flicker = 0.88 + Math.sin(elapsedSec * 46) * 0.16;
       lc.flameGroup.scale.set(
         1,
-        Math.max(0.42, L.throttle) * flicker * (L.coreSeparated ? 0.55 : 1.18),
+        Math.max(0.42, L.throttle) * flicker * (L.srbSeparated ? 0.65 : 1.18),
         1
       );
       lc.trenchLight.intensity = alt < 4 ? 11 * L.throttle : 0;
@@ -737,9 +799,9 @@ export class SpaceSceneManager {
             -9.5 - Math.random() * 6,
             (Math.random() - 0.5) * 3.8,
             0.48,
-            1.0,
-            0.68,
-            0.24
+            L.coreSeparated ? 0.35 : 1.0,
+            L.coreSeparated ? 0.82 : 0.68,
+            L.coreSeparated ? 1.0 : 0.24
           );
         }
         // Billowing white sound-suppression deluge steam from flame trench during liftoff
@@ -765,46 +827,95 @@ export class SpaceSceneManager {
       lc.trenchLight.intensity = 0;
     }
 
-    // SRB separation physics visual
+    // SRB separation physics visual + Booster Separation Motor (BSM) radial plume puffs
     if (L.srbSeparated) {
       if (this.srbDetachedTime < 0) this.srbDetachedTime = elapsedSec;
       const tSep = elapsedSec - this.srbDetachedTime;
-      lc.srbLeft.visible = tSep < 4.5;
-      lc.srbRight.visible = tSep < 4.5;
-      lc.srbLeft.position.set(-tSep * 4.2, -tSep * tSep * 3.0, 0);
-      lc.srbLeft.rotation.z = tSep * 0.45;
-      lc.srbRight.position.set(tSep * 4.2, -tSep * tSep * 3.0, 0);
-      lc.srbRight.rotation.z = -tSep * 0.45;
+      lc.srbLeft.visible = tSep < 4.8;
+      lc.srbRight.visible = tSep < 4.8;
+      lc.srbLeftBsm.visible = tSep < 1.15;
+      lc.srbRightBsm.visible = tSep < 1.15;
+      lc.srbLeft.position.set(-tSep * 4.6, -tSep * tSep * 3.1, -tSep * 0.6);
+      lc.srbLeft.rotation.z = tSep * 0.52;
+      lc.srbLeft.rotation.x = tSep * 0.14;
+      lc.srbRight.position.set(tSep * 4.6, -tSep * tSep * 3.1, tSep * 0.6);
+      lc.srbRight.rotation.z = -tSep * 0.52;
+      lc.srbRight.rotation.x = -tSep * 0.14;
+
+      if (!s.paused && tSep < 0.75) {
+        for (const dir of [-1, 1]) {
+          this.emitParticle(
+            dir * (2.2 + tSep * 4.5),
+            liftY + 12.5 - tSep * 3,
+            0,
+            dir * 5.2 + (Math.random() - 0.5) * 2,
+            2.2 + Math.random() * 2,
+            (Math.random() - 0.5) * 2,
+            0.55,
+            1.0,
+            0.78,
+            0.28
+          );
+        }
+      }
     } else {
       lc.srbLeft.visible = true;
       lc.srbRight.visible = true;
+      lc.srbLeftBsm.visible = false;
+      lc.srbRightBsm.visible = false;
       lc.srbLeft.position.set(0, 0, 0);
       lc.srbLeft.rotation.set(0, 0, 0);
       lc.srbRight.position.set(0, 0, 0);
       lc.srbRight.rotation.set(0, 0, 0);
     }
 
-    // Core separation
+    // Core separation (MECO cutoff + downward tumble)
     if (L.coreSeparated) {
       if (this.coreDetachedTime < 0) this.coreDetachedTime = elapsedSec;
       const tCore = elapsedSec - this.coreDetachedTime;
-      lc.coreGroup.visible = tCore < 4.0;
-      lc.coreGroup.position.set(0, -tCore * tCore * 2.8, 0);
+      lc.coreGroup.visible = tCore < 4.5;
+      lc.coreGroup.position.set(0, -tCore * tCore * 3.0, -tCore * 0.7);
+      lc.coreGroup.rotation.z = tCore * 0.18;
     } else {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
+      lc.coreGroup.rotation.set(0, 0, 0);
     }
 
-    lc.abortTower.visible = !L.lasJettisoned;
+    // LAS Tower Jettison Rocket-Away Animation
+    if (L.lasJettisoned) {
+      if (this.lasDetachedTime < 0) this.lasDetachedTime = elapsedSec;
+      const tLas = elapsedSec - this.lasDetachedTime;
+      lc.abortTower.visible = tLas < 2.2;
+      lc.lasFlame.visible = tLas < 1.25;
+      lc.abortTower.position.set(tLas * 1.6, 22.45 + tLas * 19.0, tLas * 0.9);
+      lc.abortTower.rotation.z = -tLas * 0.34;
+    } else {
+      lc.abortTower.visible = true;
+      lc.abortTower.position.set(0, 22.45, 0);
+      lc.abortTower.rotation.set(0, 0, 0);
+      lc.lasFlame.visible = false;
+    }
 
-    // Smooth camera tracking with subtle liftoff vibration
+    // Smooth camera tracking (supports full 360° orbit + wheel zoom during liftoff)
     const shakeAmp = thrusting && alt < 20 ? (alt < 2.2 ? 0.16 : 0.08) : 0;
     const shakeX = shakeAmp > 0 ? Math.sin(elapsedSec * 52) * shakeAmp : 0;
     const shakeY = shakeAmp > 0 ? Math.cos(elapsedSec * 61) * shakeAmp * 0.7 : 0;
-    this.camPosTarget.set(16.5 + shakeX, liftY + 10.5 + shakeY, 30.5);
-    this.camLookTarget.set(-0.4, liftY + 11.5, 0);
-    this.camera.position.lerp(this.camPosTarget, 1 - Math.exp(-5.0 * dt));
-    this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-6.0 * dt));
+    if (s.userOrbitActive) {
+      const dist = Math.min(90, Math.max(9, s.orbitDistance));
+      const focusY = liftY + 11.5;
+      this.camPosTarget.set(
+        Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist + shakeX,
+        Math.max(1.2, focusY + Math.sin(s.orbitPitch) * dist + shakeY),
+        Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+      );
+      this.camLookTarget.set(0, focusY, 0);
+    } else {
+      this.camPosTarget.set(16.5 + shakeX, liftY + 10.5 + shakeY, 30.5);
+      this.camLookTarget.set(-0.4, liftY + 11.5, 0);
+    }
+    this.camera.position.lerp(this.camPosTarget, 1 - Math.exp(-8.0 * dt));
+    this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-8.5 * dt));
     this.camera.lookAt(this.camLookCurrent);
   }
 
@@ -830,7 +941,7 @@ export class SpaceSceneManager {
       ss.shipShieldShell.rotation.y += dt * 1.4;
     }
 
-    // Sync Modular Orbital Satellite (Deployment, Solar Wing Unfold, Dish Lock Beam)
+    // Sync Modular Orbital Satellite (Deployment, Solar Wing & Umbrella Reflectors Unfold, Dish Lock Beam)
     const satState = sp.orbitalSat;
     ss.satellite.group.visible = satState.deployed || sp.targetId === 'relay-orbit';
     ss.satellite.group.position.set(satState.satX, 0, satState.satZ);
@@ -838,6 +949,9 @@ export class SpaceSceneManager {
     const wingUnfold = satState.deployed ? Math.max(0.18, satState.solarDeployedPct / 100) : 0.12;
     ss.satellite.solarLeftPivot.scale.x = wingUnfold;
     ss.satellite.solarRightPivot.scale.x = wingUnfold;
+    const umbrellaScale = 0.35 + 0.65 * wingUnfold;
+    ss.satellite.umbrellaLeft.scale.setScalar(umbrellaScale);
+    ss.satellite.umbrellaRight.scale.setScalar(umbrellaScale);
     ss.satellite.dishPivot.rotation.z = ((100 - satState.dishAlignedPct) / 100) * 0.55;
     ss.satellite.linkBeam.visible = satState.linkLocked;
     (ss.satellite.beaconMesh.material as THREE.MeshBasicMaterial).color.setHex(
@@ -845,6 +959,9 @@ export class SpaceSceneManager {
     );
 
     ss.gatewayGroup.rotation.y += dt * 0.15;
+    ss.earthClouds.rotation.y += dt * 0.04;
+    ss.sunCorona.scale.setScalar(1 + Math.sin(elapsedSec * 2.2) * 0.025);
+    ss.asteroidBelt.rotation.y += dt * 0.015;
 
     // Pulse solar storm ring radius
     const stormScale = s.donkiFlareActive ? 1.5 : 1.0;
@@ -864,11 +981,21 @@ export class SpaceSceneManager {
     posAttr.setXYZ(1, targetSpec.x, 0, targetSpec.z);
     posAttr.needsUpdate = true;
 
-    // Elevated chase camera above Orion spacecraft so planets, Satellite, Sun, and course line read clearly
-    this.camPosTarget.set(sp.shipX - Math.sin(sp.headingRad) * 16, 13, sp.shipZ - Math.cos(sp.headingRad) * 16);
-    this.camLookTarget.set(sp.shipX + Math.sin(sp.headingRad) * 6, 0, sp.shipZ + Math.cos(sp.headingRad) * 6);
-    this.camera.position.lerp(this.camPosTarget, Math.min(1, 5.5 * dt));
-    this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 6.5 * dt));
+    // Camera: elevated chase by default, or full 360° orbit + wheel zoom around Orion & Satellite
+    if (s.userOrbitActive) {
+      const dist = Math.min(90, Math.max(4.5, s.orbitDistance));
+      this.camPosTarget.set(
+        sp.shipX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+        Math.sin(s.orbitPitch) * dist,
+        sp.shipZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+      );
+      this.camLookTarget.set(sp.shipX, 0, sp.shipZ);
+    } else {
+      this.camPosTarget.set(sp.shipX - Math.sin(sp.headingRad) * 16, 13, sp.shipZ - Math.cos(sp.headingRad) * 16);
+      this.camLookTarget.set(sp.shipX + Math.sin(sp.headingRad) * 6, 0, sp.shipZ + Math.cos(sp.headingRad) * 6);
+    }
+    this.camera.position.lerp(this.camPosTarget, Math.min(1, 9.5 * dt));
+    this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 10.5 * dt));
     this.camera.lookAt(this.camLookCurrent);
   }
 
@@ -940,7 +1067,7 @@ export class SpaceSceneManager {
         focusZ = -13;
       }
 
-      if (s.phase === 'title') {
+      if (s.phase === 'title' && !s.userOrbitActive) {
         const angle = elapsedSec * 0.16;
         const rad = s.showcase === 'outpost' ? 24 : s.showcase === 'rover' ? 7.5 : 11;
         const camX = focusX + Math.sin(angle) * rad;
@@ -955,12 +1082,12 @@ export class SpaceSceneManager {
         const leftShift = s.showcase === 'outpost' ? 5.0 : s.showcase === 'rover' ? 1.8 : 2.8;
         this.camera.lookAt(focusX - rightX * leftShift, focusY, focusZ - rightZ * leftShift);
       } else {
-        const dist = s.orbitDistance;
-        this.camera.position.set(
-          focusX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-          focusY + Math.sin(s.orbitPitch) * dist,
-          focusZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
-        );
+        const dist = Math.min(68, Math.max(3.2, s.orbitDistance));
+        const camX = focusX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+        const camZ = focusZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+        const floorY = getSurfaceTerrainHeight(activePlanet, camX, camZ) + 0.65;
+        const camY = Math.max(floorY, focusY + Math.sin(s.orbitPitch) * dist);
+        this.camera.position.set(camX, camY, camZ);
         this.camera.lookAt(focusX, focusY, focusZ);
       }
       return;
@@ -969,17 +1096,26 @@ export class SpaceSceneManager {
     if (s.phase === 'briefing') {
       this.lander.group.position.set(0, 0.36, 0);
       this.roverModel.group.position.set(6, getSurfaceTerrainHeight(activePlanet, 6, 6), 6);
-      this.camera.position.set(16, 11, 22);
-      this.camera.lookAt(-3, 2.5, -3);
+      if (s.userOrbitActive) {
+        const dist = Math.min(68, Math.max(6, s.orbitDistance));
+        const camX = -3 + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+        const camZ = -3 + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+        const floorY = getSurfaceTerrainHeight(activePlanet, camX, camZ) + 0.8;
+        this.camera.position.set(camX, Math.max(floorY, 2.5 + Math.sin(s.orbitPitch) * dist), camZ);
+        this.camera.lookAt(-3, 2.5, -3);
+      } else {
+        this.camera.position.set(16, 11, 22);
+        this.camera.lookAt(-3, 2.5, -3);
+      }
       return;
     }
 
-    if (s.phase === 'landing') {
+    if (s.phase === 'landing' || (s.phase === 'gameover' && s.crashFx.kind === 'landing')) {
       this.syncLandingVisuals(s, dt, elapsedSec);
       return;
     }
 
-    // Rover / Victory / Gameover
+    // Rover / Victory / Rover Gameover
     this.syncRoverVisuals(s, dt, elapsedSec);
   }
 
@@ -1083,12 +1219,15 @@ export class SpaceSceneManager {
     } else if (s.cameraMode === 'overhead') {
       this.camera.position.set(f.x, Math.max(55, f.y + 42), f.z + 12);
       this.camera.lookAt(f.x, groundY, f.z);
-    } else if (s.cameraMode === 'orbit') {
-      const dist = s.orbitDistance;
+    } else if (s.cameraMode === 'orbit' || s.userOrbitActive) {
+      const dist = Math.min(82, Math.max(5.5, s.orbitDistance));
+      const camX = f.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+      const camZ = f.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+      const floorY = getSurfaceTerrainHeight(f.planet, camX, camZ) + 0.85;
       this.camera.position.set(
-        f.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        f.y + 2 + Math.sin(s.orbitPitch) * dist,
-        f.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        camX,
+        Math.max(floorY, f.y + 2 + Math.sin(s.orbitPitch) * dist),
+        camZ
       );
       this.camera.lookAt(f.x, f.y + 2, f.z);
     } else {
@@ -1173,29 +1312,148 @@ export class SpaceSceneManager {
       );
     }
 
-    // Rover Camera Modes
+    // Rover Camera Modes (supports instant 360° orbit + wheel zoom in Chase & Orbit)
     const fwdX = Math.sin(r.headingRad);
     const fwdZ = Math.cos(r.headingRad);
     if (s.cameraMode === 'cockpit') {
       this.camera.position.set(r.x + fwdX * 0.65, r.y + 2.75 + clearanceLift, r.z + fwdZ * 0.65);
       this.camera.lookAt(r.x + fwdX * 16, r.y + 1.4, r.z + fwdZ * 16);
     } else if (s.cameraMode === 'overhead') {
-      this.camera.position.set(r.x, r.y + 28, r.z + 4);
+      const zoomH = Math.min(68, Math.max(12, s.orbitDistance * 1.4));
+      this.camera.position.set(r.x, r.y + zoomH, r.z + 4);
       this.camera.lookAt(r.x, r.y, r.z);
-    } else if (s.cameraMode === 'orbit') {
-      const dist = s.orbitDistance;
+    } else if (s.cameraMode === 'orbit' || s.userOrbitActive) {
+      const dist = Math.min(62, Math.max(3.2, s.orbitDistance));
+      const camX = r.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+      const camZ = r.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+      const floorY = getSurfaceTerrainHeight(r.planet, camX, camZ) + 0.65;
       this.camera.position.set(
-        r.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        r.y + 1.6 + Math.sin(s.orbitPitch) * dist,
-        r.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        camX,
+        Math.max(floorY, r.y + 1.5 + Math.sin(s.orbitPitch) * dist),
+        camZ
       );
       this.camera.lookAt(r.x, r.y + 1.1, r.z);
     } else {
-      this.camPosTarget.set(r.x - fwdX * 9.5, r.y + 5.2 + clearanceLift, r.z - fwdZ * 9.5);
+      const dist = Math.min(34, Math.max(4.5, s.orbitDistance));
+      this.camPosTarget.set(r.x - fwdX * dist, r.y + 4.4 + dist * 0.14 + clearanceLift, r.z - fwdZ * dist);
       this.camLookTarget.set(r.x + fwdX * 3.5, r.y + 1.4, r.z + fwdZ * 3.5);
       this.camera.position.lerp(this.camPosTarget, Math.min(1, 6.5 * dt));
       this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 7.5 * dt));
       this.camera.lookAt(this.camLookCurrent);
+    }
+  }
+
+  private syncCrashFxVisuals(s: SceneSimulationBridge, dt: number, elapsedSec: number) {
+    const fx = s.crashFx;
+    const cf = this.crashFxSys;
+
+    if (!fx.active) {
+      cf.group.visible = false;
+      this.lander.descentStage.position.set(0, 0, 0);
+      this.lander.descentStage.rotation.set(0, 0, 0);
+      this.lander.ascentStage.position.set(0, 0, 0);
+      this.lander.ascentStage.rotation.set(0, 0, 0);
+      this.lander.legs.forEach((leg, idx) => {
+        leg.position.set(0, 0, 0);
+        leg.rotation.set(0, (idx * Math.PI) / 2, 0);
+      });
+      this.solarSystem.shipWingsGroup.position.set(0, 0, 0);
+      this.solarSystem.shipWingsGroup.rotation.set(0, 0, 0);
+      this.solarSystem.shipGroup.rotation.z = 0;
+      this.roverModel.bodyGroup.position.set(0, 0, 0);
+      this.roverModel.bodyGroup.rotation.set(0, 0, 0);
+      return;
+    }
+
+    const t = Math.min(2.8, Math.max(0, fx.elapsed));
+    cf.group.visible = true;
+    cf.group.position.set(fx.x, fx.y, fx.z);
+
+    // Expanding incandescent fireball & ground/plasma shockwave ring
+    const fbScale = t < 0.32 ? 0.5 + (t / 0.32) * 3.6 : Math.max(0.01, 4.1 * Math.exp(-(t - 0.32) * 2.1));
+    cf.fireball.scale.setScalar(fbScale);
+    (cf.fireball.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.92 - t * 0.58);
+    cf.fireball.visible = t < 1.65;
+
+    const swScale = 0.65 + t * 9.8;
+    cf.shockwave.scale.setScalar(swScale);
+    (cf.shockwave.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.85 - t * 0.68);
+    cf.shockwave.visible = t < 1.3;
+
+    // 28 ballistic tumbling hull/foil debris shards (zero per-frame GC)
+    const grav = fx.kind === 'space' ? 0.0 : fx.planet === 'mars' ? 3.72 : 1.62;
+    for (let i = 0; i < cf.debrisSeeds.length; i++) {
+      const d = cf.debrisSeeds[i];
+      const py = fx.kind === 'space' ? d.vy * t * 0.55 : Math.max(-0.25, d.vy * t - 0.5 * grav * t * t);
+      this.crashDummy.position.set(d.vx * t, py, d.vz * t);
+      this.crashDummy.rotation.set(d.rx * t, d.ry * t, d.rz * t);
+      this.crashDummy.scale.setScalar(d.scale);
+      this.crashDummy.updateMatrix();
+      cf.debrisMesh.setMatrixAt(i, this.crashDummy.matrix);
+    }
+    cf.debrisMesh.instanceMatrix.needsUpdate = true;
+
+    // Structural vehicle breakup per crash type
+    if (fx.kind === 'landing') {
+      const lm = this.lander;
+      lm.flameMesh.visible = false;
+      lm.engineLight.intensity = 0;
+      lm.rcsLeft.visible = false;
+      lm.rcsRight.visible = false;
+      this.guideLine.visible = false;
+      this.bullseyeRing.visible = false;
+      this.predRing.visible = false;
+      this.lunarEnv.trajectoryArc.visible = false;
+
+      const legOpen = Math.min(1, t * 3.5);
+      lm.legs.forEach((leg, idx) => {
+        leg.rotation.set(-0.34 * legOpen, (idx * Math.PI) / 2, 0.14 * legOpen * (idx % 2 === 0 ? 1 : -1));
+      });
+      lm.descentStage.rotation.set(0.18 * legOpen, 0.12 * legOpen, -0.24 * legOpen);
+      lm.ascentStage.position.set(
+        t * 2.1,
+        Math.max(-0.6, 5.2 * t - 0.5 * grav * t * t),
+        -t * 1.3
+      );
+      lm.ascentStage.rotation.set(t * 2.0, t * 0.9, -t * 2.4);
+    } else if (fx.kind === 'space') {
+      const ss = this.solarSystem;
+      ss.shipFlame.visible = false;
+      ss.shipShieldShell.visible = false;
+      ss.shipGroup.rotation.z = t * 1.9;
+      ss.shipWingsGroup.position.set(t * 1.4, t * 0.8, -t * 1.1);
+      ss.shipWingsGroup.rotation.set(t * 1.2, t * 1.7, -t * 2.1);
+    } else if (fx.kind === 'rover') {
+      const slump = Math.min(1, t * 2.6);
+      this.roverModel.bodyGroup.position.y = -0.18 * slump;
+      this.roverModel.bodyGroup.rotation.set(0.2 * slump, 0, 0.28 * slump);
+      this.roverModel.headlight.intensity = t % 0.22 < 0.11 ? 2.0 : 0.0;
+    }
+
+    // Smoke & incendiary ember particle plumes
+    if (!s.paused && t < 1.55) {
+      for (let k = 0; k < 3; k++) {
+        const hot = Math.random() > 0.38;
+        this.emitParticle(
+          fx.x + (Math.random() - 0.5) * 2.0,
+          fx.y + 0.5 + Math.random() * 1.2,
+          fx.z + (Math.random() - 0.5) * 2.0,
+          (Math.random() - 0.5) * 7.5,
+          2.8 + Math.random() * 6.5,
+          (Math.random() - 0.5) * 7.5,
+          0.95 + Math.random() * 0.55,
+          hot ? 1.0 : 0.28,
+          hot ? 0.52 : 0.26,
+          hot ? 0.15 : 0.28
+        );
+      }
+    }
+
+    // Damped camera impact shake right on impact
+    if (t < 1.15 && !s.paused && dt > 0) {
+      const amp = (1.15 - t) * 0.42;
+      this.camera.position.x += Math.sin(elapsedSec * 72) * amp;
+      this.camera.position.y += Math.cos(elapsedSec * 84) * amp * 0.7;
     }
   }
 

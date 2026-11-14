@@ -3,18 +3,13 @@ import {
   Compass,
   Database,
   FastForward,
-  Flame,
   Gauge,
-  Info,
   Pause,
   Play,
   Rocket,
   RotateCcw,
-  Shield,
-  Target,
   Volume2,
   VolumeX,
-  Zap,
 } from 'lucide-react';
 import { PHYSICS } from '../game/constants';
 import type { GamePhase, LaunchState, ResourceState } from '../game/types';
@@ -39,7 +34,7 @@ interface LaunchHUDProps {
 const STAGE_TABS: Array<{ id: GamePhase; label: string }> = [
   { id: 'briefing', label: '1. Payload' },
   { id: 'launch', label: '2. Launch' },
-  { id: 'landing', label: '3. Lunar Landing' },
+  { id: 'landing', label: '3. Landing' },
   { id: 'rover', label: '4. Rover' },
 ];
 
@@ -74,27 +69,27 @@ function getVehicleStatusBadge(launch: LaunchState): { label: string; colorClass
 
 function getEducationalHint(launch: LaunchState): string {
   if (launch.launchSequence === 'PRE_SIM') {
-    return '~3,940 kN thrust overcomes gravity (F = m·a). Click Begin Simulation.';
+    return '~3,940 kN thrust beats gravity (F = m·a). Click Begin Simulation.';
   }
   if (launch.launchSequence === 'COUNTDOWN') {
-    return 'Crew Access Arm retracting & RS-25 chilldown active. Wait for READY.';
+    return 'Crew arm retracting & RS-25 chilldown active.';
   }
   if (launch.launchSequence === 'READY') {
-    return 'Pad checks green! Hold [SPACE] or [W] (or click START LAUNCH) for liftoff.';
+    return 'Pad green! Hold [SPACE] or [W] for liftoff.';
   }
   if (launch.stagePrompt === 'SRB_SEP') {
-    return 'SRBs depleted! Press [SPACE] to jettison boosters and shed dead mass.';
+    return 'SRBs spent — press [SPACE] to drop boosters.';
   }
   if (launch.stagePrompt === 'CORE_SEP') {
-    return 'Core stage cutoff! Press [SPACE] to separate ICPS upper stage.';
+    return 'MECO cutoff — press [SPACE] to stage ICPS.';
   }
   if (launch.coreSeparated) {
-    return 'ICPS firing in vacuum — building orbital velocity toward Lunar Transfer.';
+    return 'ICPS vacuum burn — accelerating to 165 km orbit.';
   }
   if (launch.altitudeKm >= 10 && launch.altitudeKm <= 26) {
-    return 'Passing Max-Q (~12 km). Keep pitch smooth along the gravity turn.';
+    return 'Passing Max-Q (~12 km) — keep pitch smooth.';
   }
-  return 'Net force (Thrust − Gravity − Drag) accelerates the rocket off Pad 39B.';
+  return 'Net force (Thrust − Weight − Drag) climbs toward orbit.';
 }
 
 export function LaunchHUD({
@@ -181,11 +176,11 @@ export function LaunchHUD({
         <div className="hud-panel flex items-center gap-3 rounded-xl px-3.5 py-2">
           <NASAInsignia size={36} className="shrink-0" />
           <div className="leading-tight">
-            <h1 className="font-display text-base font-bold tracking-wide text-white">
+            <h1 className="font-display text-base font-bold tracking-wide text-white uppercase">
               ARTEMIS ODYSSEY
             </h1>
-            <p className="text-[11px] font-medium text-sky-300">
-              Junior Astronaut Mission Trainer
+            <p className="font-hud text-[11px] font-bold tracking-wider text-cyan-300 uppercase">
+              LC-39B Flight Director
             </p>
           </div>
         </div>
@@ -204,9 +199,9 @@ export function LaunchHUD({
                 onClick={() => {
                   if (!active) onJumpToPhase(tab.id);
                 }}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                className={`rounded-lg px-3 py-1.5 font-hud text-xs font-bold whitespace-nowrap transition ${
                   active
-                    ? 'bg-sky-500 text-slate-950 shadow-sm'
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
                     : 'text-slate-200 hover:bg-slate-800 hover:text-white'
                 }`}
               >
@@ -221,7 +216,7 @@ export function LaunchHUD({
           <button
             type="button"
             onClick={onOpenNasaModal}
-            className="hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-300 hover:border-emerald-400"
+            className="hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-emerald-300 uppercase hover:border-emerald-400"
           >
             <Database className="h-3.5 w-3.5" />
             NASA DATA
@@ -230,64 +225,58 @@ export function LaunchHUD({
           <button
             type="button"
             onClick={onToggleAutoGuidance}
-            className={`hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+            className={`hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap uppercase transition ${
               launch.autoGuidance
-                ? 'border-sky-400/70 text-sky-200'
-                : 'text-slate-300 hover:border-sky-400/50'
+                ? 'border-cyan-400/70 text-cyan-200'
+                : 'text-slate-300 hover:border-cyan-400/50'
             }`}
           >
-            <Compass className="h-3.5 w-3.5 text-sky-300" />
+            <Compass className="h-3.5 w-3.5 text-cyan-300" />
             {launch.autoGuidance ? 'AUTO GUIDANCE' : 'MANUAL PITCH'}
           </button>
 
           <button
             type="button"
             onClick={onSkipToSpace}
-            className="hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400"
+            className="hud-panel inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-200 uppercase hover:border-cyan-400"
           >
-            <FastForward className="h-3.5 w-3.5 text-sky-300" />
-            Space Flight
+            <FastForward className="h-3.5 w-3.5 text-cyan-300" />
+            Orbit
           </button>
 
           <button
             type="button"
             onClick={onToggleMute}
             title="Toggle Sound [M]"
-            className="hud-panel rounded-lg p-2 text-slate-200 hover:border-sky-400"
+            className="hud-panel rounded-lg p-2 text-slate-200 hover:border-cyan-400"
           >
             {muted ? (
               <VolumeX className="h-4 w-4 text-slate-400" />
             ) : (
-              <Volume2 className="h-4 w-4 text-sky-300" />
+              <Volume2 className="h-4 w-4 text-cyan-300" />
             )}
           </button>
         </div>
       </header>
 
-      {/* MIDDLE ROW: Left Mission Panels | Open Center 3D Viewport | Right Telemetry & Specs */}
+      {/* MIDDLE ROW */}
       <div className="relative my-auto flex items-start justify-between gap-4 py-2">
         {/* LEFT COLUMN */}
         <aside className="pointer-events-auto flex w-64 shrink-0 flex-col gap-2.5">
           {/* Mission Objective */}
           <section className="hud-panel rounded-xl p-3.5">
-            <div className="mb-1.5 flex items-center gap-2">
-              <Target className="h-4 w-4 text-amber-400" />
-              <h2 className="font-display text-xs font-bold tracking-wider text-amber-300 uppercase">
-                Mission Objective
-              </h2>
-            </div>
-            <p className="text-xs font-semibold leading-snug text-white">
-              Launch Orion safely toward lunar transfer.
-            </p>
-            <p className="mt-1 text-[11px] leading-snug text-slate-300">
-              Balance thrust, pitch stability, and staging to reach 165 km orbit.
+            <h2 className="mb-1 font-display text-xs font-bold tracking-wider text-amber-300 uppercase">
+              Flight Objective
+            </h2>
+            <p className="text-xs leading-snug text-slate-200">
+              Reach 165 km orbit. Keep pitch smooth &amp; stage on cue.
             </p>
           </section>
 
           {/* Mission Status Progression */}
           <section className="hud-panel rounded-xl p-3.5">
             <h2 className="mb-2.5 font-display text-xs font-bold tracking-wider text-sky-300 uppercase">
-              Mission Status
+              Ascent Sequence
             </h2>
             <ul className="space-y-2">
               {checklist.map((item) => (
@@ -331,18 +320,15 @@ export function LaunchHUD({
             </ul>
           </section>
 
-          {/* Learning Resources */}
+          {/* Vehicle Systems */}
           <section className="hud-panel rounded-xl p-3.5">
             <h2 className="mb-2.5 font-display text-xs font-bold tracking-wider text-sky-300 uppercase">
-              Learning Resources
+              Vehicle Systems
             </h2>
             <div className="space-y-2 text-xs">
               <div>
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-slate-200">
-                    <Zap className="h-3.5 w-3.5 text-amber-400" />
-                    Power
-                  </span>
+                  <span className="font-hud text-slate-200 uppercase">Power</span>
                   <span className="font-mono-tech font-bold text-amber-300">
                     {Math.round(resources.power)}%
                   </span>
@@ -357,10 +343,7 @@ export function LaunchHUD({
 
               <div>
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-slate-200">
-                    <Flame className="h-3.5 w-3.5 text-sky-400" />
-                    Propellant
-                  </span>
+                  <span className="font-hud text-slate-200 uppercase">Propellant</span>
                   <span className="font-mono-tech font-bold text-sky-300">
                     {Math.round(launch.fuelPct)}%
                   </span>
@@ -375,10 +358,7 @@ export function LaunchHUD({
 
               <div>
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-slate-200">
-                    <Shield className="h-3.5 w-3.5 text-emerald-400" />
-                    Crew Support
-                  </span>
+                  <span className="font-hud text-slate-200 uppercase">Crew O₂</span>
                   <span className="font-mono-tech font-bold text-emerald-300">
                     {Math.round(resources.oxygen)}%
                   </span>
@@ -397,9 +377,9 @@ export function LaunchHUD({
         {/* CENTER-LOWER CINEMATIC OVERLAY (Positioned low so Orion & SLS remain unobstructed) */}
         <div className="pointer-events-none flex flex-1 flex-col items-center self-end pb-3">
           {launch.launchSequence === 'COUNTDOWN' && (
-            <div className="hud-panel-amber rounded-2xl px-8 py-4 text-center">
-              <p className="font-display text-xs font-bold tracking-[0.22em] text-sky-200 uppercase">
-                Launch Countdown
+            <div className="hud-panel-amber tactical-frame rounded-2xl px-8 py-4 text-center">
+              <p className="font-display text-xs font-bold tracking-[0.22em] text-cyan-200 uppercase">
+                T-Minus Sequence
               </p>
               <div className="my-1 flex items-baseline justify-center gap-6 font-display">
                 <span className="text-2xl font-bold text-slate-500">
@@ -410,20 +390,22 @@ export function LaunchHUD({
                   {countdownDigit > 1 ? countdownDigit - 1 : ''}
                 </span>
               </div>
-              <p className="text-xs font-medium text-slate-200">Get Ready for Liftoff...</p>
+              <p className="font-hud text-xs font-bold tracking-wider text-slate-200 uppercase">
+                Arming RS-25 Core Igniters...
+              </p>
             </div>
           )}
 
           {launch.launchSequence === 'READY' && (
             <div
               data-testid="launch-ready-banner"
-              className="hud-panel-amber rounded-2xl border-emerald-400/60 px-7 py-3.5 text-center"
+              className="hud-panel-success tactical-frame rounded-2xl px-7 py-3.5 text-center"
             >
               <p className="font-display text-lg font-bold tracking-wider text-emerald-300 uppercase">
                 READY FOR LIFTOFF
               </p>
               <p className="mt-0.5 font-mono-tech text-xs font-semibold text-amber-200">
-                HOLD SPACE OR PRESS W TO BEGIN LAUNCH
+                HOLD SPACE OR PRESS W TO IGNITE ENGINES
               </p>
             </div>
           )}
@@ -432,7 +414,7 @@ export function LaunchHUD({
             <button
               type="button"
               onClick={onSeparateStage}
-              className="pointer-events-auto rounded-xl bg-amber-500 px-6 py-2.5 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-amber-400"
+              className="pointer-events-auto rounded-xl bg-amber-500 px-6 py-2.5 font-display text-sm font-bold whitespace-nowrap text-slate-950 shadow-lg hover:bg-amber-400"
             >
               {launch.stagePrompt === 'SRB_SEP'
                 ? 'PRESS [SPACE] TO SEPARATE BOOSTERS!'
@@ -619,9 +601,10 @@ export function LaunchHUD({
             Auto Guidance: {launch.autoGuidance ? 'ON' : 'OFF'}
           </button>
           <div className="flex min-w-0 items-center gap-2 text-[11px] leading-tight text-slate-200">
-            <Info className="h-4 w-4 shrink-0 text-amber-300" />
+            <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 font-hud text-[10px] font-bold text-amber-300 uppercase">
+              Cue
+            </span>
             <p className="line-clamp-2" title={getEducationalHint(launch)}>
-              <strong className="text-amber-300">Hint: </strong>
               {getEducationalHint(launch)}
             </p>
           </div>

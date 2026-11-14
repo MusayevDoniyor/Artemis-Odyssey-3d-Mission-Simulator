@@ -60,12 +60,12 @@ import { SpaceSceneManager, type SceneSimulationBridge } from './three/SpaceScen
 
 const DEFAULT_DONKI: DonkiStatus = {
   isLive: false,
-  status: 'loading',
-  classType: 'Checking DONKI...',
+  status: 'archived',
+  classType: 'M2.4 Nominal',
   beginTime: '',
   sourceLocation: 'Solar Disk',
   link: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/',
-  description: 'Fetching latest solar flare telemetry from NASA DONKI.',
+  description: 'NASA DONKI solar flare telemetry active.',
 };
 
 const DEFAULT_OSDR: OsdrStatus = {
@@ -123,10 +123,12 @@ export default function App() {
     showcase: 'outpost',
     highlightedPart: null,
     donkiFlareActive: false,
-    orbitYaw: 0.6,
+    orbitYaw: 0.63,
     orbitPitch: 0.25,
-    orbitDistance: 24,
+    orbitDistance: isAutostart ? 38 : 24,
+    userOrbitActive: false,
     activeDrillingId: null,
+    crashFx: { active: false, kind: 'landing', elapsed: 0, x: 0, y: 0, z: 0, planet: 'moon' },
     launch: createInitialLaunchState(),
     space: createInitialSpaceFlightState('artemis-2'),
     landing: createInitialLandingState(PAYLOADS['oxygen-tanks'].massMultiplier, 'moon'),
@@ -282,6 +284,8 @@ export default function App() {
       s.planet = targetPlanet;
       s.input = { ...EMPTY_INPUT };
       s.activeDrillingId = null;
+      s.crashFx = { active: false, kind: 'landing', elapsed: 0, x: 0, y: 0, z: 0, planet: targetPlanet };
+      s.userOrbitActive = false;
       discoveryObjRef.current = null;
       activeAnomalyRef.current = null;
       phaseTimerRef.current = 0;
@@ -291,6 +295,9 @@ export default function App() {
         s.phase = 'title';
         s.showcase = 'outpost';
         s.highlightedPart = null;
+        s.orbitYaw = 0.63;
+        s.orbitPitch = 0.25;
+        s.orbitDistance = 24;
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'inspector') {
         s.phase = 'inspector';
@@ -299,15 +306,22 @@ export default function App() {
         s.highlightedPart = firstPart.id;
         unlockFieldNote(firstPart.unlockNoteId);
         s.orbitYaw = 0.65;
-        s.orbitPitch = 0.15;
+        s.orbitPitch = 0.18;
         s.orbitDistance = 35;
+        s.userOrbitActive = true;
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'briefing') {
         s.phase = 'briefing';
+        s.orbitYaw = 0.62;
+        s.orbitPitch = 0.26;
+        s.orbitDistance = 28;
         s.resources = { power: 75, oxygen: 75, shield: 70 };
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'launch') {
         s.phase = 'launch';
+        s.orbitYaw = 0.52;
+        s.orbitPitch = 0.12;
+        s.orbitDistance = 38;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.launch = createInitialLaunchState(s.launch.autoGuidance);
         launchPrevCountdownDigitRef.current = 4;
@@ -315,11 +329,17 @@ export default function App() {
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'space') {
         s.phase = 'space';
+        s.orbitYaw = 0.55;
+        s.orbitPitch = 0.48;
+        s.orbitDistance = 22;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
       } else if (targetPhase === 'landing') {
         s.phase = 'landing';
         s.cameraMode = 'chase';
+        s.orbitYaw = 0.54;
+        s.orbitPitch = 0.26;
+        s.orbitDistance = 28;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.landing = createInitialLandingState(
           payload.massMultiplier,
@@ -329,6 +349,9 @@ export default function App() {
       } else if (targetPhase === 'rover') {
         s.phase = 'rover';
         s.cameraMode = 'chase';
+        s.orbitYaw = 0.6;
+        s.orbitPitch = 0.26;
+        s.orbitDistance = 11;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.rover = createInitialRoverState(6, 6, targetPlanet);
         s.objectives = clonePlanetObjectives(targetPlanet);
@@ -351,6 +374,23 @@ export default function App() {
       const s = simRef.current;
       if (s.paused || nasaModalOpen || fieldNotebookOpen || discoveryObjRef.current) {
         soundSynth.setThrustVolume(0);
+        return;
+      }
+
+      // Active 3D crash breakup animation before revealing Mission Abort modal
+      if (s.crashFx.active) {
+        soundSynth.setThrustVolume(0);
+        if (s.phase !== 'gameover') {
+          s.crashFx.elapsed += dt;
+          if (s.crashFx.elapsed >= 1.65) {
+            s.phase = 'gameover';
+            syncUiNow();
+          }
+          return;
+        }
+        if (s.crashFx.elapsed < 3.0) {
+          s.crashFx.elapsed += dt;
+        }
         return;
       }
 
@@ -383,6 +423,10 @@ export default function App() {
           soundSynth.playSuccess();
           scoreRef.current += 500;
           s.phase = 'space';
+          s.userOrbitActive = false;
+          s.orbitYaw = 0.55;
+          s.orbitPitch = 0.48;
+          s.orbitDistance = 22;
           phaseTimerRef.current = 0;
           activeAnomalyRef.current = null;
           s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
@@ -436,9 +480,17 @@ export default function App() {
         if (s.resources.shield <= 0) {
           soundSynth.setThrustVolume(0);
           soundSynth.playCrash();
-          failReasonRef.current = 'Solar radiation depleted your spacecraft shielding!';
-          s.phase = 'gameover';
-          syncUiNow();
+          failReasonRef.current =
+            'Solar proton storm overwhelmed Orion radiation shield.';
+          s.crashFx = {
+            active: true,
+            kind: 'space',
+            elapsed: 0,
+            x: s.space.shipX,
+            y: 0,
+            z: s.space.shipZ,
+            planet: s.planet,
+          };
           return;
         }
       } else if (s.phase === 'landing') {
@@ -452,10 +504,17 @@ export default function App() {
             soundSynth.playCrash();
             failReasonRef.current =
               s.landing.planet === 'mars'
-                ? 'Mars Jezero touchdown was too fast or tilted! 0.38g demands earlier braking.'
-                : 'Lunar touchdown was too fast or tilted! Brake earlier next time.';
-            s.phase = 'gameover';
-            syncUiNow();
+                ? 'Mars 0.38g touchdown exceeded sink-rate or tilt limit.'
+                : 'Lunar touchdown exceeded gear speed or tilt limit.';
+            s.crashFx = {
+              active: true,
+              kind: 'landing',
+              elapsed: 0,
+              x: s.landing.x,
+              y: s.landing.y + 0.4,
+              z: s.landing.z,
+              planet: s.landing.planet,
+            };
             return;
           }
 
@@ -472,6 +531,11 @@ export default function App() {
           const startX = clamp(s.landing.x + 5, -120, 120);
           const startZ = clamp(s.landing.z + 5, -120, 120);
           s.planet = s.landing.planet;
+          s.cameraMode = 'chase';
+          s.userOrbitActive = false;
+          s.orbitYaw = 0.6;
+          s.orbitPitch = 0.26;
+          s.orbitDistance = 11;
           s.rover = createInitialRoverState(startX, startZ, s.landing.planet);
           s.objectives = clonePlanetObjectives(s.landing.planet);
           activeAnomalyRef.current = null;
@@ -577,12 +641,19 @@ export default function App() {
           soundSynth.playCrash();
           failReasonRef.current =
             s.resources.oxygen <= 0
-              ? 'Outpost Oxygen ran out! Complete Ice/MOXIE objectives or manage O₂.'
+              ? 'Crew O₂ reserve depleted before ice or MOXIE resupply.'
               : s.resources.power <= 0
-                ? 'Outpost Power depleted! Survey ridges to recharge & clean dust.'
-                : 'Radiation Shield failed during solar activity!';
-          s.phase = 'gameover';
-          syncUiNow();
+                ? 'Rover battery depleted on shadowed surface.'
+                : 'Surface shielding breached by solar particle storm.';
+          s.crashFx = {
+            active: true,
+            kind: 'rover',
+            elapsed: 0,
+            x: s.rover.x,
+            y: s.rover.y + 0.5,
+            z: s.rover.z,
+            planet: s.rover.planet,
+          };
           return;
         }
       } else {
@@ -706,7 +777,9 @@ export default function App() {
 
       if (e.code === 'KeyC' && !e.repeat && (s.phase === 'landing' || s.phase === 'rover')) {
         const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-        s.cameraMode = order[(order.indexOf(s.cameraMode) + 1) % order.length];
+        const nextMode = order[(order.indexOf(s.cameraMode) + 1) % order.length];
+        s.cameraMode = nextMode;
+        s.userOrbitActive = nextMode === 'orbit';
         syncUiNow();
       }
 
@@ -788,34 +861,57 @@ export default function App() {
     };
   }, [jumpToPhase, syncUiNow]);
 
-  // Drag-to-orbit camera handler on canvas container
+  // Universal 360° drag-to-orbit + scroll-wheel zoom across every 3D stage & model
   const dragStateRef = useRef<{ active: boolean; x: number; y: number }>({
     active: false,
     x: 0,
     y: 0,
   });
+
+  useEffect(() => {
+    const onWindowPointerMove = (e: PointerEvent) => {
+      if (!dragStateRef.current.active) return;
+      const dx = e.clientX - dragStateRef.current.x;
+      const dy = e.clientY - dragStateRef.current.y;
+      dragStateRef.current.x = e.clientX;
+      dragStateRef.current.y = e.clientY;
+      if (Math.abs(dx) + Math.abs(dy) < 0.25) return;
+
+      const s = simRef.current;
+      s.userOrbitActive = true;
+      s.orbitYaw -= dx * 0.0085;
+      s.orbitPitch = clamp(s.orbitPitch + dy * 0.0068, -1.35, 1.42);
+    };
+
+    const onWindowPointerUp = () => {
+      dragStateRef.current.active = false;
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerUp);
+    window.addEventListener('blur', onWindowPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerUp);
+      window.removeEventListener('blur', onWindowPointerUp);
+    };
+  }, []);
+
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
+    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi) return;
     dragStateRef.current = { active: true, x: e.clientX, y: e.clientY };
   };
-  const handleCanvasPointerMove = (e: React.PointerEvent) => {
-    if (!dragStateRef.current.active) return;
-    const dx = e.clientX - dragStateRef.current.x;
-    const dy = e.clientY - dragStateRef.current.y;
-    dragStateRef.current = { active: true, x: e.clientX, y: e.clientY };
-    const s = simRef.current;
-    if (s.phase === 'inspector' || s.cameraMode === 'orbit') {
-      s.orbitYaw -= dx * 0.008;
-      s.orbitPitch = clamp(s.orbitPitch + dy * 0.006, -0.35, 1.15);
-    }
-  };
-  const handleCanvasPointerUp = () => {
-    dragStateRef.current.active = false;
-  };
+
   const handleCanvasWheel = (e: React.WheelEvent) => {
+    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi) return;
     const s = simRef.current;
-    if (s.phase === 'inspector' || s.cameraMode === 'orbit') {
-      s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.02, 6, 48);
-    }
+    const minD = s.phase === 'launch' ? 9 : s.phase === 'space' ? 4.5 : s.phase === 'landing' ? 5.5 : 3.2;
+    const maxD = s.phase === 'launch' || s.phase === 'space' ? 88 : s.phase === 'landing' ? 80 : 65;
+    s.userOrbitActive = true;
+    s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.022, minD, maxD);
   };
 
   const toggleMute = () => {
@@ -872,10 +968,9 @@ export default function App() {
       <div
         ref={containerRef}
         onPointerDown={handleCanvasPointerDown}
-        onPointerMove={handleCanvasPointerMove}
-        onPointerUp={handleCanvasPointerUp}
         onWheel={handleCanvasWheel}
-        className="fixed inset-0 z-0"
+        onContextMenu={(e) => e.preventDefault()}
+        className="fixed inset-0 z-0 cursor-grab active:cursor-grabbing"
       />
 
       {phase === 'title' && (
@@ -884,6 +979,11 @@ export default function App() {
           carryover={carryoverUi}
           onSelectShowcase={(v) => {
             simRef.current.showcase = v;
+            simRef.current.userOrbitActive = false;
+            simRef.current.orbitYaw = 0.63;
+            simRef.current.orbitPitch = 0.25;
+            simRef.current.orbitDistance =
+              v === 'rocket' ? 35 : v === 'outpost' ? 24 : v === 'rover' ? 7.5 : v === 'satellite' ? 7.8 : 11;
             setShowcase(v);
           }}
           onSelectCampaignMission={selectCampaignMission}
@@ -903,8 +1003,9 @@ export default function App() {
           unlockedNotes={carryoverUi.unlockedFieldNotes}
           onSelectVehicle={(v) => {
             simRef.current.showcase = v;
+            simRef.current.userOrbitActive = true;
             simRef.current.orbitDistance =
-              v === 'rocket' ? 35 : v === 'outpost' ? 24 : v === 'rover' ? 6.2 : 11;
+              v === 'rocket' ? 35 : v === 'outpost' ? 24 : v === 'rover' ? 7.5 : v === 'satellite' ? 7.8 : 11;
             const firstPart = VEHICLE_CATALOG[v].parts[0];
             simRef.current.highlightedPart = firstPart.id;
             unlockFieldNote(firstPart.unlockNoteId);
@@ -958,6 +1059,15 @@ export default function App() {
             soundSynth.playClick();
             soundSynth.setThrustVolume(0);
             simRef.current.input = { ...EMPTY_INPUT };
+            simRef.current.crashFx = {
+              active: false,
+              kind: 'landing',
+              elapsed: 0,
+              x: 0,
+              y: 0,
+              z: 0,
+              planet: simRef.current.planet,
+            };
             simRef.current.launch = createInitialLaunchState(simRef.current.launch.autoGuidance);
             launchPrevCountdownDigitRef.current = 4;
             syncUiNow();
@@ -1066,8 +1176,9 @@ export default function App() {
           }}
           onCycleCamera={() => {
             const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            simRef.current.cameraMode =
-              order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            const nextMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            simRef.current.cameraMode = nextMode;
+            simRef.current.userOrbitActive = nextMode === 'orbit';
             syncUiNow();
           }}
           onSelectZone={(id) => {
@@ -1100,8 +1211,9 @@ export default function App() {
           }}
           onCycleCamera={() => {
             const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            simRef.current.cameraMode =
-              order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            const nextMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
+            simRef.current.cameraMode = nextMode;
+            simRef.current.userOrbitActive = nextMode === 'orbit';
             syncUiNow();
           }}
           onSetDriveMode={(mode: RoverDriveMode) => {
@@ -1145,6 +1257,16 @@ export default function App() {
           resources={resourcesUi}
           carryover={carryoverUi}
           nextMissionLabel={nextMissionLabel}
+          failTelemetry={
+            phase === 'gameover'
+              ? {
+                  crashKind: simRef.current.crashFx.kind,
+                  planet: simRef.current.crashFx.planet,
+                  descentMs: Math.abs(landingUi.vy),
+                  tiltDeg: Math.max(Math.abs(landingUi.pitchDeg), Math.abs(landingUi.rollDeg)),
+                }
+              : undefined
+          }
           onResume={
             paused
               ? () => {
