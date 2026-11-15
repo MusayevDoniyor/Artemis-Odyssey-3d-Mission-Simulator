@@ -2,32 +2,29 @@ import * as THREE from 'three';
 
 export interface RealPlanetMaps {
   earthMap: THREE.Texture;
+  earthCloudsMap: THREE.Texture;
   moonMap: THREE.Texture;
   marsMap: THREE.Texture;
   dispose: () => void;
 }
 
-const EARTH_MAP_URL = '/assets/aistudio/image_ff00a818.png';
-const MOON_MAP_URL = '/assets/aistudio/image_b10e22ac.png';
-const MARS_MAP_URL = '/assets/aistudio/image_93ad272a.png';
+const EARTH_MAP_URL = '/assets/planets/earth.jpg';
+const EARTH_CLOUDS_MAP_URL = '/assets/planets/earth-clouds.png';
+const MOON_MAP_URL = '/assets/planets/moon.jpg';
+const MARS_MAP_URL = '/assets/planets/mars.jpg';
 
 function configureEquirectTexture(
   tex: THREE.Texture,
   maxAnisotropy: number,
-  vRepeat = 1,
-  vOffset = 0
+  isColorMap = true
 ): THREE.Texture {
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = isColorMap ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.anisotropy = maxAnisotropy;
-  if (vRepeat !== 1 || vOffset !== 0) {
-    tex.repeat.set(1, vRepeat);
-    tex.offset.set(0, vOffset);
-  }
   tex.needsUpdate = true;
   return tex;
 }
@@ -39,35 +36,42 @@ export function createRealPlanetMaps(maxAnisotropy: number): RealPlanetMaps {
     loader.load(EARTH_MAP_URL, (loaded) => {
       loaded.needsUpdate = true;
     }),
-    maxAnisotropy
+    maxAnisotropy,
+    true
   );
 
-  // Trim 2% top/bottom border rows present on source lunar mosaic to keep poles seamless
+  const earthCloudsMap = configureEquirectTexture(
+    loader.load(EARTH_CLOUDS_MAP_URL, (loaded) => {
+      loaded.needsUpdate = true;
+    }),
+    maxAnisotropy,
+    false
+  );
+
   const moonMap = configureEquirectTexture(
     loader.load(MOON_MAP_URL, (loaded) => {
       loaded.needsUpdate = true;
     }),
     maxAnisotropy,
-    0.96,
-    0.02
+    true
   );
 
-  // Trim bottom attribution/scale strip on Mars Express mosaic via UV framing
   const marsMap = configureEquirectTexture(
     loader.load(MARS_MAP_URL, (loaded) => {
       loaded.needsUpdate = true;
     }),
     maxAnisotropy,
-    0.94,
-    0.045
+    true
   );
 
   return {
     earthMap,
+    earthCloudsMap,
     moonMap,
     marsMap,
     dispose: () => {
       earthMap.dispose();
+      earthCloudsMap.dispose();
       moonMap.dispose();
       marsMap.dispose();
     },

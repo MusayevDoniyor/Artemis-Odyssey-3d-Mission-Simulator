@@ -54,19 +54,19 @@ export const EXPLORATION_VISUAL_LAYOUT: Record<
   { orbitRadiusUnits: number; bodyRadiusUnits: number }
 > = {
   sun: { orbitRadiusUnits: 0, bodyRadiusUnits: 8.8 },
-  mercury: { orbitRadiusUnits: 16.5, bodyRadiusUnits: 1.05 },
-  venus: { orbitRadiusUnits: 25.0, bodyRadiusUnits: 1.75 },
+  mercury: { orbitRadiusUnits: 16.5, bodyRadiusUnits: 0.90 },
+  venus: { orbitRadiusUnits: 25.0, bodyRadiusUnits: 2.23 },
   earth: { orbitRadiusUnits: 38.5, bodyRadiusUnits: 2.35 },
-  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.72 },
-  mars: { orbitRadiusUnits: 54.0, bodyRadiusUnits: 1.45 },
-  ceres: { orbitRadiusUnits: 67.0, bodyRadiusUnits: 0.85 },
+  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.64 },
+  mars: { orbitRadiusUnits: 54.0, bodyRadiusUnits: 1.25 },
+  ceres: { orbitRadiusUnits: 67.0, bodyRadiusUnits: 0.52 },
   jupiter: { orbitRadiusUnits: 86.0, bodyRadiusUnits: 4.5 },
   saturn: { orbitRadiusUnits: 108.0, bodyRadiusUnits: 3.8 },
   uranus: { orbitRadiusUnits: 128.0, bodyRadiusUnits: 2.6 },
   neptune: { orbitRadiusUnits: 146.0, bodyRadiusUnits: 2.5 },
-  pluto: { orbitRadiusUnits: 164.0, bodyRadiusUnits: 0.95 },
-  eris: { orbitRadiusUnits: 184.0, bodyRadiusUnits: 0.92 },
-  halley: { orbitRadiusUnits: 74.0, bodyRadiusUnits: 0.68 },
+  pluto: { orbitRadiusUnits: 164.0, bodyRadiusUnits: 0.58 },
+  eris: { orbitRadiusUnits: 184.0, bodyRadiusUnits: 0.57 },
+  halley: { orbitRadiusUnits: 74.0, bodyRadiusUnits: 0.45 },
 };
 
 /**

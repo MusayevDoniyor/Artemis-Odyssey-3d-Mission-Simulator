@@ -464,4 +464,88 @@ test('Deep space flight tracks dominant SOI gravity well and classifies Hyperbol
   );
 });
 
+test('Launch physics is frame-rate independent (30 FPS, 60 FPS, 120 FPS) and holds on pad until TWR > 1.0', () => {
+  const runForDuration = (fps: number, durationSec: number) => {
+    let L = createInitialLaunchState();
+    L = beginLaunchCountdown(L);
+    // Complete 3s countdown
+    for (let i = 0; i < 60; i++) {
+      L = stepLaunchPhysics(L, { forward: false, left: false, right: false, action: false }, 0.05);
+    }
+    assert.equal(L.launchSequence, 'READY');
+    assert.equal(L.phaseStage, 'ENGINE_IGNITION');
+
+    const dt = 1 / fps;
+    const steps = Math.round(durationSec * fps);
+    for (let i = 0; i < steps; i++) {
+      L = stepLaunchPhysics(L, { forward: true, left: false, right: false, action: false }, dt);
+    }
+    return L;
+  };
+
+  // During initial 0.25s RS-25 engine ignition startup, TWR < 1.0 and rocket must remain clamped on pad (altitudeKm === 0)
+  const earlyIgnition = runForDuration(120, 0.25);
+  assert.equal(earlyIgnition.ignited, true);
+  assert.equal(earlyIgnition.phaseStage, 'ENGINE_IGNITION');
+  assert.ok(earlyIgnition.twr < 1.0, `Expected TWR < 1.0 during initial RS-25 spin-up, got ${earlyIgnition.twr}`);
+  assert.equal(earlyIgnition.altitudeKm, 0, 'Hold-down bolts must keep rocket on pad while TWR <= 1.0');
+  assert.equal(earlyIgnition.verticalSpeedMs, 0);
+
+  // Compare 5.0 seconds of powered flight at 30 FPS, 60 FPS, and 120 FPS
+  const l30 = runForDuration(30, 5.0);
+  const l60 = runForDuration(60, 5.0);
+  const l120 = runForDuration(120, 5.0);
+
+  assert.ok(l60.altitudeKm > 0.1, `Rocket should have lifted off by t=5.0s, got ${l60.altitudeKm} km`);
+  assert.equal(l30.altitudeKm, l60.altitudeKm, '30 FPS and 60 FPS altitudeKm must match identically');
+  assert.equal(l60.altitudeKm, l120.altitudeKm, '60 FPS and 120 FPS altitudeKm must match identically');
+  assert.equal(l30.verticalSpeedMs, l120.verticalSpeedMs, '30 FPS and 120 FPS verticalSpeedMs must match');
+  assert.equal(l30.horizontalSpeedMs, l120.horizontalSpeedMs, '30 FPS and 120 FPS horizontalSpeedMs must match');
+  assert.equal(l30.fuelPct, l120.fuelPct, '30 FPS and 120 FPS propellant consumption must match');
+});
+
+test('Launch ascent progresses monotonically without altitude stall and traverses key launch phases', () => {
+  let L = createInitialLaunchState();
+  const seenPhases = new Set<string>([L.phaseStage ?? '']);
+  L = beginLaunchCountdown(L);
+  if (L.phaseStage) seenPhases.add(L.phaseStage);
+  for (let i = 0; i < 65; i++) {
+    L = stepLaunchPhysics(L, { forward: false, left: false, right: false, action: false }, 0.05);
+    if (L.phaseStage) seenPhases.add(L.phaseStage);
+  }
+
+  let prevAlt = 0;
+  for (let i = 0; i < 420; i++) {
+    L = stepLaunchPhysics(L, { forward: true, left: false, right: false, action: false }, 0.05);
+    if (L.phaseStage) seenPhases.add(L.phaseStage);
+
+    assert.ok(
+      L.altitudeKm >= prevAlt,
+      `Altitude must climb monotonically without dipping (step ${i}: ${L.altitudeKm} < ${prevAlt})`
+    );
+    prevAlt = L.altitudeKm;
+
+    if (L.altitudeKm >= PHYSICS.SLS_SRB_SEP_ALT_KM && !L.srbSeparated) {
+      L = separateLaunchStage(L);
+      if (L.phaseStage) seenPhases.add(L.phaseStage);
+    }
+    if (L.srbSeparated && L.altitudeKm >= PHYSICS.SLS_CORE_SEP_ALT_KM && !L.coreSeparated) {
+      L = separateLaunchStage(L);
+      if (L.phaseStage) seenPhases.add(L.phaseStage);
+    }
+    if (L.orbitReached) break;
+  }
+
+  assert.equal(L.orbitReached, true);
+  assert.ok(seenPhases.has('PRE_LAUNCH'));
+  assert.ok(seenPhases.has('SYSTEM_CHECK'));
+  assert.ok(seenPhases.has('ENGINE_IGNITION'));
+  assert.ok(seenPhases.has('THRUST_BUILDUP'));
+  assert.ok(seenPhases.has('LIFTOFF'));
+  assert.ok(seenPhases.has('MAX_Q'));
+  assert.ok(seenPhases.has('UPPER_STAGE_OPERATION'));
+  assert.ok(seenPhases.has('ORBIT_CONFIRMATION'));
+});
+
+
 

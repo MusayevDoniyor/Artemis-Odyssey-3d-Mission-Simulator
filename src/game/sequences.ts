@@ -126,8 +126,8 @@ export function stepLeoTransfer(
     const propMassKg = (totalPropKg * currentFuelPct) / 100;
     const massKg = dryMassKg + propMassKg;
 
-    // Orbital departure time compression (~185x real-time so ~800s RL10 burn plays smoothly over ~4.4s)
-    const burnTimeScale = 185;
+    // Orbital departure time compression (~210x real-time so ~800s RL10 burn plays smoothly over ~4.0s)
+    const burnTimeScale = 210;
     const burnDt = Math.min(dt, 0.1) * burnTimeScale;
     const accelMs2 = rl10ThrustN / massKg;
     const dvStepMs = accelMs2 * burnDt;

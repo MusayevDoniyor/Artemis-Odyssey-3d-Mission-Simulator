@@ -1,19 +1,41 @@
-import { Battery, Compass, Flame, Gauge, Orbit, Play, Rocket, Shield, Wind, X } from 'lucide-react';
+import { Battery, Camera, Compass, Flame, Gauge, Orbit, Play, Rocket, Shield, Wind, X } from 'lucide-react';
 import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
 import { PRE_LAUNCH_ITEMS, areAllPreLaunchChecksGo } from '../game/sequences';
 import type {
+  CameraMode,
   GameMenuTab,
+  LaunchPhaseStage,
   LaunchState,
+  LaunchTimeWarp,
   LeoTransferState,
   PreLaunchChecks,
   ResourceState,
 } from '../game/types';
+
+const LAUNCH_STAGE_META: Record<LaunchPhaseStage, { index: number; label: string }> = {
+  PRE_LAUNCH: { index: 1, label: 'PRE-LAUNCH PAD CHECK' },
+  SYSTEM_CHECK: { index: 2, label: 'SYSTEM & DELUGE CHECK' },
+  ENGINE_IGNITION: { index: 3, label: 'RS-25 ENGINE IGNITION' },
+  THRUST_BUILDUP: { index: 4, label: 'THRUST BUILDUP (HOLD-DOWN)' },
+  LIFTOFF: { index: 5, label: 'LIFTOFF & TOWER CLEAR' },
+  INITIAL_ASCENT: { index: 6, label: 'INITIAL VERTICAL ASCENT' },
+  PITCH_PROGRAM: { index: 7, label: 'GRAVITY TURN PITCH PROGRAM' },
+  MAX_Q: { index: 8, label: 'MAX-Q AERODYNAMIC PEAK' },
+  BOOSTER_SEPARATION: { index: 9, label: 'SRB BOOSTER SEPARATION' },
+  CORE_STAGE_SEPARATION: { index: 10, label: 'CORE STAGE MECO & SEP' },
+  UPPER_STAGE_OPERATION: { index: 11, label: 'ICPS RL10B-2 ASCENT' },
+  ORBITAL_INSERTION: { index: 12, label: 'SECO-1 ORBITAL INSERTION' },
+  ORBIT_CONFIRMATION: { index: 13, label: '165 KM LEO PARK CONFIRMED' },
+  SPACECRAFT_DEPLOYMENT: { index: 14, label: 'TRANSLUNAR INJECTION (TLI)' },
+};
 
 interface LaunchHUDProps {
   launch: LaunchState;
   preLaunchChecks: PreLaunchChecks;
   leoTransfer: LeoTransferState;
   resources: ResourceState;
+  cameraMode?: CameraMode;
+  userOrbitActive?: boolean;
   selectedPartId?: string | null;
   onClearSelectedPart?: () => void;
   onOpenMenuTab: (tab: GameMenuTab) => void;
@@ -24,6 +46,8 @@ interface LaunchHUDProps {
   onSeparateStage: () => void;
   onFireTliBurn: () => void;
   onToggleAutoGuidance: () => void;
+  onChangeTimeWarp?: (warp: LaunchTimeWarp) => void;
+  onSelectCameraMode?: (mode: CameraMode | 'free') => void;
   onSkipToSpace: () => void;
   onResetLaunch: () => void;
 }
@@ -33,6 +57,8 @@ export function LaunchHUD({
   preLaunchChecks,
   leoTransfer,
   resources,
+  cameraMode = 'chase',
+  userOrbitActive = false,
   selectedPartId,
   onClearSelectedPart,
   onOpenMenuTab,
@@ -43,6 +69,8 @@ export function LaunchHUD({
   onSeparateStage,
   onFireTliBurn,
   onToggleAutoGuidance,
+  onChangeTimeWarp,
+  onSelectCameraMode,
   onSkipToSpace,
   onResetLaunch,
 }: LaunchHUDProps) {
@@ -57,7 +85,15 @@ export function LaunchHUD({
   const countdownDigit = Math.max(1, Math.ceil(launch.countdownSec));
   const allChecksGo = areAllPreLaunchChecksGo(preLaunchChecks);
   const doneCount = PRE_LAUNCH_ITEMS.filter((i) => preLaunchChecks[i.key]).length;
-  const isMoving = launch.launchSequence === 'ASCENDING' && speedTotal > 2;
+  const isIgnitedOrMoving =
+    launch.launchSequence === 'ASCENDING' && (launch.ignited || speedTotal > 0);
+
+  const effectiveStageKey: LaunchPhaseStage =
+    launch.orbitReached && leoTransfer.tliBurnActive
+      ? 'SPACECRAFT_DEPLOYMENT'
+      : launch.phaseStage || 'PRE_LAUNCH';
+  const stageMeta = LAUNCH_STAGE_META[effectiveStageKey] || LAUNCH_STAGE_META.PRE_LAUNCH;
+  const activeTimeWarp: LaunchTimeWarp = launch.timeWarp ?? 1;
 
   let objectiveLine = 'Complete Pad 39B checks to begin launch.';
   let counterText = `${doneCount} / 4`;
@@ -70,6 +106,13 @@ export function LaunchHUD({
   } else if (launch.stagePrompt === 'CORE_SEP') {
     objectiveLine = 'Core cutoff — press Space for upper stage.';
     counterText = `${Math.round(launch.altitudeKm)} km`;
+  } else if (
+    launch.launchSequence === 'ASCENDING' &&
+    launch.altitudeKm <= 0.001 &&
+    launch.twr <= 1.0
+  ) {
+    objectiveLine = 'RS-25 thrust building — hold-down bolts release at TWR > 1.00.';
+    counterText = `TWR ${launch.twr.toFixed(2)}`;
   } else if (launch.launchSequence === 'ASCENDING') {
     objectiveLine = 'Climb smoothly to 165 km parking orbit.';
     counterText = `${Math.round(launch.altitudeKm)} / 165 km`;
@@ -85,7 +128,7 @@ export function LaunchHUD({
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4 lg:p-5">
       {/* TOP ROW: Compact Edge-Hugging Objective (Left) & Meters + Always-Visible Propellant (Right) */}
       <div className="flex items-start justify-between gap-4">
-        {/* GROUP 1: Top-Left Wordmark + Objective + Altitude Progress */}
+        {/* GROUP 1: Top-Left Wordmark + Objective + 14-Stage Milestone + Altitude Progress */}
         <div data-testid="hud-group-objective" className="flex flex-col items-start gap-2.5">
           <div className="flex items-center gap-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
             <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -102,7 +145,7 @@ export function LaunchHUD({
             </div>
           </div>
 
-          <section className="hud-soft pointer-events-auto w-[300px] rounded-2xl px-3.5 py-2.5 text-slate-100 lg:w-[324px]">
+          <section className="hud-soft pointer-events-auto w-[308px] rounded-2xl px-3.5 py-2.5 text-slate-100 lg:w-[340px]">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-cyan-300 lg:text-sm">
                 <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400" />
@@ -112,12 +155,22 @@ export function LaunchHUD({
                 {counterText}
               </span>
             </div>
+
+            <div className="mt-1 flex items-center justify-between gap-2 font-mono-tech text-[10px] font-bold tracking-wider uppercase">
+              <span data-testid="launch-phase-stage" className="text-amber-300">
+                STAGE {stageMeta.index}/14 · {stageMeta.label}
+              </span>
+              <span className="text-slate-400 tabular-nums">
+                T+{launch.elapsed.toFixed(1)}s
+              </span>
+            </div>
+
             <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">{objectiveLine}</p>
             <div className="mt-1.5 flex items-center justify-between gap-2 font-mono-tech text-[10px] font-semibold text-cyan-200/80">
               <span>
                 {launch.orbitReached
-                  ? 'RL10B-2 Orbital Transfer'
-                  : `${PHYSICS.LAUNCH_TIME_SCALE}× Time Scale · Real SI Propulsion`}
+                  ? 'RL10B-2 Orbital Transfer · SI Vis-Viva'
+                  : `SCIENTIFIC SI · 120 Hz Δt · ${activeTimeWarp}× Warp`}
               </span>
               <span className="text-right tabular-nums">
                 {launch.orbitReached
@@ -138,7 +191,7 @@ export function LaunchHUD({
           {inspectedPart && (
             <div
               data-testid="launch-part-callout"
-              className="hud-soft pointer-events-auto w-[300px] rounded-2xl p-3 text-slate-100 lg:w-[324px]"
+              className="hud-soft pointer-events-auto w-[308px] rounded-2xl p-3 text-slate-100 lg:w-[340px]"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-bold text-amber-300">{inspectedPart.name}</span>
@@ -158,7 +211,7 @@ export function LaunchHUD({
           )}
         </div>
 
-        {/* GROUP 2: Top-Right 4 Core Telemetry Meters + Always-Visible Propellant Bar */}
+        {/* GROUP 2: Top-Right 4 Core Telemetry Meters + Always-Visible Propellant Bar + Time Warp / Camera Bar */}
         <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
           <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-3.5 py-2 tabular-nums">
             <div className="flex items-center gap-2 pr-3.5">
@@ -202,7 +255,7 @@ export function LaunchHUD({
             </div>
           </div>
 
-          {/* Always-visible compact Propellant readout + conditional Steep Pitch chip */}
+          {/* Always-visible compact Propellant readout + Time Warp + Camera controls */}
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div
               data-testid="launch-propellant-status"
@@ -226,6 +279,63 @@ export function LaunchHUD({
               </div>
               <span className="font-bold text-white">{fuelPctClamped}%</span>
             </div>
+
+            {onChangeTimeWarp && (
+              <div className="hud-soft pointer-events-auto flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold tabular-nums">
+                <span className="px-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  Warp
+                </span>
+                {([1, 2, 4] as const).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    data-testid={`launch-warp-${w}x`}
+                    onClick={() => onChangeTimeWarp(w)}
+                    className={`rounded-lg px-2 py-0.5 text-xs font-bold transition ${
+                      activeTimeWarp === w
+                        ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/60'
+                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {w}×
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {onSelectCameraMode && (
+              <div className="hud-soft pointer-events-auto flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold">
+                <Camera className="mx-1 h-3.5 w-3.5 text-cyan-300" />
+                {(
+                  [
+                    { id: 'chase', label: 'Chase' },
+                    { id: 'cockpit', label: 'Hull' },
+                    { id: 'overhead', label: 'Profile' },
+                    { id: 'free', label: 'Orbit' },
+                  ] as const
+                ).map((cam) => {
+                  const active =
+                    cam.id === 'free'
+                      ? userOrbitActive
+                      : !userOrbitActive && cameraMode === cam.id;
+                  return (
+                    <button
+                      key={cam.id}
+                      type="button"
+                      data-testid={`launch-cam-${cam.id}`}
+                      onClick={() => onSelectCameraMode(cam.id)}
+                      className={`rounded-lg px-2 py-0.5 text-xs font-semibold transition ${
+                        active
+                          ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/60'
+                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {cam.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {Math.abs(launch.pitchDeg) > 58 && !launch.orbitReached && (
               <span className="hud-soft-alert rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-rose-200 tabular-nums">
@@ -362,18 +472,26 @@ export function LaunchHUD({
             </button>
           )}
 
-          {isMoving && !launch.orbitReached && (
+          {isIgnitedOrMoving && !launch.orbitReached && (
             <div className="hud-soft flex flex-wrap items-center justify-center gap-3 rounded-2xl px-4 py-2 font-mono-tech tabular-nums">
               <span data-testid="launch-speed" className="text-base font-bold text-white lg:text-lg">
                 {speedTotal} m/s
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-cyan-200">
+                TWR {launch.twr.toFixed(2)}
               </span>
               <span className="h-4 w-px bg-white/15" />
               <span className="text-xs font-semibold text-amber-300">
                 q {Math.round(launch.dynamicPressureKpa)} kPa
               </span>
               <span className="h-4 w-px bg-white/15" />
-              <span className="text-xs font-semibold text-cyan-200">
-                TWR {launch.twr.toFixed(2)}
+              <span className="text-xs font-semibold text-slate-200">
+                Mach {(launch.machNumber ?? 0).toFixed(2)}
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-slate-200">
+                ṁ {Math.round(launch.massFlowRateKgS ?? 0)} kg/s
               </span>
               <span className="h-4 w-px bg-white/15" />
               <span className="text-xs font-semibold text-slate-200">
@@ -441,3 +559,4 @@ export function LaunchHUD({
     </div>
   );
 }
+

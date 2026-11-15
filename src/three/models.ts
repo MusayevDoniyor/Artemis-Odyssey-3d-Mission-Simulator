@@ -129,9 +129,10 @@ export function createLunarEnvironment(
   const earthClouds = new THREE.Mesh(
     new THREE.SphereGeometry(28.35, 44, 32),
     new THREE.MeshStandardMaterial({
-      map: tex.earthClouds,
+      color: 0xffffff,
+      alphaMap: planetMaps.earthCloudsMap,
       transparent: true,
-      opacity: 0.36,
+      opacity: 0.72,
       depthWrite: false,
       roughness: 0.92,
     })
@@ -2438,6 +2439,18 @@ export function createLaunchComplexAndSLS(
       earthLimbGlobeMat
     )
   );
+  const earthLimbClouds = new THREE.Mesh(
+    new THREE.SphereGeometry(95.22, 52, 34),
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      alphaMap: planetMaps.earthCloudsMap,
+      transparent: true,
+      opacity: 0.68,
+      depthWrite: false,
+      roughness: 0.92,
+    })
+  );
+  earthLimb.add(earthLimbClouds);
   const earthLimbScatter = new THREE.Mesh(
     new THREE.SphereGeometry(95.35, 56, 36),
     createEarthSurfaceScatteringMaterial(0.84)
@@ -3584,9 +3597,10 @@ export function createSolarSystemScene(
   const earthClouds = new THREE.Mesh(
     new THREE.SphereGeometry(1.014, 44, 32),
     new THREE.MeshStandardMaterial({
-      map: tex.earthClouds,
+      color: 0xffffff,
+      alphaMap: planetMaps.earthCloudsMap,
       transparent: true,
-      opacity: 0.36,
+      opacity: 0.74,
       roughness: 0.92,
       metalness: 0.0,
       depthWrite: false,
@@ -3704,6 +3718,8 @@ export function createSolarSystemScene(
         id === 'moon'
           ? new THREE.MeshStandardMaterial({
               map: planetMaps.moonMap,
+              bumpMap: planetMaps.moonMap,
+              bumpScale: 0.022,
               color: 0xffffff,
               roughness: 0.92,
               metalness: 0.0,
@@ -3711,12 +3727,14 @@ export function createSolarSystemScene(
             })
           : new THREE.MeshStandardMaterial({
               map: planetMaps.marsMap,
+              bumpMap: planetMaps.marsMap,
+              bumpScale: 0.018,
               color: 0xffffff,
               roughness: 0.86,
               metalness: 0.0,
               envMapIntensity: 0.1,
             });
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.0, 44, 32), mat);
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.0, 48, 36), mat);
       tiltGroup.add(mesh);
 
       if (id === 'mars') {

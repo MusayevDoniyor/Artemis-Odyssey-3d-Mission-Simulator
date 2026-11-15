@@ -2721,6 +2721,8 @@ export default function App() {
           preLaunchChecks={preLaunchChecks}
           leoTransfer={leoTransferUi}
           resources={resourcesUi}
+          cameraMode={cameraMode}
+          userOrbitActive={simRef.current.userOrbitActive}
           selectedPartId={highlightedPart}
           onClearSelectedPart={() => {
             simRef.current.highlightedPart = null;
@@ -2785,6 +2787,24 @@ export default function App() {
           }}
           onToggleAutoGuidance={() => {
             simRef.current.launch.autoGuidance = !simRef.current.launch.autoGuidance;
+            syncUiNow();
+          }}
+          onChangeTimeWarp={(warp) => {
+            soundSynth.init();
+            soundSynth.playClick();
+            simRef.current.launch = { ...simRef.current.launch, timeWarp: warp };
+            syncUiNow();
+          }}
+          onSelectCameraMode={(mode) => {
+            soundSynth.init();
+            soundSynth.playClick();
+            if (mode === 'free') {
+              simRef.current.userOrbitActive = true;
+            } else {
+              simRef.current.userOrbitActive = false;
+              simRef.current.cameraMode = mode;
+              setCameraMode(mode);
+            }
             syncUiNow();
           }}
           onSkipToSpace={() => jumpToPhase('space')}

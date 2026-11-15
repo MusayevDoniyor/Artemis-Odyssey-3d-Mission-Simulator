@@ -147,19 +147,45 @@ export interface CampaignMissionSpec {
 
 export type LaunchSequencePhase = 'PRE_SIM' | 'COUNTDOWN' | 'READY' | 'ASCENDING';
 
+export type LaunchPhaseStage =
+  | 'PRE_LAUNCH'
+  | 'SYSTEM_CHECK'
+  | 'ENGINE_IGNITION'
+  | 'THRUST_BUILDUP'
+  | 'LIFTOFF'
+  | 'INITIAL_ASCENT'
+  | 'PITCH_PROGRAM'
+  | 'MAX_Q'
+  | 'BOOSTER_SEPARATION'
+  | 'CORE_STAGE_SEPARATION'
+  | 'UPPER_STAGE_OPERATION'
+  | 'ORBITAL_INSERTION'
+  | 'ORBIT_CONFIRMATION'
+  | 'SPACECRAFT_DEPLOYMENT';
+
+export type LaunchTimeWarp = 1 | 2 | 4;
+
 export interface LaunchState {
   launchSequence: LaunchSequencePhase;
+  phaseStage?: LaunchPhaseStage;
   countdownSec: number;
   autoGuidance: boolean;
   ignited: boolean;
+  ignitionTimerSec?: number;
+  physicsAccumulatorSec?: number;
+  timeWarp?: LaunchTimeWarp;
   elapsed: number;
   altitudeKm: number;
+  downrangeKm?: number;
   verticalSpeedMs: number;
   horizontalSpeedMs: number;
   netAccelMs2: number;
   thrustKn: number;
   dragKn: number;
   massKg: number;
+  propellantMassKg?: number;
+  massFlowRateKgS?: number;
+  machNumber?: number;
   dynamicPressureKpa: number;
   pitchDeg: number;
   throttle: number;
