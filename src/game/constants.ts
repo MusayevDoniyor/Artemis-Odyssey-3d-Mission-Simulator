@@ -692,9 +692,11 @@ export const CAMPAIGN_ANOMALIES: MissionAnomaly[] = [
   },
 ];
 
-export const VEHICLE_CATALOG: Record<
-  VehicleShowcaseId,
-  { title: string; subtitle: string; summary: string; parts: VehiclePartSpec[] }
+export const VEHICLE_CATALOG: Partial<
+  Record<
+    VehicleShowcaseId,
+    { title: string; subtitle: string; summary: string; parts: VehiclePartSpec[] }
+  >
 > = {
   rocket: {
     title: 'SLS Block 1 Launch System',

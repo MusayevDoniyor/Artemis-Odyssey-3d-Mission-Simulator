@@ -29,8 +29,8 @@ import {
   OSDR_FACTS,
   PAYLOADS,
   PHYSICS,
-  VEHICLE_CATALOG,
 } from '../game/constants';
+import { HARDWARE_CATALOG, HARDWARE_ORDER } from '../game/hardwareCatalog';
 import type {
   CampaignMissionId,
   DonkiStatus,
@@ -50,13 +50,9 @@ interface MobileAcademyViewProps {
   onOpenNasaModal: () => void;
 }
 
-const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = [
-  { id: 'rocket', short: 'SLS Block 1' },
-  { id: 'satellite', short: 'HERMES Sat' },
-  { id: 'lander', short: 'Descent Lander' },
-  { id: 'rover', short: 'VIPER Rover' },
-  { id: 'outpost', short: 'Base Outpost' },
-];
+const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = HARDWARE_ORDER.map(
+  (id) => ({ id, short: HARDWARE_CATALOG[id].shortLabel })
+);
 
 export function MobileAcademyView({
   donki,
@@ -73,7 +69,7 @@ export function MobileAcademyView({
 
   const missionSpec = CAMPAIGN_MISSIONS[selectedMission];
   const payloadSpec = PAYLOADS[selectedPayload];
-  const vehicleSpec = VEHICLE_CATALOG[selectedVehicle];
+  const vehicleSpec = HARDWARE_CATALOG[selectedVehicle];
 
   const solvedCount = CAMPAIGN_ANOMALIES.filter((a) => {
     const pick = anomalyPicks[a.id];

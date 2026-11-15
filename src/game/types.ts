@@ -15,7 +15,14 @@ export type SurfacePlanet = 'moon' | 'mars';
 
 export type CameraMode = 'chase' | 'cockpit' | 'overhead' | 'orbit';
 
-export type VehicleShowcaseId = 'rocket' | 'lander' | 'rover' | 'outpost' | 'satellite';
+export type VehicleShowcaseId =
+  | 'rocket'
+  | 'satellite'
+  | 'jwst'
+  | 'voyager'
+  | 'lander'
+  | 'rover'
+  | 'outpost';
 
 export type PayloadId = 'heavy-shield' | 'oxygen-tanks' | 'solar-panels' | 'water-drill';
 
@@ -53,6 +60,9 @@ export interface DonkiStatus {
   sourceLocation: string;
   link: string;
   description: string;
+  totalEvents30d?: number | null;
+  cmeCount30d?: number;
+  gstCount30d?: number;
 }
 
 export interface OsdrStudy {
@@ -335,4 +345,167 @@ export interface CrashFxState {
   z: number;
   planet: SurfacePlanet;
 }
+
+export interface PreLaunchChecks {
+  powerBus: boolean;
+  cryoChill: boolean;
+  delugeArmed: boolean;
+  crewArmClear: boolean;
+}
+
+export interface LeoTransferState {
+  inParkingOrbit: boolean;
+  orbitAltitudeKm: number;
+  orbitalVelocityKmS: number;
+  inclinationDeg: number;
+  orbitalPeriodMin: number;
+  tliBurnActive: boolean;
+  tliBurnProgressPct: number;
+  tliDeltaVAppliedMs: number;
+  tliTargetDeltaVMs: number;
+  readyForSpaceTransition: boolean;
+}
+
+export type MarsEdlStage =
+  | 'CRUISE_SEP'
+  | 'ENTRY_PLASMA'
+  | 'PARACHUTE'
+  | 'HEAT_SHIELD_DROP'
+  | 'SKY_CRANE'
+  | 'HANDOFF';
+
+export interface MarsEdlState {
+  active: boolean;
+  stage: MarsEdlStage;
+  stageTimerSec: number;
+  signalDelayMin: number;
+  commsBlackout: boolean;
+  heatShieldDropped: boolean;
+  parachuteDeployed: boolean;
+  skyCraneLoweringPct: number;
+}
+
+export type PostLandingUnstowStage =
+  | 'ENGINE_COOL'
+  | 'CREW_CHECKLIST'
+  | 'RAMP_DEPLOY'
+  | 'ROVER_UNSTOW'
+  | 'SYSTEMS_CHECK'
+  | 'COMPLETE';
+
+export interface PostLandingUnstowState {
+  active: boolean;
+  stage: PostLandingUnstowStage;
+  planet: SurfacePlanet;
+  stageElapsedSec: number;
+  totalProgressPct: number;
+  rampDeployPct: number;
+  roverRolloutPct: number;
+  mastDeployPct: number;
+  completed: boolean;
+}
+
+export type TelemetrySpeedScale = 'KID_25X' | 'REAL_SPEED';
+
+export type DrillSetting = 'GENTLE' | 'NOMINAL' | 'HIGH_TORQUE';
+
+export interface DrillStratum {
+  index: number;
+  depthRangeCm: string;
+  name: string;
+  hardness: number;
+  icePct: number;
+  mineralNote: string;
+  colorHex: string;
+}
+
+export interface DrillingConsoleState {
+  open: boolean;
+  objectiveId: string;
+  objectiveTitle: string;
+  planet: SurfacePlanet;
+  depthCm: number;
+  targetDepthCm: number;
+  setting: DrillSetting;
+  bitTempC: number;
+  torquePct: number;
+  jammed: boolean;
+  overheated: boolean;
+  coolingPulseSec: number;
+  isDrilling: boolean;
+  collectedStrata: number[];
+  completed: boolean;
+  statusNote: string;
+}
+
+export type AirlockStage =
+  | 'EXTERIOR_OPEN'
+  | 'REPRESSURIZING'
+  | 'SEALED_INT'
+  | 'DEPRESSURIZING';
+
+export type OutpostInteriorRoom = 'quarters' | 'lab' | 'greenhouse' | 'comms';
+
+export type PowerSourceMode = 'solar' | 'kilopower';
+
+export interface OutpostConsoleState {
+  open: boolean;
+  planet: SurfacePlanet;
+  airlockStage: AirlockStage;
+  airlockProgressPct: number;
+  activeRoom: OutpostInteriorRoom;
+  powerSource: PowerSourceMode;
+  solNumber: number;
+  kilopowerActive: boolean;
+}
+
+export interface SolSummaryReport {
+  solNumber: number;
+  planet: SurfacePlanet;
+  powerPct: number;
+  oxygenPct: number;
+  shieldPct: number;
+  doseMsv: number;
+  powerSource: PowerSourceMode;
+  highlights: string[];
+  recommendation: string;
+}
+
+export interface AudioSettings {
+  muted: boolean;
+  masterVolume: number;
+  sfxVolume: number;
+  ambienceVolume: number;
+}
+
+export type QualityPreset = 'low' | 'med' | 'high';
+
+export interface InspectorLabelPoint {
+  partId: string;
+  name: string;
+  xPct: number;
+  yPct: number;
+  visible: boolean;
+}
+
+export interface InspectorUiState {
+  explodePct: number;
+  isolatePart: boolean;
+  showConnections: boolean;
+  showLabels: boolean;
+  autoRotate: boolean;
+  quizMode: boolean;
+  quizTargetId: string | null;
+  quizFeedback: string | null;
+  quizScore: number;
+}
+
+export interface LandedPose {
+  planet: SurfacePlanet;
+  x: number;
+  y: number;
+  z: number;
+  zoneId: number;
+}
+
 

@@ -3,7 +3,9 @@ import {
   Compass,
   Database,
   FastForward,
+  Flame,
   Gauge,
+  Orbit,
   Pause,
   Play,
   Rocket,
@@ -14,15 +16,25 @@ import {
 } from 'lucide-react';
 import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
 import { getLaunchMissionProgress } from '../game/missionProgress';
-import type { GamePhase, LaunchState, ResourceState } from '../game/types';
+import { PRE_LAUNCH_ITEMS, areAllPreLaunchChecksGo } from '../game/sequences';
+import type {
+  GamePhase,
+  LaunchState,
+  LeoTransferState,
+  PreLaunchChecks,
+  ResourceState,
+} from '../game/types';
 import { getLaunchWarnings } from '../game/warnings';
 import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionTelemetryStrip } from './MissionTelemetryStrip';
 import { MissionWarningBanner } from './MissionWarningBanner';
 import { NASAInsignia } from './NASAInsignia';
 
 interface LaunchHUDProps {
   launch: LaunchState;
+  preLaunchChecks: PreLaunchChecks;
+  leoTransfer: LeoTransferState;
   resources: ResourceState;
   selectedPartId?: string | null;
   onClearSelectedPart?: () => void;
@@ -30,9 +42,12 @@ interface LaunchHUDProps {
   onToggleMute: () => void;
   onPause: () => void;
   onResetLaunch: () => void;
+  onTogglePreLaunchCheck: (key: keyof PreLaunchChecks) => void;
+  onVerifyAllPreLaunchChecks: () => void;
   onBeginSimulation: () => void;
   onStartLaunch: () => void;
   onSeparateStage: () => void;
+  onFireTliBurn: () => void;
   onToggleAutoGuidance: () => void;
   onSkipToSpace: () => void;
   onJumpToPhase: (phase: GamePhase) => void;
@@ -105,6 +120,8 @@ function getEducationalHint(launch: LaunchState): string {
 
 export function LaunchHUD({
   launch,
+  preLaunchChecks,
+  leoTransfer,
   resources,
   selectedPartId,
   onClearSelectedPart,
@@ -112,9 +129,12 @@ export function LaunchHUD({
   onToggleMute,
   onPause,
   onResetLaunch,
+  onTogglePreLaunchCheck,
+  onVerifyAllPreLaunchChecks,
   onBeginSimulation,
   onStartLaunch,
   onSeparateStage,
+  onFireTliBurn,
   onToggleAutoGuidance,
   onSkipToSpace,
   onJumpToPhase,
@@ -129,8 +149,11 @@ export function LaunchHUD({
     launch.altitudeKm < 1
       ? `${Math.round(launch.altitudeKm * 1000)} m`
       : `${launch.altitudeKm.toFixed(1)} km`;
-  const statusBadge = getVehicleStatusBadge(launch);
+  const statusBadge = launch.orbitReached
+    ? { label: 'LEO PARKING', colorClass: 'text-emerald-300' }
+    : getVehicleStatusBadge(launch);
   const countdownDigit = Math.max(1, Math.ceil(launch.countdownSec));
+  const allChecksGo = areAllPreLaunchChecksGo(preLaunchChecks);
 
   const checklist =
     launch.launchSequence === 'ASCENDING'
@@ -280,6 +303,31 @@ export function LaunchHUD({
         </header>
 
         <MissionProgressBar info={missionProgress} />
+        <MissionTelemetryStrip
+          context={launch.orbitReached ? 'leo' : 'launch'}
+          elapsedSec={launch.elapsed}
+          phaseLabel={launch.orbitReached ? 'LOW EARTH ORBIT (LEO)' : statusBadge.label}
+          nextMilestone={
+            launch.orbitReached
+              ? 'Fire TLI Burn (3,150 m/s Δv)'
+              : !launch.srbSeparated
+                ? 'SRB Sep (45 km)'
+                : !launch.coreSeparated
+                  ? 'MECO & ICPS Stage (110 km)'
+                  : '165 km Parking Orbit'
+          }
+          etaLabel={
+            launch.orbitReached
+              ? `${Math.round(leoTransfer.tliBurnProgressPct)}%`
+              : `${Math.max(1, Math.round((165 - launch.altitudeKm) / Math.max(0.8, launch.verticalSpeedMs / 450)))}s`
+          }
+          metrics={[
+            { label: 'Alt', value: altDisplay, tone: 'white' },
+            { label: 'Vel', value: `${speedTotal} m/s`, tone: 'cyan' },
+            { label: 'Pitch', value: `${Math.round(launch.pitchDeg)}°`, tone: 'amber' },
+            { label: 'Max-Q', value: `${Math.round(launch.dynamicPressureKpa)} kPa`, tone: launch.dynamicPressureKpa > 24 ? 'amber' : 'emerald' },
+          ]}
+        />
         <MissionWarningBanner warnings={getLaunchWarnings(launch, resources)} />
       </div>
 
@@ -403,6 +451,118 @@ export function LaunchHUD({
 
         {/* CENTER-LOWER CINEMATIC OVERLAY (Positioned low so Orion & SLS remain unobstructed) */}
         <div className="pointer-events-none flex flex-1 flex-col items-center self-end pb-3">
+          {launch.launchSequence === 'PRE_SIM' && (
+            <div
+              data-testid="prelaunch-checklist-panel"
+              className="hud-panel tactical-frame pointer-events-auto mb-2 max-w-md rounded-xl p-3.5 text-xs"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-1.5">
+                <span className="font-display text-xs font-bold text-amber-300 uppercase">
+                  Pre-Launch Verification Checklist
+                </span>
+                <button
+                  type="button"
+                  data-testid="verify-all-checks-btn"
+                  onClick={onVerifyAllPreLaunchChecks}
+                  className="rounded border border-emerald-400/60 bg-emerald-500/20 px-2 py-0.5 font-hud text-[10px] font-bold text-emerald-200 uppercase hover:bg-emerald-500/30"
+                >
+                  Verify All Go
+                </button>
+              </div>
+              <div className="space-y-1.5">
+                {PRE_LAUNCH_ITEMS.map((item) => {
+                  const checked = preLaunchChecks[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      data-testid={`prelaunch-chk-${item.key}`}
+                      onClick={() => onTogglePreLaunchCheck(item.key)}
+                      className={`flex w-full items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${
+                        checked
+                          ? 'border-emerald-400/60 bg-emerald-950/60 text-emerald-100'
+                          : 'border-slate-700 bg-slate-900/95 text-slate-200 hover:border-cyan-400'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-hud text-[11px] font-bold">
+                          <span className="font-mono-tech text-cyan-300">{item.code}</span> · {item.label}
+                        </div>
+                        <p className="text-[10px] text-slate-300">{item.detail}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 font-mono-tech text-[10px] font-bold ${
+                          checked ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {checked ? 'GO' : 'CHK'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {launch.orbitReached && (
+            <div
+              data-testid="leo-transfer-panel"
+              className="hud-panel-success tactical-frame pointer-events-auto mb-2 w-full max-w-md rounded-2xl p-4 text-xs"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 font-display text-sm font-bold text-emerald-300 uppercase">
+                  <Orbit className="h-4 w-4" />
+                  165 km LEO Parking Orbit
+                </span>
+                <span className="font-mono-tech text-[11px] font-bold text-cyan-300">
+                  {leoTransfer.orbitalVelocityKmS.toFixed(2)} km/s · {leoTransfer.inclinationDeg}° inc
+                </span>
+              </div>
+              <p className="mb-2.5 text-slate-200">
+                SLS Core separated cleanly! System health verified in 88-min Earth orbit. Ignite RL10 engine for Trans-Lunar Injection (TLI) toward deep space.
+              </p>
+
+              <div className="mb-2.5">
+                <div className="mb-1 flex justify-between font-mono-tech text-[11px]">
+                  <span className="text-amber-300">TLI Δv Burn Progress</span>
+                  <span className="font-bold text-white">
+                    {leoTransfer.tliDeltaVAppliedMs} / {leoTransfer.tliTargetDeltaVMs} m/s
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full bg-amber-400 transition-all"
+                    style={{ width: `${Math.round(leoTransfer.tliBurnProgressPct)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="fire-tli-btn"
+                  disabled={leoTransfer.tliBurnActive || leoTransfer.readyForSpaceTransition}
+                  onClick={onFireTliBurn}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 font-display text-xs font-bold text-slate-950 uppercase hover:bg-amber-400 disabled:bg-emerald-500"
+                >
+                  <Flame className="h-4 w-4" />
+                  {leoTransfer.tliBurnActive
+                    ? 'FIRING TLI BURN...'
+                    : leoTransfer.readyForSpaceTransition
+                      ? 'TLI COMPLETE!'
+                      : 'FIRE TLI BURN TO DEEP SPACE'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onSkipToSpace}
+                  className="rounded-xl border border-cyan-400/50 bg-slate-900 px-3 py-2.5 font-hud text-xs font-bold text-cyan-200 uppercase hover:border-cyan-300"
+                >
+                  Fast-Track
+                </button>
+              </div>
+            </div>
+          )}
+
           {launch.launchSequence === 'COUNTDOWN' && (
             <div className="hud-panel-amber tactical-frame rounded-2xl px-8 py-4 text-center">
               <p className="font-display text-xs font-bold tracking-[0.22em] text-cyan-200 uppercase">
@@ -437,7 +597,7 @@ export function LaunchHUD({
             </div>
           )}
 
-          {launch.launchSequence === 'ASCENDING' && launch.stagePrompt && (
+          {launch.launchSequence === 'ASCENDING' && launch.stagePrompt && !launch.orbitReached && (
             <button
               type="button"
               onClick={onSeparateStage}
@@ -513,6 +673,16 @@ export function LaunchHUD({
                 <span className="text-slate-300">Acceleration</span>
                 <span className="font-mono-tech text-sm font-bold text-amber-300">
                   {launch.netAccelMs2.toFixed(1)} m/s²
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">Dynamic Pressure</span>
+                <span
+                  className={`font-mono-tech text-sm font-bold ${
+                    launch.dynamicPressureKpa > 24 ? 'text-amber-300' : 'text-emerald-300'
+                  }`}
+                >
+                  {launch.dynamicPressureKpa.toFixed(1)} kPa
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -675,11 +845,16 @@ export function LaunchHUD({
             <button
               type="button"
               data-testid="begin-simulation-btn"
-              onClick={onBeginSimulation}
+              onClick={() => {
+                if (!allChecksGo) {
+                  onVerifyAllPreLaunchChecks();
+                }
+                onBeginSimulation();
+              }}
               className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 font-display text-sm font-bold tracking-wide text-slate-950 shadow-lg hover:bg-amber-400 active:scale-[0.98]"
             >
               <Play className="h-4 w-4 fill-slate-950" />
-              BEGIN SIMULATION
+              {allChecksGo ? 'BEGIN SIMULATION' : 'AUTO-VERIFY & BEGIN'}
             </button>
           )}
 

@@ -1,24 +1,32 @@
-import { BookOpen, Database, Play, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Compass, Database, Play, Volume2, VolumeX } from 'lucide-react';
 import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
 import type {
+  AudioSettings,
   CampaignCarryoverState,
   CampaignMissionId,
   GamePhase,
+  QualityPreset,
   VehicleShowcaseId,
 } from '../game/types';
+import { AudioQualityPopover } from './AudioQualityPopover';
 import { CameraViewControls } from './CameraViewControls';
 import { NASAInsignia } from './NASAInsignia';
 
 interface TitleOverlayProps {
   showcase: VehicleShowcaseId;
   carryover: CampaignCarryoverState;
+  audioSettings: AudioSettings;
+  qualityPreset: QualityPreset;
+  onUpdateAudio: (partial: Partial<AudioSettings>) => void;
+  onChangeQuality: (quality: QualityPreset) => void;
   onSelectShowcase: (v: VehicleShowcaseId) => void;
   onSetCameraPreset: (yaw: number, pitch: number) => void;
   onZoomCamera: (delta: number) => void;
   onResetCamera: () => void;
   onSelectCampaignMission: (id: CampaignMissionId) => void;
   onStartMission: () => void;
+  onStartFreeExplore: () => void;
   onJumpToPhase: (phase: GamePhase) => void;
   onOpenNotebook: () => void;
   onOpenNasaModal: () => void;
@@ -30,6 +38,8 @@ const SHOWCASE_OPTIONS: Array<{ id: VehicleShowcaseId; label: string }> = [
   { id: 'outpost', label: 'Moon Base' },
   { id: 'rocket', label: 'SLS Rocket' },
   { id: 'satellite', label: 'HERMES Sat' },
+  { id: 'jwst', label: 'JWST' },
+  { id: 'voyager', label: 'Voyager' },
   { id: 'lander', label: 'Lander' },
   { id: 'rover', label: 'Rover' },
 ];
@@ -37,7 +47,7 @@ const SHOWCASE_OPTIONS: Array<{ id: VehicleShowcaseId; label: string }> = [
 const QUICK_STAGES: Array<{ phase: GamePhase; label: string }> = [
   { phase: 'inspector', label: 'Hardware' },
   { phase: 'launch', label: 'Launch' },
-  { phase: 'space', label: 'Orbit & Sat' },
+  { phase: 'space', label: 'Solar System' },
   { phase: 'landing', label: 'Descent' },
   { phase: 'rover', label: 'Rover' },
 ];
@@ -46,18 +56,23 @@ const MISSION_ROUTE_BADGE: Record<CampaignMissionId, string> = {
   'artemis-2': 'SLS Launch -> HERMES Sat -> Link Lock',
   'artemis-3': '0.165g Land -> 4 Crater Sites -> ISRU',
   'artemis-4': 'Lunar Orbit -> NRHO Gateway -> Storm Shield',
-  'mars-pathfinder': '0.38g Entry -> Jezero Delta -> MOXIE O₂',
+  'mars-pathfinder': '0.38g EDL -> Jezero Delta -> MOXIE O₂',
 };
 
 export function TitleOverlay({
   showcase,
   carryover,
+  audioSettings,
+  qualityPreset,
+  onUpdateAudio,
+  onChangeQuality,
   onSelectShowcase,
   onSetCameraPreset,
   onZoomCamera,
   onResetCamera,
   onSelectCampaignMission,
   onStartMission,
+  onStartFreeExplore,
   onJumpToPhase,
   onOpenNotebook,
   onOpenNasaModal,
@@ -72,7 +87,7 @@ export function TitleOverlay({
       <div className="title-scrim pointer-events-none absolute inset-0" />
 
       {/* Top right utility buttons */}
-      <div className="relative z-10 flex items-center justify-end gap-2 px-6 pt-5">
+      <div className="relative z-20 flex items-center justify-end gap-2 px-6 pt-5">
         <button
           type="button"
           onClick={onOpenNotebook}
@@ -90,6 +105,13 @@ export function TitleOverlay({
           <Database className="h-3.5 w-3.5" />
           NASA OSDR &amp; DONKI
         </button>
+
+        <AudioQualityPopover
+          audio={audioSettings}
+          quality={qualityPreset}
+          onUpdateAudio={onUpdateAudio}
+          onChangeQuality={onChangeQuality}
+        />
 
         <button
           type="button"
@@ -134,7 +156,7 @@ export function TitleOverlay({
         </div>
 
         <p className="mb-4 max-w-md text-sm text-slate-200">
-          Fly SLS Block 1, deploy HERMES relay, land on Moon &amp; Mars, and reuse ISRU reserves.
+          Launch SLS Block 1, explore every Solar System world, land on Moon &amp; Mars, and run your polar outpost.
         </p>
 
         {/* 4-Stage Campaign Selector */}
@@ -190,12 +212,12 @@ export function TitleOverlay({
         </div>
 
         {/* Primary CTA */}
-        <div className="pointer-events-auto mb-4 flex flex-wrap items-center gap-3">
+        <div className="pointer-events-auto mb-4 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             data-start="true"
             onClick={onStartMission}
-            className="inline-flex items-center gap-2.5 rounded-xl bg-amber-500 px-6 py-3.5 font-display text-sm font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase shadow-lg transition hover:bg-amber-400 active:scale-[0.98]"
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-display text-sm font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase shadow-lg transition hover:bg-amber-400 active:scale-[0.98]"
           >
             <Play className="h-4 w-4 fill-slate-950" />
             Brief &amp; Launch
@@ -203,8 +225,18 @@ export function TitleOverlay({
 
           <button
             type="button"
+            data-testid="free-explore-btn"
+            onClick={onStartFreeExplore}
+            className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/60 bg-emerald-500/20 px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-emerald-100 uppercase transition hover:bg-emerald-500/30"
+          >
+            <Compass className="h-4 w-4 text-emerald-300" />
+            Free Explore
+          </button>
+
+          <button
+            type="button"
             onClick={() => onJumpToPhase('inspector')}
-            className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3.5 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-cyan-100 uppercase transition hover:border-cyan-400/75"
+            className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-cyan-100 uppercase transition hover:border-cyan-400/75"
           >
             Hardware Bay
           </button>
@@ -279,3 +311,4 @@ export function TitleOverlay({
     </div>
   );
 }
+

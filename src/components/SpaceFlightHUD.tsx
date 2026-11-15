@@ -1,6 +1,23 @@
-import { BookOpen, Navigation, Pause, Radio, Satellite, Shield, Volume2, VolumeX } from 'lucide-react';
+import {
+  BookOpen,
+  Compass,
+  Navigation,
+  Pause,
+  Radio,
+  Rocket,
+  Satellite,
+  Scale,
+  Shield,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { CAMPAIGN_MISSIONS, SOLAR_TARGETS } from '../game/constants';
 import { getSpaceMissionProgress } from '../game/missionProgress';
+import {
+  SOLAR_SYSTEM_BODIES,
+  type SolarScaleMode,
+  computeWeightOnBodyKg,
+} from '../game/solarSystemData';
 import type {
   CampaignCarryoverState,
   CampaignMissionId,
@@ -12,6 +29,7 @@ import type {
 import { getSpaceWarnings } from '../game/warnings';
 import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionTelemetryStrip } from './MissionTelemetryStrip';
 import { MissionWarningBanner } from './MissionWarningBanner';
 
 interface SpaceFlightHUDProps {
@@ -21,6 +39,13 @@ interface SpaceFlightHUDProps {
   carryover: CampaignCarryoverState;
   activeAnomaly: MissionAnomaly | null;
   donkiFlareActive: boolean;
+  freeExploreMode: boolean;
+  solarScaleMode: SolarScaleMode;
+  solarTimeSpeed: number;
+  focusedSolarBodyId: string | null;
+  onChangeSolarScaleMode: (mode: SolarScaleMode) => void;
+  onChangeSolarTimeSpeed: (speed: number) => void;
+  onFocusSolarBody: (bodyId: string | null) => void;
   muted: boolean;
   onToggleMute: () => void;
   onPause: () => void;
@@ -138,6 +163,13 @@ export function SpaceFlightHUD({
   carryover,
   activeAnomaly,
   donkiFlareActive,
+  freeExploreMode,
+  solarScaleMode,
+  solarTimeSpeed,
+  focusedSolarBodyId,
+  onChangeSolarScaleMode,
+  onChangeSolarTimeSpeed,
+  onFocusSolarBody,
   muted,
   onToggleMute,
   onPause,
@@ -156,14 +188,36 @@ export function SpaceFlightHUD({
 }: SpaceFlightHUDProps) {
   const activeTarget = SOLAR_TARGETS[space.targetId];
   const distToTarget = Math.hypot(activeTarget.x - space.shipX, activeTarget.z - space.shipZ);
+  const shipSpeed = Math.hypot(space.vx, space.vz);
   const missionSpec = CAMPAIGN_MISSIONS[campaignMission];
   const sat = space.orbitalSat;
   const missionProgress = getSpaceMissionProgress(space, campaignMission);
+  const focusedBody = focusedSolarBodyId
+    ? SOLAR_SYSTEM_BODIES.find((b) => b.id === focusedSolarBodyId) ?? null
+    : null;
+  const lightTimeLabel =
+    space.targetId === 'mars'
+      ? '14 min'
+      : space.targetId === 'moon' || space.targetId === 'gateway'
+        ? '1.3 s'
+        : '0.4 s';
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
       <div className="flex flex-col gap-2">
         <MissionProgressBar info={missionProgress} />
+        <MissionTelemetryStrip
+          context="space"
+          elapsedSec={space.elapsedDays * 4}
+          phaseLabel={freeExploreMode ? 'FREE EXPLORE · SOLAR SYSTEM' : `${missionSpec.code} TRANSIT`}
+          nextMilestone={activeTarget.name.split(' · ')[0]}
+          etaLabel={`${Math.max(1, Math.round(distToTarget / Math.max(2, shipSpeed)))}s`}
+          metrics={[
+            { label: 'Vel', value: `${shipSpeed.toFixed(1)} u/s`, tone: 'cyan' },
+            { label: 'Comms Lag', value: lightTimeLabel, tone: 'amber' },
+            { label: 'Range', value: `${Math.round(distToTarget)}u`, tone: 'white' },
+          ]}
+        />
         <MissionWarningBanner warnings={getSpaceWarnings(space, resources, donkiFlareActive)} />
 
         {/* Top Bar: Destination Selector + Ecliptic Radar + Resources */}
@@ -378,11 +432,119 @@ export function SpaceFlightHUD({
         </div>
       </div>
 
-      {/* Bottom Controls & Orbital Objective Actions */}
-      <div className="mx-auto flex flex-col items-center gap-2.5">
+      {/* Bottom Controls, Complete Solar System Explorer & Orbital Objective Actions */}
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-2">
+        {/* Complete Solar System Explorer Bar (8 Planets + Dwarf Worlds + Halley's Comet) */}
+        <div
+          data-testid="solar-explorer-bar"
+          className="hud-panel pointer-events-auto flex w-full flex-col gap-1.5 rounded-xl px-3 py-2 text-xs"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onFocusSolarBody(null)}
+                className={`rounded px-2 py-1 font-hud text-[10px] font-bold uppercase ${
+                  !focusedSolarBodyId
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                Orion Ship
+              </button>
+              {SOLAR_SYSTEM_BODIES.map((b) => {
+                const active = focusedSolarBodyId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    data-testid={`solar-body-${b.id}`}
+                    onClick={() => onFocusSolarBody(active ? null : b.id)}
+                    className={`rounded px-2 py-1 font-hud text-[10px] font-bold whitespace-nowrap transition ${
+                      active
+                        ? 'bg-cyan-400 text-slate-950'
+                        : 'bg-slate-900 text-slate-200 hover:bg-slate-800'
+                    }`}
+                  >
+                    {b.name.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded border border-slate-700 bg-slate-900 p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  data-testid="scale-exploration-btn"
+                  onClick={() => onChangeSolarScaleMode('exploration')}
+                  className={`rounded px-2 py-0.5 font-hud font-bold uppercase ${
+                    solarScaleMode === 'exploration'
+                      ? 'bg-cyan-400 text-slate-950'
+                      : 'text-slate-300'
+                  }`}
+                >
+                  Explore Scale
+                </button>
+                <button
+                  type="button"
+                  data-testid="scale-scientific-btn"
+                  onClick={() => onChangeSolarScaleMode('scientific')}
+                  className={`rounded px-2 py-0.5 font-hud font-bold uppercase ${
+                    solarScaleMode === 'scientific'
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'text-slate-300'
+                  }`}
+                >
+                  Real AU Scale
+                </button>
+              </div>
+
+              <label className="flex items-center gap-1.5 font-mono-tech text-[10px] text-slate-300">
+                <span>Time</span>
+                <input
+                  type="range"
+                  aria-label="Orbital Time Speed"
+                  min={0}
+                  max={4}
+                  step={0.5}
+                  value={solarTimeSpeed}
+                  onChange={(e) => onChangeSolarTimeSpeed(Number(e.target.value))}
+                  className="w-16 accent-cyan-400"
+                />
+                <span className="text-cyan-300">{solarTimeSpeed}×</span>
+              </label>
+            </div>
+          </div>
+
+          {focusedBody && (
+            <div
+              data-testid="solar-body-detail"
+              className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-1.5 text-[11px]"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-display font-bold text-amber-300 uppercase">
+                  {focusedBody.name}
+                </span>
+                <span className="font-mono-tech text-cyan-300">
+                  {focusedBody.semiMajorAu} AU · {focusedBody.gravityG}g · Light-time {focusedBody.lightTimeOneWay}
+                </span>
+                <span className="text-slate-300">{focusedBody.moonsSummary}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 font-mono-tech text-[10px] font-bold text-emerald-200">
+                  <Scale className="h-3 w-3" />
+                  35 kg Kid Weighs {computeWeightOnBodyKg(35, focusedBody.gravityG)} kg
+                </span>
+                <span className="hidden text-slate-200 xl:inline">{focusedBody.fact}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {space.inRadiationZone && (
-          <div className="hud-panel-amber pointer-events-auto flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-amber-200">
-            <span className="h-2 w-2 rounded-full bg-amber-400" />
+          <div className="hud-panel-amber pointer-events-auto flex items-center gap-2 rounded-lg px-4 py-1.5 text-xs font-semibold text-amber-200">
+            <Compass className="h-3.5 w-3.5 text-amber-400" />
             Solar Radiation Ring — enable Storm Shield or steer clear.
           </div>
         )}
@@ -393,7 +555,7 @@ export function SpaceFlightHUD({
               type="button"
               data-testid="complete-sat-mission-btn"
               onClick={onCompleteSatelliteMission}
-              className="pointer-events-auto rounded-xl bg-emerald-500 px-6 py-3 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-emerald-400"
+              className="pointer-events-auto rounded-xl bg-emerald-500 px-6 py-2.5 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-emerald-400"
             >
               RELAY LOCKED — COMPLETE ARTEMIS II
             </button>
@@ -404,29 +566,33 @@ export function SpaceFlightHUD({
               type="button"
               data-testid="complete-gateway-mission-btn"
               onClick={onCompleteGatewayMission}
-              className="pointer-events-auto rounded-xl bg-emerald-500 px-6 py-3 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-emerald-400"
+              className="pointer-events-auto rounded-xl bg-emerald-500 px-6 py-2.5 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-emerald-400"
             >
               GATEWAY DOCKED — COMPLETE ARTEMIS IV
             </button>
           )}
 
-          {space.arrivedMoon && campaignMission !== 'mars-pathfinder' && (
+          {(space.arrivedMoon || freeExploreMode) && campaignMission !== 'mars-pathfinder' && (
             <button
               type="button"
+              data-testid="land-moon-btn"
               onClick={onEnterLunarOrbit}
-              className="pointer-events-auto rounded-xl bg-sky-500 px-6 py-3 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-sky-400"
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-5 py-2.5 font-display text-xs font-bold text-slate-950 shadow-lg hover:bg-sky-400"
             >
-              LUNAR ORBIT — START 0.165g DESCENT
+              <Rocket className="h-4 w-4" />
+              {space.arrivedMoon ? 'LUNAR ORBIT — START 0.165g DESCENT' : 'FREE EXPLORE: LAND MOON (0.165g)'}
             </button>
           )}
 
-          {space.arrivedMars && (
+          {(space.arrivedMars || freeExploreMode) && (
             <button
               type="button"
+              data-testid="land-mars-btn"
               onClick={onEnterMarsOrbit}
-              className="pointer-events-auto rounded-xl bg-orange-500 px-6 py-3 font-display text-sm font-bold text-slate-950 shadow-lg hover:bg-orange-400"
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-5 py-2.5 font-display text-xs font-bold text-slate-950 shadow-lg hover:bg-orange-400"
             >
-              MARS ORBIT — START 0.38g DESCENT
+              <Rocket className="h-4 w-4" />
+              {space.arrivedMars ? 'MARS ORBIT — START 0.38g EDL' : 'FREE EXPLORE: LAND MARS (0.38g)'}
             </button>
           )}
         </div>

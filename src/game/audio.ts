@@ -1,7 +1,16 @@
+import type { AudioSettings } from './types';
+
 class SoundSynth {
   private ctx: AudioContext | null = null;
   private thrustGain: GainNode | null = null;
-  private muted = false;
+  private thrustFilter: BiquadFilterNode | null = null;
+  private settings: AudioSettings = {
+    muted: false,
+    masterVolume: 0.85,
+    sfxVolume: 0.9,
+    ambienceVolume: 0.75,
+  };
+  private altitudeScale = 1.0;
 
   init() {
     if (this.ctx) {
@@ -27,51 +36,84 @@ class SoundSynth {
     noise.buffer = buffer;
     noise.loop = true;
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 175;
+    this.thrustFilter = this.ctx.createBiquadFilter();
+    this.thrustFilter.type = 'lowpass';
+    this.thrustFilter.frequency.value = 175;
 
     this.thrustGain = this.ctx.createGain();
     this.thrustGain.gain.value = 0;
 
-    noise.connect(filter);
-    filter.connect(this.thrustGain);
+    noise.connect(this.thrustFilter);
+    this.thrustFilter.connect(this.thrustGain);
     this.thrustGain.connect(this.ctx.destination);
     noise.start(0);
   }
 
+  getSettings(): AudioSettings {
+    return { ...this.settings };
+  }
+
+  updateSettings(partial: Partial<AudioSettings>) {
+    this.settings = { ...this.settings, ...partial };
+    if (this.settings.muted) {
+      this.setThrustVolume(0);
+    }
+  }
+
   isMuted(): boolean {
-    return this.muted;
+    return this.settings.muted;
   }
 
   setMuted(next: boolean) {
-    this.muted = next;
-    if (this.muted) {
+    this.settings.muted = next;
+    if (this.settings.muted) {
       this.setThrustVolume(0);
     }
   }
 
   toggleMute(): boolean {
-    this.setMuted(!this.muted);
-    return this.muted;
+    this.setMuted(!this.settings.muted);
+    return this.settings.muted;
+  }
+
+  /**
+   * Physics-accurate atmospheric taper: engine air-borne roar drops smoothly above 50 km
+   * to near-silence in vacuum (>95 km), leaving only soft cabin mechanical conduction.
+   */
+  setLaunchAtmosphere(altitudeKm: number, dynamicPressureKpa: number) {
+    const atmoFactor = Math.max(0.08, 1 - Math.min(1, altitudeKm / 95));
+    this.altitudeScale = atmoFactor;
+    if (this.ctx && this.thrustFilter) {
+      const targetFreq = 160 + Math.min(340, dynamicPressureKpa * 9.5) + atmoFactor * 90;
+      this.thrustFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  resetAtmosphere() {
+    this.altitudeScale = 1.0;
+    if (this.ctx && this.thrustFilter) {
+      this.thrustFilter.frequency.setTargetAtTime(175, this.ctx.currentTime, 0.08);
+    }
   }
 
   setThrustVolume(level: number) {
     if (!this.ctx || !this.thrustGain) return;
-    const v = this.muted ? 0 : Math.max(0, Math.min(0.4, level * 0.36));
+    const scale = this.settings.masterVolume * this.settings.ambienceVolume * this.altitudeScale;
+    const v = this.settings.muted ? 0 : Math.max(0, Math.min(0.42, level * 0.36 * scale));
     this.thrustGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.06);
   }
 
   playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume = 0.14) {
-    if (this.muted) return;
+    if (this.settings.muted) return;
     this.init();
     if (!this.ctx) return;
 
+    const effVol = Math.max(0.002, volume * this.settings.masterVolume * this.settings.sfxVolume);
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.setValueAtTime(effVol, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
     osc.connect(gain);
     gain.connect(this.ctx.destination);
@@ -102,6 +144,21 @@ class SoundSynth {
     this.playTone(860 + Math.random() * 80, 0.05, 'sine', 0.07);
   }
 
+  playRoverDrivePulse(speedAbs: number) {
+    if (speedAbs < 0.4) return;
+    this.playTone(120 + Math.min(90, speedAbs * 7), 0.04, 'triangle', 0.032);
+  }
+
+  playAirlockCycle() {
+    this.playTone(210, 0.38, 'sine', 0.11);
+    setTimeout(() => this.playTone(320, 0.35, 'triangle', 0.08), 180);
+  }
+
+  playCautionAlarm() {
+    this.playTone(940, 0.12, 'square', 0.11);
+    setTimeout(() => this.playTone(940, 0.12, 'square', 0.11), 190);
+  }
+
   playCountdownBeep(isReady = false) {
     if (isReady) {
       this.playTone(1046.5, 0.14, 'sine', 0.16);
@@ -112,16 +169,17 @@ class SoundSynth {
   }
 
   playIgnitionRoar() {
-    if (this.muted) return;
+    if (this.settings.muted) return;
     this.init();
     if (!this.ctx) return;
+    const effVol = 0.24 * this.settings.masterVolume * this.settings.sfxVolume;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(52, this.ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(118, this.ctx.currentTime + 0.55);
     gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.24, this.ctx.currentTime + 0.25);
+    gain.gain.linearRampToValueAtTime(effVol, this.ctx.currentTime + 0.25);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.9);
     osc.connect(gain);
     gain.connect(this.ctx.destination);

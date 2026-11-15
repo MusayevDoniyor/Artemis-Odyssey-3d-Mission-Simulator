@@ -112,7 +112,7 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // 1. Live NASA DONKI Space Weather API Proxy (Solar Flares)
+  // 1. Live NASA DONKI Space Weather API Proxy (FLR + CME + GST unified report)
   app.get('/api/donki', async (_req, res) => {
     if (donkiCache && Date.now() < donkiCache.expiresAt) {
       return res.json(donkiCache.payload);
@@ -120,22 +120,38 @@ async function startServer() {
 
     const endDate = new Date().toISOString().slice(0, 10);
     const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const url = `https://api.nasa.gov/DONKI/FLR?startDate=${startDate}&endDate=${endDate}&api_key=DEMO_KEY`;
+    const apiKey = process.env.NASA_API_KEY || 'DEMO_KEY';
 
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
-      if (!response.ok) throw new Error(`DONKI HTTP ${response.status}`);
-      const data = (await response.json()) as Array<{
+      const [flrRes, cmeRes, gstRes] = await Promise.all([
+        fetch(`https://api.nasa.gov/DONKI/FLR?startDate=${startDate}&endDate=${endDate}&api_key=${apiKey}`, {
+          signal: AbortSignal.timeout(6500),
+        }),
+        fetch(`https://api.nasa.gov/DONKI/CME?startDate=${startDate}&endDate=${endDate}&api_key=${apiKey}`, {
+          signal: AbortSignal.timeout(6500),
+        }).catch(() => null),
+        fetch(`https://api.nasa.gov/DONKI/GST?startDate=${startDate}&endDate=${endDate}&api_key=${apiKey}`, {
+          signal: AbortSignal.timeout(6500),
+        }).catch(() => null),
+      ]);
+
+      if (!flrRes.ok) throw new Error(`DONKI HTTP ${flrRes.status}`);
+      const flrData = (await flrRes.json()) as Array<{
         classType?: string;
         beginTime?: string;
-        peakTime?: string;
         sourceLocation?: string;
         link?: string;
       }>;
+      const cmeData = cmeRes?.ok ? ((await cmeRes.json()) as Array<{ startTime?: string; note?: string }>) : [];
+      const gstData = gstRes?.ok ? ((await gstRes.json()) as Array<{ startTime?: string; allKpIndex?: Array<{ kpIndex?: number }> }>) : [];
+
+      const flrCount = Array.isArray(flrData) ? flrData.length : 0;
+      const cmeCount = Array.isArray(cmeData) ? cmeData.length : 0;
+      const gstCount = Array.isArray(gstData) ? gstData.length : 0;
 
       let payload;
-      if (Array.isArray(data) && data.length > 0) {
-        const latest = data.reduce((a, b) => ((b.beginTime || '') > (a.beginTime || '') ? b : a), data[0]);
+      if (flrCount > 0) {
+        const latest = flrData.reduce((a, b) => ((b.beginTime || '') > (a.beginTime || '') ? b : a), flrData[0]);
         payload = {
           isLive: true,
           status: 'live',
@@ -143,8 +159,10 @@ async function startServer() {
           beginTime: latest.beginTime || endDate,
           sourceLocation: latest.sourceLocation || 'Solar Disk',
           link: latest.link || 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/',
-          totalEvents30d: data.length,
-          description: `NASA DONKI live report: Class ${latest.classType || 'Solar'} flare observed ${latest.beginTime?.slice(0, 10) || endDate}.`,
+          totalEvents30d: flrCount,
+          cmeCount30d: cmeCount,
+          gstCount30d: gstCount,
+          description: `NASA DONKI live 30-day scan: ${flrCount} Flares (latest ${latest.classType || 'Solar'}), ${cmeCount} CMEs, ${gstCount} Geomagnetic Storms.`,
         };
       } else {
         payload = {
@@ -155,7 +173,9 @@ async function startServer() {
           sourceLocation: 'Solar Disk',
           link: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/',
           totalEvents30d: 0,
-          description: 'NASA DONKI live report: Quiet solar conditions over the last 30 days.',
+          cmeCount30d: cmeCount,
+          gstCount30d: gstCount,
+          description: `NASA DONKI live report: Quiet flares (${cmeCount} CMEs, ${gstCount} GST events in 30d).`,
         };
       }
 
@@ -170,10 +190,32 @@ async function startServer() {
         sourceLocation: 'AR3664 (Archived DONKI Sample)',
         link: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/',
         totalEvents30d: null,
+        cmeCount30d: 4,
+        gstCount30d: 2,
         description:
-          'Offline archived NASA DONKI reference flare (M2.4) loaded for radiation-shielding simulation.',
+          'Offline archived NASA DONKI reference flare (M2.4 + 4 CMEs) loaded for radiation-shielding simulation.',
       });
     }
+  });
+
+  // 1a. NASA JPL Solar System Light-Time & Orbital Ephemeris Reference
+  app.get('/api/jpl-reference', (_req, res) => {
+    return res.json({
+      source: 'NASA JPL Solar System Dynamics & Horizons Reference',
+      isLive: false,
+      note: 'Static scientific reference table (AU, one-way light-time, surface gravity).',
+      bodies: [
+        { name: 'Moon', au: 1.0, lightTime: '1.28 s', gravityG: 0.165 },
+        { name: 'Mercury', au: 0.39, lightTime: '5.1 min', gravityG: 0.38 },
+        { name: 'Venus', au: 0.72, lightTime: '2.3–14.4 min', gravityG: 0.9 },
+        { name: 'Mars', au: 1.52, lightTime: '3.2–22.4 min', gravityG: 0.38 },
+        { name: 'Jupiter', au: 5.2, lightTime: '33–54 min', gravityG: 2.53 },
+        { name: 'Saturn', au: 9.58, lightTime: '67–92 min', gravityG: 1.07 },
+        { name: 'Uranus', au: 19.2, lightTime: '2.4–2.9 hrs', gravityG: 0.89 },
+        { name: 'Neptune', au: 30.05, lightTime: '4.0–4.3 hrs', gravityG: 1.14 },
+        { name: 'Pluto', au: 39.5, lightTime: '5.5 hrs', gravityG: 0.063 },
+      ],
+    });
   });
 
   // 1b. NASA Open Science Data Repository (OSDR) Radiation & Space Biology Studies

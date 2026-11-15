@@ -2,14 +2,23 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { PHYSICS, SOLAR_TARGETS, getLandingZones } from '../game/constants';
 import { getSurfaceTerrainHeight } from '../game/physics';
+import { SOLAR_SYSTEM_BODIES, computeKeplerBodyPosition, type SolarScaleMode } from '../game/solarSystemData';
+import { HARDWARE_CATALOG } from '../game/hardwareCatalog';
 import type {
   CameraMode,
   CampaignMissionId,
   CrashFxState,
   GamePhase,
   InputState,
+  InspectorLabelPoint,
+  InspectorUiState,
+  LandedPose,
   LandingState,
   LaunchState,
+  LeoTransferState,
+  MarsEdlState,
+  PostLandingUnstowState,
+  QualityPreset,
   ResourceState,
   RoverCollider,
   RoverObjective,
@@ -20,12 +29,14 @@ import type {
 } from '../game/types';
 import {
   createCrashFxSystem,
+  createJWSTModel,
   createLaunchComplexAndSLS,
   createLunarEnvironment,
   createLunarLander,
   createOrbitalSatellite,
   createSolarSystemScene,
   createViperRover,
+  createVoyagerModel,
   type CrashFxHandles,
   type LaunchComplexHandles,
   type LunarEnvironmentHandles,
@@ -58,6 +69,18 @@ export interface SceneSimulationBridge {
   resources: ResourceState;
   objectives: RoverObjective[];
   input: InputState;
+  freeExploreMode?: boolean;
+  inspector?: InspectorUiState;
+  leoTransfer?: LeoTransferState;
+  marsEdl?: MarsEdlState;
+  unstow?: PostLandingUnstowState | null;
+  landedPose?: LandedPose | null;
+  mastPanRad?: number;
+  kilopowerActive?: boolean;
+  solarScaleMode?: SolarScaleMode;
+  solarEpochYears?: number;
+  focusedSolarBodyId?: string | null;
+  quality?: QualityPreset;
 }
 
 const PARTICLE_COUNT = 260;
@@ -82,7 +105,14 @@ export class SpaceSceneManager {
   private launchComplex: LaunchComplexHandles;
   private solarSystem: SolarSystemHandles;
   private showcaseSatellite: OrbitalSatelliteHandles;
+  private jwstModel: { group: THREE.Group };
+  private voyagerModel: { group: THREE.Group };
   private crashFxSys: CrashFxHandles;
+
+  private trackIdx = 0;
+  private lastTrackX = 9999;
+  private lastTrackZ = 9999;
+  private appliedQuality: QualityPreset = 'high';
 
   private sunLight: THREE.DirectionalLight;
   private ambientLight: THREE.HemisphereLight;
@@ -219,6 +249,14 @@ export class SpaceSceneManager {
     this.showcaseSatellite.beaconMesh.visible = false;
     this.scene.add(this.showcaseSatellite.group);
 
+    this.jwstModel = createJWSTModel(this.textures);
+    this.jwstModel.group.visible = false;
+    this.scene.add(this.jwstModel.group);
+
+    this.voyagerModel = createVoyagerModel(this.textures);
+    this.voyagerModel.group.visible = false;
+    this.scene.add(this.voyagerModel.group);
+
     this.crashFxSys = createCrashFxSystem(this.textures);
     this.scene.add(this.crashFxSys.group);
 
@@ -316,6 +354,101 @@ export class SpaceSceneManager {
       }
     }
     return null;
+  }
+
+  private getInspectorRoots(showcase: VehicleShowcaseId): THREE.Object3D[] {
+    switch (showcase) {
+      case 'rocket':
+        return [this.launchComplex.rocketFull, this.launchComplex.groundGroup];
+      case 'satellite':
+        return [this.showcaseSatellite.group];
+      case 'jwst':
+        return [this.jwstModel.group];
+      case 'voyager':
+        return [this.voyagerModel.group];
+      case 'lander':
+        return [this.lander.group];
+      case 'rover':
+        return [this.roverModel.group];
+      case 'outpost':
+        return [this.lunarEnv.habGroup];
+    }
+  }
+
+  pickInspectorPart(clientX: number, clientY: number, showcase: VehicleShowcaseId): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNdc, this.camera);
+    const hits = this.raycaster.intersectObjects(this.getInspectorRoots(showcase), true);
+    for (const hit of hits) {
+      let cur: THREE.Object3D | null = hit.object;
+      while (cur) {
+        if (typeof cur.userData?.partId === 'string') {
+          return cur.userData.partId;
+        }
+        cur = cur.parent;
+      }
+    }
+    return null;
+  }
+
+  getInspectorScreenLabels(showcase: VehicleShowcaseId): InspectorLabelPoint[] {
+    const spec = HARDWARE_CATALOG[showcase];
+    if (!spec) return [];
+    const roots = this.getInspectorRoots(showcase);
+    const accumMap = new Map<string, { box: THREE.Box3; count: number }>();
+    roots.forEach((root) => {
+      root.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh) || !obj.visible) return;
+        const pid = obj.userData?.partId as string | undefined;
+        if (!pid) return;
+        if (!accumMap.has(pid)) {
+          accumMap.set(pid, { box: new THREE.Box3().setFromObject(obj), count: 1 });
+        } else {
+          accumMap.get(pid)!.box.expandByObject(obj);
+          accumMap.get(pid)!.count += 1;
+        }
+      });
+    });
+
+    const out: InspectorLabelPoint[] = [];
+    spec.parts.forEach((part) => {
+      const entry = accumMap.get(part.id);
+      if (!entry) {
+        out.push({ partId: part.id, name: part.name, xPct: 50, yPct: 50, visible: false });
+        return;
+      }
+      entry.box.getCenter(this.scratchVec);
+      this.scratchVec.project(this.camera);
+      const visible =
+        this.scratchVec.z >= -1 &&
+        this.scratchVec.z <= 1 &&
+        this.scratchVec.x >= -0.95 &&
+        this.scratchVec.x <= 0.95 &&
+        this.scratchVec.y >= -0.95 &&
+        this.scratchVec.y <= 0.95;
+      out.push({
+        partId: part.id,
+        name: part.name,
+        xPct: Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10,
+        yPct: Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10,
+        visible,
+      });
+    });
+    return out;
+  }
+
+  resetWheelTracks() {
+    this.trackIdx = 0;
+    this.lastTrackX = 9999;
+    this.lastTrackZ = 9999;
+    const zeroMat = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < 320; i++) {
+      this.lunarEnv.wheelTrackMesh.setMatrixAt(i, zeroMat);
+    }
+    this.lunarEnv.wheelTrackMesh.instanceMatrix.needsUpdate = true;
   }
 
   private detectSoftwareGl(): boolean {
@@ -498,6 +631,8 @@ export class SpaceSceneManager {
       this.roverModel.group,
       this.lunarEnv.group,
       this.showcaseSatellite.group,
+      this.jwstModel.group,
+      this.voyagerModel.group,
     ];
 
     const highlightActive =
@@ -530,9 +665,74 @@ export class SpaceSceneManager {
     });
   }
 
+  private applyExplodeAndIsolate(s: SceneSimulationBridge) {
+    const isInspector = s.phase === 'inspector';
+    const explodeT = isInspector ? (s.inspector?.explodePct ?? 0) / 100 : 0;
+    const isolate = isInspector && Boolean(s.inspector?.isolatePart && s.highlightedPart);
+    const activeCraft = HARDWARE_CATALOG[s.showcase];
+
+    const craftList = [
+      this.launchComplex.rocketFull,
+      this.launchComplex.groundGroup,
+      this.showcaseSatellite.group,
+      this.jwstModel.group,
+      this.voyagerModel.group,
+      this.lander.group,
+      this.roverModel.group,
+      this.lunarEnv.habGroup,
+    ];
+
+    craftList.forEach((root) => {
+      root.traverse((obj) => {
+        const expId = obj.userData?.explodePartId as string | undefined;
+        if (expId && obj.userData.basePos instanceof THREE.Vector3) {
+          const base = obj.userData.basePos as THREE.Vector3;
+          const partSpec = activeCraft?.parts.find((p) => p.id === expId);
+          if (explodeT > 0 && partSpec && isInspector) {
+            obj.position.set(
+              base.x + partSpec.explodeAxis[0] * explodeT,
+              base.y + partSpec.explodeAxis[1] * explodeT,
+              base.z + partSpec.explodeAxis[2] * explodeT
+            );
+          } else {
+            obj.position.copy(base);
+          }
+        }
+        if (obj instanceof THREE.Mesh && typeof obj.userData?.partId === 'string') {
+          if (isolate && activeCraft?.parts.some((p) => p.id === s.highlightedPart)) {
+            obj.visible = obj.userData.partId === s.highlightedPart;
+          } else {
+            obj.visible = true;
+          }
+        }
+      });
+    });
+  }
+
+  private syncQuality(quality: QualityPreset = 'high') {
+    if (this.appliedQuality === quality) return;
+    this.appliedQuality = quality;
+    if (this.isSoftwareGl) return;
+    if (quality === 'low') {
+      this.renderer.setPixelRatio(1);
+      this.renderer.shadowMap.enabled = false;
+      this.sunLight.castShadow = false;
+    } else if (quality === 'med') {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      this.renderer.shadowMap.enabled = true;
+      this.sunLight.castShadow = true;
+    } else {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this.renderer.shadowMap.enabled = true;
+      this.sunLight.castShadow = true;
+    }
+  }
+
   private syncScene(dt: number, elapsedSec: number) {
     const s = this.simRef.current;
     const { phase } = s;
+
+    this.syncQuality(s.quality ?? 'high');
 
     // Reset launch visual offsets if not in launch or reset to pre-sim
     if (phase !== 'launch' || s.launch.launchSequence === 'PRE_SIM') {
@@ -541,21 +741,36 @@ export class SpaceSceneManager {
       this.lasDetachedTime = -1;
     }
 
+    // Auto-rotate showcase in inspector if enabled
+    if (phase === 'inspector' && s.inspector?.autoRotate && !s.userOrbitActive) {
+      s.orbitYaw += dt * 0.32;
+    }
+
     // Visibility matrix per phase
     const showLaunch = phase === 'launch' || ((phase === 'title' || phase === 'inspector') && s.showcase === 'rocket');
     const showSatelliteShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'satellite';
+    const showJwstShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'jwst';
+    const showVoyagerShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'voyager';
     const showSpace = phase === 'space' || (phase === 'gameover' && s.crashFx.active && s.crashFx.kind === 'space');
-    const showLunar = !showLaunch && !showSpace && !showSatelliteShowcase;
+    const showLunar =
+      !showLaunch && !showSpace && !showSatelliteShowcase && !showJwstShowcase && !showVoyagerShowcase;
 
     this.launchComplex.group.visible = showLaunch;
     this.solarSystem.group.visible = showSpace;
     this.showcaseSatellite.group.visible = showSatelliteShowcase;
+    this.jwstModel.group.visible = showJwstShowcase;
+    this.voyagerModel.group.visible = showVoyagerShowcase;
     this.lunarEnv.group.visible = showLunar;
+    this.lunarEnv.kilopowerGroup.visible =
+      Boolean(s.kilopowerActive) ||
+      ((phase === 'title' || phase === 'inspector') && s.showcase === 'outpost');
     this.starField.visible = !showLaunch || s.launch.altitudeKm > 18;
     this.scene.fog = showLaunch && s.launch.altitudeKm < 16 ? this.launchFog : null;
     if (showLaunch) {
       this.launchFog.density = Math.max(0, 0.0022 * (1 - s.launch.altitudeKm / 16));
     }
+
+    const unstowingOnSurface = phase === 'landing' && Boolean(s.unstow?.active);
 
     this.lander.group.visible =
       phase === 'landing' ||
@@ -563,12 +778,13 @@ export class SpaceSceneManager {
       phase === 'victory' ||
       (phase === 'gameover' && s.crashFx.kind !== 'space') ||
       phase === 'briefing' ||
-      (phase === 'title' && s.showcase !== 'rocket' && s.showcase !== 'satellite') ||
+      (phase === 'title' && s.showcase !== 'rocket' && s.showcase !== 'satellite' && s.showcase !== 'jwst' && s.showcase !== 'voyager') ||
       (phase === 'inspector' && (s.showcase === 'lander' || s.showcase === 'outpost'));
 
     this.roverModel.group.visible =
       phase === 'rover' ||
       phase === 'victory' ||
+      unstowingOnSurface ||
       (phase === 'gameover' && s.crashFx.kind === 'rover') ||
       phase === 'briefing' ||
       (phase === 'title' && (s.showcase === 'rover' || s.showcase === 'outpost')) ||
@@ -580,6 +796,7 @@ export class SpaceSceneManager {
 
     // Highlight parts during Vehicle Inspector
     this.updatePartHighlight(s.highlightedPart, phase);
+    this.applyExplodeAndIsolate(s);
 
     // Hide landing helpers unless in landing phase
     this.guideLine.visible = false;
@@ -588,13 +805,13 @@ export class SpaceSceneManager {
     this.lunarEnv.trajectoryArc.visible = false;
     this.lunarEnv.approachGates.forEach((g) => (g.group.visible = false));
     this.lunarEnv.landingZoneMeshes.forEach((z) => {
-      z.group.visible = phase === 'landing' && z.planet === s.planet;
+      z.group.visible = phase === 'landing' && z.planet === s.planet && !unstowingOnSurface;
     });
 
     if (showLaunch) {
       this.syncLaunchScene(s, dt, elapsedSec);
-    } else if (showSatelliteShowcase) {
-      this.syncSatelliteShowcaseScene(s, elapsedSec);
+    } else if (showSatelliteShowcase || showJwstShowcase || showVoyagerShowcase) {
+      this.syncSpacecraftShowcaseScene(s, elapsedSec, showJwstShowcase ? 'jwst' : showVoyagerShowcase ? 'voyager' : 'satellite');
     } else if (showSpace) {
       this.syncSpaceScene(s, dt, elapsedSec);
     } else {
@@ -605,33 +822,46 @@ export class SpaceSceneManager {
     this.updateParticles(dt);
   }
 
-  private syncSatelliteShowcaseScene(s: SceneSimulationBridge, elapsedSec: number) {
+  private syncSpacecraftShowcaseScene(
+    s: SceneSimulationBridge,
+    elapsedSec: number,
+    kind: 'satellite' | 'jwst' | 'voyager'
+  ) {
     (this.scene.background as THREE.Color).setHex(0x020617);
-    const sat = this.showcaseSatellite;
-    sat.group.position.set(0, 0, 0);
-    // Keep satellite steady when user is orbiting/inspecting so 360° view stays intuitive
-    sat.group.rotation.set(
-      0.18,
-      s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.25 : 0.35,
-      0
-    );
-    sat.solarLeftPivot.scale.x = 1;
-    sat.solarRightPivot.scale.x = 1;
-    sat.umbrellaLeft.scale.setScalar(1);
-    sat.umbrellaRight.scale.setScalar(1);
-    sat.linkBeam.visible = false;
-
-    if (s.phase === 'title' && !s.userOrbitActive) {
-      this.camera.position.set(4.8, 2.7, 6.6);
-      this.camera.lookAt(-1.4, 0, 0);
+    if (kind === 'satellite') {
+      const sat = this.showcaseSatellite;
+      sat.group.position.set(0, 0, 0);
+      sat.group.rotation.set(
+        0.18,
+        s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.25 : 0.35,
+        0
+      );
+      sat.solarLeftPivot.scale.x = 1;
+      sat.solarRightPivot.scale.x = 1;
+      sat.umbrellaLeft.scale.setScalar(1);
+      sat.umbrellaRight.scale.setScalar(1);
+      sat.linkBeam.visible = false;
+    } else if (kind === 'jwst') {
+      this.jwstModel.group.position.set(0, 0.2, 0);
+      this.jwstModel.group.rotation.set(0.12, s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.2 : 0.45, 0);
     } else {
-      const dist = Math.min(28, Math.max(3.2, s.orbitDistance));
+      this.voyagerModel.group.position.set(0, 0.2, 0);
+      this.voyagerModel.group.rotation.set(0.16, s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.2 : -0.4, 0);
+    }
+
+    const focusY = kind === 'satellite' ? 0 : 0.2;
+    if (s.phase === 'title' && !s.userOrbitActive) {
+      const dist = kind === 'satellite' ? 8.2 : 10.6;
+      this.camera.position.set(dist * 0.6, 3.2, dist * 0.85);
+      this.camera.lookAt(-1.4, focusY, 0);
+    } else {
+      const dist = Math.min(34, Math.max(3.2, s.orbitDistance));
       this.camera.position.set(
         Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        Math.sin(s.orbitPitch) * dist,
+        focusY + Math.sin(s.orbitPitch) * dist,
         Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camera.lookAt(0, 0, 0);
+      this.camera.lookAt(0, focusY, 0);
     }
   }
 
@@ -789,25 +1019,28 @@ export class SpaceSceneManager {
 
     lc.earthLimb.visible = alt > 20;
     lc.earthLimb.position.y = -102 - Math.min(20, (alt - 20) * 0.12);
+    lc.leoOrbitRing.visible = L.orbitReached;
+    lc.leoOrbitRing.position.copy(lc.earthLimb.position);
 
     // Sky transitions from Florida dusk to black space
     const spaceFade = Math.min(1, alt / 55);
     this.scratchColor.setHex(0x0b132b).lerp(new THREE.Color(0x020617), spaceFade);
     (this.scene.background as THREE.Color).copy(this.scratchColor);
 
-    const pitchRad = (L.pitchDeg * Math.PI) / 180;
+    const pitchRad = L.orbitReached ? Math.PI / 2 : (L.pitchDeg * Math.PI) / 180;
     lc.rocketFull.position.set(0, liftY, 0);
     lc.rocketFull.rotation.set(0, 0, -pitchRad);
 
     // Flame + trench fire + deluge steam cloud on pad clearance + Transonic Mach Cone
-    const thrusting = L.ignited && L.throttle > 0.05 && L.fuelPct > 0;
+    const tliBurning = Boolean(L.orbitReached && s.leoTransfer?.tliBurnActive);
+    const thrusting = (L.ignited && L.throttle > 0.05 && L.fuelPct > 0 && !L.orbitReached) || tliBurning;
     lc.flameGroup.visible = thrusting && !L.coreSeparated;
     lc.icpsFlame.visible = thrusting && L.coreSeparated;
     if (lc.icpsFlame.visible) {
       const flicker = 0.85 + Math.sin(elapsedSec * 38) * 0.16;
-      lc.icpsFlame.scale.set(1, Math.max(0.45, L.throttle) * flicker, 1);
+      lc.icpsFlame.scale.set(1, (tliBurning ? 1.25 : Math.max(0.45, L.throttle)) * flicker, 1);
     }
-    lc.machCone.visible = thrusting && alt >= 7 && alt <= 19;
+    lc.machCone.visible = thrusting && !L.orbitReached && alt >= 7 && alt <= 19;
     if (lc.machCone.visible) {
       const pulse = 0.94 + Math.sin(elapsedSec * 28) * 0.07;
       lc.machCone.scale.set(pulse, 1, pulse);
@@ -1036,15 +1269,63 @@ export class SpaceSceneManager {
     posAttr.setXYZ(1, targetSpec.x, 0, targetSpec.z);
     posAttr.needsUpdate = true;
 
-    // Camera: elevated chase by default, or full 360° orbit + wheel zoom around Orion & Satellite
-    if (s.userOrbitActive) {
-      const dist = Math.min(90, Math.max(4.5, s.orbitDistance));
+    // Complete Solar System Keplerian Positioning & Scale Mode
+    const scaleMode: SolarScaleMode = s.solarScaleMode ?? 'exploration';
+    const epochYears = s.solarEpochYears ?? 0;
+    let focusPos: THREE.Vector3 | null = null;
+    SOLAR_SYSTEM_BODIES.forEach((b) => {
+      if (b.id === 'sun') {
+        if (s.focusedSolarBodyId === 'sun') focusPos = new THREE.Vector3(-48, 0, -36);
+        return;
+      }
+      const pos = computeKeplerBodyPosition(b, epochYears, scaleMode);
+      const ring = ss.orbitRings[b.id];
+      if (ring) {
+        const refRad = Math.max(2, b.explorationRadiusUnits);
+        ring.scale.setScalar((scaleMode === 'scientific' ? b.scientificScaleRadius : b.explorationRadiusUnits) / refRad);
+      }
+      const bodyObj = ss.extraBodies[b.id];
+      if (bodyObj) {
+        if (b.id !== 'earth' && b.id !== 'mars') {
+          bodyObj.position.set(pos.x, 0, pos.z);
+          bodyObj.rotation.y += dt * 0.25;
+        } else if (b.id === 'mars' && scaleMode === 'scientific') {
+          ss.planets.mars.position.set(pos.x, 0, pos.z);
+          bodyObj.position.set(pos.x, 0, pos.z);
+        } else if (b.id === 'mars') {
+          ss.planets.mars.position.set(marsSpec.x, 0, marsSpec.z);
+          bodyObj.position.set(marsSpec.x, 0, marsSpec.z);
+        }
+        if (b.id === 'halley') {
+          // Point comet tail radially away from Sun (-48, 0, -36)
+          const dx = pos.x + 48;
+          const dz = pos.z + 36;
+          bodyObj.rotation.y = Math.atan2(dx, dz);
+        }
+        if (s.focusedSolarBodyId === b.id) {
+          focusPos = bodyObj.position.clone();
+        }
+      }
+    });
+
+    // Camera: focused Solar System body OR elevated chase OR full 360° orbit + wheel zoom around Orion & Satellite
+    if (focusPos && !s.userOrbitActive) {
+      const dist = Math.min(140, Math.max(6.5, s.orbitDistance));
       this.camPosTarget.set(
-        sp.shipX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        Math.sin(s.orbitPitch) * dist,
-        sp.shipZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        (focusPos as THREE.Vector3).x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+        Math.max(2, Math.sin(s.orbitPitch) * dist + 4),
+        (focusPos as THREE.Vector3).z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camLookTarget.set(sp.shipX, 0, sp.shipZ);
+      this.camLookTarget.copy(focusPos);
+    } else if (s.userOrbitActive) {
+      const anchor = focusPos ?? new THREE.Vector3(sp.shipX, 0, sp.shipZ);
+      const dist = Math.min(180, Math.max(4.5, s.orbitDistance));
+      this.camPosTarget.set(
+        anchor.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+        Math.sin(s.orbitPitch) * dist,
+        anchor.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+      );
+      this.camLookTarget.copy(anchor);
     } else {
       this.camPosTarget.set(sp.shipX - Math.sin(sp.headingRad) * 16, 13, sp.shipZ - Math.cos(sp.headingRad) * 16);
       this.camLookTarget.set(sp.shipX + Math.sin(sp.headingRad) * 6, 0, sp.shipZ + Math.cos(sp.headingRad) * 6);
@@ -1196,19 +1477,60 @@ export class SpaceSceneManager {
     const zone = zones[f.targetZoneId] || zones[0];
     const gravity = f.planet === 'mars' ? PHYSICS.MARS_GRAVITY : PHYSICS.MOON_GRAVITY;
 
-    lm.group.position.set(f.x, f.y, f.z);
-    lm.group.rotation.set((f.pitchDeg * Math.PI) / 180, 0, (f.rollDeg * Math.PI) / 180);
+    const unstow = s.unstow;
+    const groundY = getSurfaceTerrainHeight(f.planet, f.x, f.z);
+
+    if (unstow?.active) {
+      // Lander settles at touchdown spot; ramp unfolds and rover drives down ramp cleanly!
+      lm.group.position.set(f.x, groundY + 0.36, f.z);
+      lm.group.rotation.set(0, 0, 0);
+      lm.flameMesh.visible = false;
+      lm.engineLight.intensity = 0;
+      lm.landingSpot.intensity = 1.6;
+      lm.entryPlasmaCone.visible = false;
+      lm.parachuteGroup.visible = false;
+      lm.heatShieldDisk.visible = false;
+      lm.skyCraneGroup.visible = false;
+      lm.rampGroup.rotation.x = (unstow.rampDeployPct / 100) * 1.18;
+
+      const rollT = unstow.roverRolloutPct / 100;
+      const rx = f.x;
+      const rz = f.z + 1.8 + rollT * 4.4;
+      const ry = Math.max(getSurfaceTerrainHeight(f.planet, rx, rz), groundY + (1 - rollT) * 1.15);
+      this.roverModel.group.position.set(rx, ry, rz);
+      this.roverModel.group.rotation.set(rollT > 0.05 && rollT < 0.85 ? 0.25 : 0, 0, 0);
+      this.roverModel.camHead.rotation.y = 0;
+      this.roverModel.wheelModules.forEach((wm) => {
+        wm.spin.rotation.x += rollT > 0.02 && rollT < 0.98 ? dt * 6 : 0;
+      });
+    } else {
+      lm.rampGroup.rotation.x = 0;
+      lm.group.position.set(f.x, f.y, f.z);
+      lm.group.rotation.set((f.pitchDeg * Math.PI) / 180, 0, (f.rollDeg * Math.PI) / 180);
+
+      // Mars 7-Min EDL Stage Visuals
+      const edl = s.marsEdl;
+      const marsEdlOn = f.planet === 'mars' && Boolean(edl?.active);
+      lm.entryPlasmaCone.visible = marsEdlOn && edl?.stage === 'ENTRY_PLASMA';
+      lm.heatShieldDisk.visible = marsEdlOn && !edl?.heatShieldDropped;
+      lm.parachuteGroup.visible = marsEdlOn && Boolean(edl?.parachuteDeployed);
+      lm.skyCraneGroup.visible = marsEdlOn && edl?.stage === 'SKY_CRANE';
+      if (lm.skyCraneGroup.visible && edl) {
+        const t = Math.max(0.1, edl.skyCraneLoweringPct / 100);
+        lm.skyCraneCables.position.y = -t * 1.8;
+        lm.skyCraneCables.scale.y = 0.4 + t * 1.8;
+      }
+    }
 
     lm.nozzleGroup.rotation.z = -(f.rollDeg * Math.PI) / 360;
     lm.nozzleGroup.rotation.x = (f.pitchDeg * Math.PI) / 360;
 
-    const firing = f.throttle > 0.05 && f.fuelPct > 0 && !f.landed;
-    const groundY = getSurfaceTerrainHeight(f.planet, f.x, f.z);
+    const firing = f.throttle > 0.05 && f.fuelPct > 0 && !f.landed && !unstow?.active;
     const alt = Math.max(0, f.y - groundY);
 
     lm.flameMesh.visible = firing;
     lm.engineLight.intensity = firing ? 3.5 + f.throttle * 14 : 0;
-    lm.landingSpot.intensity = !f.landed && alt < 44 ? 1.2 + (1 - alt / 44) * 3.8 : 0;
+    lm.landingSpot.intensity = unstow?.active ? 1.8 : !f.landed && alt < 44 ? 1.2 + (1 - alt / 44) * 3.8 : 0;
     lm.probes.forEach((p) => {
       if (f.landed) {
         p.position.y = 0.32;
@@ -1382,9 +1704,17 @@ export class SpaceSceneManager {
     const r = s.rover;
     const rm = this.roverModel;
 
-    // Keep lander parked on Pad Alpha with retracted contact probes
-    this.lander.group.position.set(0, 0.36, 0);
+    // Keep lander parked at actual touchdown pose (never teleporting back to (0,0) if landed elsewhere!)
+    const lx = s.landedPose?.x ?? 0;
+    const lz = s.landedPose?.z ?? 0;
+    const ly = getSurfaceTerrainHeight(r.planet, lx, lz) + 0.36;
+    this.lander.group.position.set(lx, ly, lz);
     this.lander.group.rotation.set(0, 0, 0);
+    this.lander.rampGroup.rotation.x = 1.18;
+    this.lander.entryPlasmaCone.visible = false;
+    this.lander.parachuteGroup.visible = false;
+    this.lander.heatShieldDisk.visible = false;
+    this.lander.skyCraneGroup.visible = false;
     this.lander.flameMesh.visible = false;
     this.lander.engineLight.intensity = 0;
     this.lander.probes.forEach((p) => {
@@ -1395,6 +1725,26 @@ export class SpaceSceneManager {
     const clearanceLift = r.highClearance || r.driveMode === 'WALKER' ? 0.34 : 0;
     rm.group.position.set(r.x, r.y + clearanceLift, r.z);
     rm.group.rotation.set(r.pitchRad, r.headingRad, r.rollRad);
+
+    // Record persistent wheel track decals onto terrain when rover moves >0.85m
+    if (s.phase === 'rover' && Math.hypot(r.x - this.lastTrackX, r.z - this.lastTrackZ) > 0.85) {
+      this.lastTrackX = r.x;
+      this.lastTrackZ = r.z;
+      const rightX = Math.cos(r.headingRad) * 0.88;
+      const rightZ = -Math.sin(r.headingRad) * 0.88;
+      for (const side of [-1, 1]) {
+        const tx = r.x + rightX * side;
+        const tz = r.z + rightZ * side;
+        const ty = getSurfaceTerrainHeight(r.planet, tx, tz) + 0.08;
+        this.crashDummy.position.set(tx, ty, tz);
+        this.crashDummy.rotation.set(-Math.PI / 2, 0, r.headingRad);
+        this.crashDummy.scale.set(1, 1, 1);
+        this.crashDummy.updateMatrix();
+        this.lunarEnv.wheelTrackMesh.setMatrixAt(this.trackIdx, this.crashDummy.matrix);
+        this.trackIdx = (this.trackIdx + 1) % 320;
+      }
+      this.lunarEnv.wheelTrackMesh.instanceMatrix.needsUpdate = true;
+    }
 
     // Update 4 articulated wheel-legs + rocker arms
     rm.wheelModules.forEach((wm, idx) => {
@@ -1413,7 +1763,8 @@ export class SpaceSceneManager {
       wm.arm.rotation.x = -wm.forward * (lift - clearanceLift * 0.45) * 0.85;
     });
 
-    // Headlight, Volumetric Beams, Comms Dish Sweep, Mast Strobe Beacon & Mars Dust Shading on Solar Array
+    // Headlight, Mast Pan, Volumetric Beams, Comms Dish Sweep, Mast Strobe Beacon & Mars Dust Shading on Solar Array
+    rm.camHead.rotation.y = s.mastPanRad ?? 0;
     rm.headlight.intensity = r.headlightsOn ? 44 : 0;
     rm.headlightBounce.intensity = r.headlightsOn ? 6.5 : 0;
     rm.headlightBeams.visible = r.headlightsOn;

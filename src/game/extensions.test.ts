@@ -1,0 +1,211 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  HARDWARE_CATALOG,
+  HARDWARE_ORDER,
+} from './hardwareCatalog';
+import {
+  SOLAR_SYSTEM_BODIES,
+  computeKeplerBodyPosition,
+  computeWeightOnBodyKg,
+} from './solarSystemData';
+import {
+  areAllPreLaunchChecksGo,
+  computeRoverDisplaySpeed,
+  createInitialLeoTransferState,
+  createInitialMarsEdlState,
+  createInitialPreLaunchChecks,
+  createInitialUnstowState,
+  fastForwardMarsEdl,
+  fastForwardUnstow,
+  shouldTriggerApollo1202Alarm,
+  stepLeoTransfer,
+  stepMarsEdlSequence,
+  stepUnstowSequence,
+} from './sequences';
+import {
+  createInitialDrillingState,
+  getDrillStrata,
+  purgeAndCoolDrill,
+  setDrillSetting,
+  stepDrillingConsole,
+} from './drilling';
+import {
+  buildSolSummaryReport,
+  createInitialOutpostConsoleState,
+  stepAirlockCycle,
+  switchOutpostPowerSource,
+  toggleOutpostAirlock,
+} from './outpost';
+import { createInitialCampaignCarryover } from './physics';
+
+test('hardware catalog includes all 7 vehicles with parts, explode axes, and connections', () => {
+  assert.equal(HARDWARE_ORDER.length, 7);
+  for (const id of HARDWARE_ORDER) {
+    const spec = HARDWARE_CATALOG[id];
+    assert.ok(spec, `Missing hardware spec for ${id}`);
+    assert.ok(spec.parts.length >= 3, `Expected >= 3 parts for ${id}`);
+    for (const part of spec.parts) {
+      assert.equal(part.explodeAxis.length, 3);
+      assert.ok(Array.isArray(part.connections));
+      assert.ok(part.quizPrompt.length > 5);
+    }
+  }
+});
+
+test('solar system catalog covers Sun through Eris/Halley with Kepler motion & weight math', () => {
+  assert.equal(SOLAR_SYSTEM_BODIES.length, 13);
+  const saturn = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'saturn');
+  assert.ok(saturn);
+  const expPos = computeKeplerBodyPosition(saturn, 0, 'exploration');
+  const sciPos = computeKeplerBodyPosition(saturn, 0, 'scientific');
+  assert.notEqual(expPos.x, sciPos.x);
+
+  const laterPos = computeKeplerBodyPosition(saturn, 5, 'exploration');
+  assert.notEqual(laterPos.angleRad, expPos.angleRad);
+
+  assert.equal(computeWeightOnBodyKg(35, 0.165), 5.8);
+  assert.equal(computeWeightOnBodyKg(35, 0.38), 13.3);
+});
+
+test('pre-launch checklist gates countdown and LEO parking completes TLI burn cleanly', () => {
+  const checks = createInitialPreLaunchChecks();
+  assert.equal(areAllPreLaunchChecksGo(checks), false);
+  checks.powerBus = true;
+  checks.cryoChill = true;
+  checks.delugeArmed = true;
+  checks.crewArmClear = true;
+  assert.equal(areAllPreLaunchChecksGo(checks), true);
+
+  let leo = createInitialLeoTransferState();
+  leo = stepLeoTransfer(leo, 0.5, true);
+  assert.equal(leo.inParkingOrbit, true);
+  assert.equal(leo.readyForSpaceTransition, false);
+
+  leo = { ...leo, tliBurnActive: true };
+  for (let i = 0; i < 60; i++) {
+    leo = stepLeoTransfer(leo, 0.1, true);
+  }
+  assert.equal(leo.tliBurnProgressPct, 100);
+  assert.equal(leo.tliDeltaVAppliedMs, 3150);
+  assert.equal(leo.readyForSpaceTransition, true);
+});
+
+test('Apollo 1202 alarm triggers once on Moon descent window in manual mode only', () => {
+  assert.equal(shouldTriggerApollo1202Alarm('moon', 60, 'MANUAL', false, false), true);
+  assert.equal(shouldTriggerApollo1202Alarm('moon', 60, 'AUTOLAND', false, false), false);
+  assert.equal(shouldTriggerApollo1202Alarm('moon', 60, 'MANUAL', true, false), false);
+  assert.equal(shouldTriggerApollo1202Alarm('mars', 60, 'MANUAL', false, false), false);
+});
+
+test('Mars 7-minute EDL progresses through comms blackout, parachute, heat shield, sky crane, to handoff', () => {
+  let edl = createInitialMarsEdlState('mars');
+  assert.equal(edl.active, true);
+  assert.equal(edl.stage, 'CRUISE_SEP');
+
+  let sawBlackout = false;
+  let sawChute = false;
+  let sawSkyCrane = false;
+  for (let i = 0; i < 140; i++) {
+    edl = stepMarsEdlSequence(edl, 0.1, Math.max(20, 120 - i), 'mars');
+    if (edl.commsBlackout) sawBlackout = true;
+    if (edl.parachuteDeployed) sawChute = true;
+    if (edl.stage === 'SKY_CRANE') sawSkyCrane = true;
+  }
+  assert.equal(sawBlackout, true);
+  assert.equal(sawChute, true);
+  assert.equal(sawSkyCrane, true);
+  assert.equal(edl.stage, 'HANDOFF');
+  assert.equal(edl.active, false);
+
+  const skipped = fastForwardMarsEdl(createInitialMarsEdlState('mars'));
+  assert.equal(skipped.stage, 'HANDOFF');
+  assert.equal(skipped.active, false);
+});
+
+test('Post-landing unstow runs Engine Cool -> Crew Check -> Ramp -> Rover Unstow -> Complete', () => {
+  let unstow = createInitialUnstowState('moon');
+  assert.equal(unstow.active, true);
+  assert.equal(unstow.stage, 'ENGINE_COOL');
+
+  const seenStages = new Set<string>();
+  for (let i = 0; i < 100; i++) {
+    seenStages.add(unstow.stage);
+    unstow = stepUnstowSequence(unstow, 0.1);
+  }
+  assert.ok(seenStages.has('RAMP_DEPLOY'));
+  assert.ok(seenStages.has('ROVER_UNSTOW'));
+  assert.equal(unstow.completed, true);
+  assert.equal(unstow.rampDeployPct, 100);
+  assert.equal(unstow.roverRolloutPct, 100);
+
+  const fast = fastForwardUnstow(createInitialUnstowState('mars'));
+  assert.equal(fast.completed, true);
+  assert.equal(fast.active, false);
+});
+
+test('computeRoverDisplaySpeed converts accurately between Real VIPER rate and Kid Explore x25', () => {
+  const real = computeRoverDisplaySpeed(13.2, 'REAL_SPEED');
+  assert.equal(real.displayMs, 0.18);
+  assert.equal(real.badgeText, 'REAL DATA');
+
+  const kid = computeRoverDisplaySpeed(10.0, 'KID_25X');
+  assert.equal(kid.displayMs, 10.0);
+  assert.equal(kid.badgeText, 'SIMULATED VALUE');
+});
+
+test('TRIDENT drilling console handles strata progression, overheating at >=95C, and Purge & Cool recovery', () => {
+  assert.equal(getDrillStrata('moon').length, 4);
+  assert.equal(getDrillStrata('mars').length, 4);
+
+  let drill = createInitialDrillingState('shackleton-ice', 'Drill Shackleton Rim Ice', 'moon');
+  drill = setDrillSetting(drill, 'HIGH_TORQUE');
+  drill = { ...drill, isDrilling: true };
+
+  // Step continuously in High Torque until overheat occurs
+  for (let i = 0; i < 60; i++) {
+    drill = stepDrillingConsole(drill, 0.1, 1.0);
+  }
+  assert.equal(drill.overheated, true);
+  assert.equal(drill.isDrilling, false);
+
+  drill = purgeAndCoolDrill(drill);
+  assert.equal(drill.overheated, false);
+  assert.equal(drill.jammed, false);
+
+  // Switch to GENTLE and finish core to 100cm
+  drill = setDrillSetting(drill, 'GENTLE');
+  drill = { ...drill, isDrilling: true };
+  for (let i = 0; i < 180; i++) {
+    drill = stepDrillingConsole(drill, 0.1, 1.2);
+  }
+  assert.equal(drill.completed, true);
+  assert.equal(drill.collectedStrata.length, 4);
+});
+
+test('Outpost airlock cycles cleanly, Kilopower switches bus, and Sol report summarizes trade-offs', () => {
+  let outpost = createInitialOutpostConsoleState('mars');
+  assert.equal(outpost.airlockStage, 'EXTERIOR_OPEN');
+  outpost = toggleOutpostAirlock(outpost);
+  assert.equal(outpost.airlockStage, 'REPRESSURIZING');
+
+  for (let i = 0; i < 25; i++) {
+    outpost = stepAirlockCycle(outpost, 0.1);
+  }
+  assert.equal(outpost.airlockStage, 'SEALED_INT');
+
+  outpost = switchOutpostPowerSource(outpost, 'kilopower');
+  assert.equal(outpost.kilopowerActive, true);
+
+  const report = buildSolSummaryReport(
+    'mars',
+    { power: 40, oxygen: 65, shield: 70 },
+    createInitialCampaignCarryover(),
+    'kilopower',
+    2,
+    45
+  );
+  assert.equal(report.solNumber, 2);
+  assert.ok(report.highlights.length >= 1);
+  assert.ok(report.recommendation.toLowerCase().includes('power'));
+});
