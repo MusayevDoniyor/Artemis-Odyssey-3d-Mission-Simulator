@@ -19,6 +19,7 @@ import {
 } from '../game/orbitalMechanics';
 import { PLANETARY_CATALOG_SI } from '../game/planetaryCatalog';
 import { HARDWARE_CATALOG } from '../game/hardwareCatalog';
+import { getStageSepStep, resolveInspectorLabelLayout } from '../game/hardwareInspector';
 import type {
   CameraMode,
   CampaignMissionId,
@@ -105,6 +106,7 @@ export interface SceneSimulationBridge {
   spaceCameraMode?: SpaceCameraMode;
   localAnchorId?: string;
   quality?: QualityPreset;
+  panOffset?: { x: number; y: number; z: number };
 }
 
 const PARTICLE_COUNT = 260;
@@ -306,7 +308,9 @@ export class SpaceSceneManager {
     Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
   private sunLight: THREE.DirectionalLight;
+  private bayRimLight: THREE.DirectionalLight;
   private ambientLight: THREE.HemisphereLight;
+  private bayTurntable: THREE.Group;
   private starField: THREE.Points;
 
   // Separate Three.js Fresnel blue-rim mesh layers for Earth across scenes
@@ -343,13 +347,34 @@ export class SpaceSceneManager {
   private scratchShipAnchor = new THREE.Vector3();
   private sunOriginVec = new THREE.Vector3(SOLAR_SUN_ORIGIN_X, 0, SOLAR_SUN_ORIGIN_Z);
   private scratchColor = new THREE.Color();
+  private dimTargetColor = new THREE.Color(0x0f172a);
   private crashDummy = new THREE.Object3D();
   private scratchBeltDummy = new THREE.Object3D();
 
-  // Original emissive storage for part inspector highlight
+  // Hardware Bay per-mesh material isolation & smooth inspection state
   private emissiveOriginal = new WeakMap<THREE.MeshStandardMaterial, { hex: number; intensity: number }>();
+  private inspectorMatCache = new WeakMap<
+    THREE.Mesh,
+    {
+      origMat: THREE.Material;
+      inspectMat: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+      origColorHex: number;
+      origEmissiveHex: number;
+      origEmissiveIntensity: number;
+      origOpacity: number;
+      origTransparent: boolean;
+    }
+  >();
+  private inspectorMaterialsActive = false;
   private lastHighlightedPart: string | null = null;
+  private lastHoverPart: string | null = null;
+  private lastSubEngine: number | null = null;
   private lastHighlightPhase: GamePhase | null = null;
+  private currentExplodeT = 0;
+  private inspectFocusCurrent = new THREE.Vector3(0, 12, 0);
+  private inspectBoxScratch = new THREE.Box3();
+  private inspectFocusBox = new THREE.Box3();
+  private lastInspectShowcase: VehicleShowcaseId | null = null;
   private raycaster = new THREE.Raycaster();
   private pointerNdc = new THREE.Vector2();
   private launchFog = new THREE.FogExp2(0x162238, 0.0022);
@@ -421,6 +446,34 @@ export class SpaceSceneManager {
     this.sunLight.shadow.camera.bottom = -d;
     this.sunLight.shadow.bias = -0.0005;
     this.scene.add(this.sunLight);
+
+    // Subtle cool aerospace rim light & turntable reference ring for Hardware Bay inspection
+    this.bayRimLight = new THREE.DirectionalLight(0x7dd3fc, 0);
+    this.bayRimLight.position.set(-70, 36, -65);
+    this.scene.add(this.bayRimLight);
+
+    this.bayTurntable = new THREE.Group();
+    const bayRingOuter = new THREE.Mesh(
+      new THREE.RingGeometry(4.8, 5.0, 64),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.24, side: THREE.DoubleSide })
+    );
+    bayRingOuter.rotation.x = -Math.PI / 2;
+    const bayDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(4.8, 48),
+      new THREE.MeshStandardMaterial({ color: 0x091224, roughness: 0.88, metalness: 0.25 })
+    );
+    bayDisc.rotation.x = -Math.PI / 2;
+    bayDisc.position.y = -0.02;
+    bayDisc.receiveShadow = true;
+    const bayInnerRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.6, 2.68, 48),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.14, side: THREE.DoubleSide })
+    );
+    bayInnerRing.rotation.x = -Math.PI / 2;
+    bayInnerRing.position.y = 0.01;
+    this.bayTurntable.add(bayDisc, bayRingOuter, bayInnerRing);
+    this.bayTurntable.visible = false;
+    this.scene.add(this.bayTurntable);
 
     // Starfield
     this.starField = this.createStarField();
@@ -661,7 +714,10 @@ export class SpaceSceneManager {
       let cur: THREE.Object3D | null = hit.object;
       while (cur) {
         if (typeof cur.userData?.partId === 'string') {
-          return cur.userData.partId;
+          const pid = cur.userData.partId;
+          if (pid === 'sls-rs25') return 'sls-core';
+          if (pid === 'sls-orion' || pid === 'sls-esm' || pid === 'sls-las') return 'sls-upper';
+          return pid;
         }
         cur = cur.parent;
       }
@@ -672,7 +728,7 @@ export class SpaceSceneManager {
   private getInspectorRoots(showcase: VehicleShowcaseId): THREE.Object3D[] {
     switch (showcase) {
       case 'rocket':
-        return [this.launchComplex.rocketFull, this.launchComplex.groundGroup];
+        return [this.launchComplex.rocketFull];
       case 'satellite':
         return [this.showcaseSatellite.group];
       case 'jwst':
@@ -688,23 +744,60 @@ export class SpaceSceneManager {
     }
   }
 
-  pickInspectorPart(clientX: number, clientY: number, showcase: VehicleShowcaseId): string | null {
+  pickInspectorHit(
+    clientX: number,
+    clientY: number,
+    showcase: VehicleShowcaseId
+  ): { partId: string | null; subEngineIndex?: number } {
     const rect = this.renderer.domElement.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
+    if (rect.width <= 0 || rect.height <= 0) return { partId: null };
     this.pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointerNdc, this.camera);
     const hits = this.raycaster.intersectObjects(this.getInspectorRoots(showcase), true);
     for (const hit of hits) {
+      if (!hit.object.visible) continue;
       let cur: THREE.Object3D | null = hit.object;
+      let subEngineIndex: number | undefined;
       while (cur) {
+        if (typeof cur.userData?.subEngineIndex === 'number' && subEngineIndex === undefined) {
+          subEngineIndex = cur.userData.subEngineIndex;
+        }
         if (typeof cur.userData?.partId === 'string') {
-          return cur.userData.partId;
+          return { partId: cur.userData.partId, subEngineIndex };
         }
         cur = cur.parent;
       }
     }
-    return null;
+    return { partId: null };
+  }
+
+  pickInspectorPart(clientX: number, clientY: number, showcase: VehicleShowcaseId): string | null {
+    return this.pickInspectorHit(clientX, clientY, showcase).partId;
+  }
+
+  private computeInspectorPartWorldCenter(
+    showcase: VehicleShowcaseId,
+    partId: string | null,
+    out: THREE.Vector3
+  ): boolean {
+    const roots = this.getInspectorRoots(showcase);
+    this.inspectFocusBox.makeEmpty();
+    let found = false;
+    roots.forEach((root) => {
+      root.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh) || !obj.visible) return;
+        const pid = obj.userData?.partId as string | undefined;
+        if (!pid) return;
+        if (partId && pid !== partId) return;
+        this.inspectBoxScratch.setFromObject(obj);
+        this.inspectFocusBox.union(this.inspectBoxScratch);
+        found = true;
+      });
+    });
+    if (!found || this.inspectFocusBox.isEmpty()) return false;
+    this.inspectFocusBox.getCenter(out);
+    return true;
   }
 
   getInspectorScreenLabels(showcase: VehicleShowcaseId): InspectorLabelPoint[] {
@@ -726,31 +819,41 @@ export class SpaceSceneManager {
       });
     });
 
-    const out: InspectorLabelPoint[] = [];
+    const raw: InspectorLabelPoint[] = [];
     spec.parts.forEach((part) => {
-      const entry = accumMap.get(part.id);
-      if (!entry) {
-        out.push({ partId: part.id, name: part.name, xPct: 50, yPct: 50, visible: false });
-        return;
+      if (showcase === 'rocket' && part.id === 'sls-boosters') {
+        this.inspectBoxScratch.setFromObject(this.launchComplex.srbRight);
+        this.inspectBoxScratch.getCenter(this.scratchVec);
+      } else {
+        const entry = accumMap.get(part.id);
+        if (!entry) {
+          raw.push({ partId: part.id, name: part.shortName, role: part.role, xPct: 50, yPct: 50, visible: false });
+          return;
+        }
+        entry.box.getCenter(this.scratchVec);
       }
-      entry.box.getCenter(this.scratchVec);
       this.scratchVec.project(this.camera);
       const visible =
         this.scratchVec.z >= -1 &&
         this.scratchVec.z <= 1 &&
-        this.scratchVec.x >= -0.95 &&
-        this.scratchVec.x <= 0.95 &&
-        this.scratchVec.y >= -0.95 &&
-        this.scratchVec.y <= 0.95;
-      out.push({
+        this.scratchVec.x >= -0.92 &&
+        this.scratchVec.x <= 0.92 &&
+        this.scratchVec.y >= -0.92 &&
+        this.scratchVec.y <= 0.92;
+      const anchorX = Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10;
+      const anchorY = Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10;
+      raw.push({
         partId: part.id,
-        name: part.name,
-        xPct: Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10,
-        yPct: Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10,
+        name: part.shortName,
+        role: part.role,
+        xPct: anchorX,
+        yPct: anchorY,
+        anchorXPct: anchorX,
+        anchorYPct: anchorY,
         visible,
       });
     });
-    return out;
+    return resolveInspectorLabelLayout(raw);
   }
 
   pickSolarBody(clientX: number, clientY: number): string | null {
@@ -1003,28 +1106,154 @@ export class SpaceSceneManager {
     }
   }
 
-  private updatePartHighlight(partId: string | null, phase: GamePhase) {
-    if (partId === this.lastHighlightedPart && phase === this.lastHighlightPhase) return;
-    this.lastHighlightedPart = partId;
-    this.lastHighlightPhase = phase;
-
-    const targets = [
+  private getAllInspectableRoots(): THREE.Object3D[] {
+    return [
       this.launchComplex.rocketFull,
       this.launchComplex.groundGroup,
       this.lander.group,
       this.roverModel.group,
-      this.lunarEnv.group,
+      this.lunarEnv.habGroup,
       this.showcaseSatellite.group,
       this.jwstModel.group,
       this.voyagerModel.group,
     ];
+  }
 
-    const highlightActive =
-      (phase === 'inspector' || phase === 'launch') && Boolean(partId);
+  private setInspectorMaterialsMode(active: boolean) {
+    if (active === this.inspectorMaterialsActive) return;
+    this.inspectorMaterialsActive = active;
+    const roots = this.getAllInspectableRoots();
+    roots.forEach((root) => {
+      root.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        if (!obj.userData?.partId) return;
+        const m = obj.material;
+        if (Array.isArray(m)) return;
+
+        if (active) {
+          let cached = this.inspectorMatCache.get(obj);
+          if (!cached && (m instanceof THREE.MeshStandardMaterial || m instanceof THREE.MeshBasicMaterial)) {
+            const cloned = m.clone() as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+            cached = {
+              origMat: m,
+              inspectMat: cloned,
+              origColorHex: cloned.color.getHex(),
+              origEmissiveHex: cloned instanceof THREE.MeshStandardMaterial ? cloned.emissive.getHex() : 0,
+              origEmissiveIntensity: cloned instanceof THREE.MeshStandardMaterial ? cloned.emissiveIntensity : 0,
+              origOpacity: cloned.opacity,
+              origTransparent: cloned.transparent,
+            };
+            this.inspectorMatCache.set(obj, cached);
+          }
+          if (cached) {
+            obj.material = cached.inspectMat;
+          }
+        } else {
+          const cached = this.inspectorMatCache.get(obj);
+          if (cached) {
+            obj.material = cached.origMat;
+          }
+        }
+      });
+    });
+  }
+
+  private updatePartHighlight(
+    partId: string | null,
+    phase: GamePhase,
+    hoverPartId: string | null = null,
+    selectedSubEngine: number | null = null
+  ) {
+    this.setInspectorMaterialsMode(phase === 'inspector');
+
+    if (
+      partId === this.lastHighlightedPart &&
+      phase === this.lastHighlightPhase &&
+      hoverPartId === this.lastHoverPart &&
+      selectedSubEngine === this.lastSubEngine
+    ) {
+      return;
+    }
+    this.lastHighlightedPart = partId;
+    this.lastHighlightPhase = phase;
+    this.lastHoverPart = hoverPartId;
+    this.lastSubEngine = selectedSubEngine;
+
+    const targets = this.getAllInspectableRoots();
+    const isInspector = phase === 'inspector';
+    const isLaunchHighlight = phase === 'launch' && Boolean(partId);
 
     targets.forEach((root) => {
       root.traverse((obj) => {
         if (!(obj instanceof THREE.Mesh)) return;
+        const meshPart = obj.userData.partId as string | undefined;
+
+        if (isInspector && meshPart) {
+          const cached = this.inspectorMatCache.get(obj);
+          if (!cached) return;
+          const mat = cached.inspectMat;
+          const isSelected = Boolean(partId && meshPart === partId);
+          const isHovered = Boolean(hoverPartId && meshPart === hoverPartId);
+          const subIdx = obj.userData?.subEngineIndex as number | undefined;
+
+          if (isSelected) {
+            mat.color.setHex(cached.origColorHex);
+            if (partId === 'sls-rs25' && selectedSubEngine && subIdx) {
+              if (subIdx === selectedSubEngine) {
+                mat.opacity = 1;
+                mat.transparent = cached.origTransparent;
+                if (mat instanceof THREE.MeshStandardMaterial) {
+                  mat.emissive.setHex(0x22d3ee);
+                  mat.emissiveIntensity = 0.55;
+                }
+              } else {
+                mat.color.setHex(cached.origColorHex).lerp(this.dimTargetColor, 0.55);
+                mat.opacity = cached.origOpacity;
+                mat.transparent = cached.origTransparent;
+                if (mat instanceof THREE.MeshStandardMaterial) {
+                  mat.emissive.setHex(cached.origEmissiveHex);
+                  mat.emissiveIntensity = cached.origEmissiveIntensity * 0.15;
+                }
+              }
+            } else {
+              mat.color.setHex(cached.origColorHex);
+              mat.opacity = cached.origOpacity;
+              mat.transparent = cached.origTransparent;
+              if (mat instanceof THREE.MeshStandardMaterial) {
+                mat.emissive.setHex(0x0ea5e9);
+                mat.emissiveIntensity = Math.min(0.24, cached.origEmissiveIntensity + 0.16);
+              }
+            }
+          } else if (partId) {
+            // Subtle albedo darkening for unrelated components without alpha-sorting artifacts
+            mat.color.setHex(cached.origColorHex).lerp(this.dimTargetColor, isHovered ? 0.15 : 0.68);
+            mat.opacity = cached.origOpacity;
+            mat.transparent = cached.origTransparent;
+            if (mat instanceof THREE.MeshStandardMaterial) {
+              mat.emissive.setHex(isHovered ? 0x38bdf8 : cached.origEmissiveHex);
+              mat.emissiveIntensity = isHovered ? 0.2 : cached.origEmissiveIntensity * 0.08;
+            }
+          } else if (isHovered) {
+            mat.color.setHex(cached.origColorHex);
+            mat.opacity = cached.origOpacity;
+            mat.transparent = cached.origTransparent;
+            if (mat instanceof THREE.MeshStandardMaterial) {
+              mat.emissive.setHex(0x22d3ee);
+              mat.emissiveIntensity = Math.min(0.26, cached.origEmissiveIntensity + 0.18);
+            }
+          } else {
+            mat.color.setHex(cached.origColorHex);
+            mat.opacity = cached.origOpacity;
+            mat.transparent = cached.origTransparent;
+            if (mat instanceof THREE.MeshStandardMaterial) {
+              mat.emissive.setHex(cached.origEmissiveHex);
+              mat.emissiveIntensity = cached.origEmissiveIntensity;
+            }
+          }
+          return;
+        }
+
+        // Non-inspector phase (e.g., Launch hover/click)
         const mat = obj.material;
         if (!(mat instanceof THREE.MeshStandardMaterial)) return;
         if (!this.emissiveOriginal.has(mat)) {
@@ -1034,13 +1263,9 @@ export class SpaceSceneManager {
           });
         }
         const orig = this.emissiveOriginal.get(mat)!;
-        const meshPart = obj.userData.partId as string | undefined;
-        if (highlightActive && meshPart === partId) {
-          mat.emissive.setHex(phase === 'launch' ? 0x22d3ee : 0xf59e0b);
-          mat.emissiveIntensity = phase === 'launch' ? 0.72 : 0.95;
-        } else if (phase === 'inspector' && partId && meshPart) {
-          mat.emissive.setHex(orig.hex);
-          mat.emissiveIntensity = orig.intensity * 0.28;
+        if (isLaunchHighlight && meshPart === partId) {
+          mat.emissive.setHex(0x22d3ee);
+          mat.emissiveIntensity = 0.72;
         } else {
           mat.emissive.setHex(orig.hex);
           mat.emissiveIntensity = orig.intensity;
@@ -1049,15 +1274,24 @@ export class SpaceSceneManager {
     });
   }
 
-  private applyExplodeAndIsolate(s: SceneSimulationBridge) {
+  private applyExplodeAndIsolate(s: SceneSimulationBridge, dt: number) {
     const isInspector = s.phase === 'inspector';
-    const explodeT = isInspector ? (s.inspector?.explodePct ?? 0) / 100 : 0;
+    const targetExplodeT = isInspector ? (s.inspector?.explodePct ?? 0) / 100 : 0;
+    const blend = isInspector ? 1 - Math.exp(-10 * dt) : 1;
+    this.currentExplodeT += (targetExplodeT - this.currentExplodeT) * blend;
+    if (Math.abs(this.currentExplodeT - targetExplodeT) < 0.001) {
+      this.currentExplodeT = targetExplodeT;
+    }
+    const explodeT = this.currentExplodeT;
     const isolate = isInspector && Boolean(s.inspector?.isolatePart && s.highlightedPart);
     const activeCraft = HARDWARE_CATALOG[s.showcase];
+    const stageSpec =
+      isInspector && s.showcase === 'rocket' && (s.inspector?.stageSepStep ?? 0) > 0
+        ? getStageSepStep(s.inspector?.stageSepStep ?? 0)
+        : null;
 
     const craftList = [
       this.launchComplex.rocketFull,
-      this.launchComplex.groundGroup,
       this.showcaseSatellite.group,
       this.jwstModel.group,
       this.voyagerModel.group,
@@ -1072,16 +1306,35 @@ export class SpaceSceneManager {
         if (expId && obj.userData.basePos instanceof THREE.Vector3) {
           const base = obj.userData.basePos as THREE.Vector3;
           const partSpec = activeCraft?.parts.find((p) => p.id === expId);
-          if (explodeT > 0 && partSpec && isInspector) {
-            obj.position.set(
-              base.x + partSpec.explodeAxis[0] * explodeT,
-              base.y + partSpec.explodeAxis[1] * explodeT,
-              base.z + partSpec.explodeAxis[2] * explodeT
-            );
-          } else {
-            obj.position.copy(base);
+          const axis = (obj.userData.explodeAxisOverride as [number, number, number] | undefined) || partSpec?.explodeAxis;
+
+          let ox = 0;
+          let oy = 0;
+          let oz = 0;
+          if (explodeT > 0.001 && axis && isInspector) {
+            ox += axis[0] * explodeT;
+            oy += axis[1] * explodeT;
+            oz += axis[2] * explodeT;
           }
+
+          // SLS Stage Separation Sequence preview offsets
+          if (stageSpec) {
+            if (expId === 'sls-boosters' && stageSpec.srbSepFactor > 0) {
+              const sideSign = obj === this.launchComplex.srbLeft ? -1 : 1;
+              ox += sideSign * 3.8 * stageSpec.srbSepFactor;
+              oy -= 2.6 * stageSpec.srbSepFactor;
+            } else if (expId === 'sls-las' && stageSpec.lasSepFactor > 0) {
+              ox += 1.2 * stageSpec.lasSepFactor;
+              oy += 4.5 * stageSpec.lasSepFactor;
+              oz += 0.6 * stageSpec.lasSepFactor;
+            } else if ((expId === 'sls-core' || expId === 'sls-rs25') && stageSpec.coreSepFactor > 0) {
+              oy -= 4.8 * stageSpec.coreSepFactor;
+            }
+          }
+
+          obj.position.set(base.x + ox, base.y + oy, base.z + oz);
         }
+
         if (obj instanceof THREE.Mesh && typeof obj.userData?.partId === 'string') {
           if (isolate && activeCraft?.parts.some((p) => p.id === s.highlightedPart)) {
             obj.visible = obj.userData.partId === s.highlightedPart;
@@ -1091,6 +1344,36 @@ export class SpaceSceneManager {
         }
       });
     });
+
+    // Interactive hardware actuation in inspector (RS-25 gimbals, ESM solar wings, HERMES solar/dish)
+    if (isInspector && s.showcase === 'rocket') {
+      const lc = this.launchComplex;
+      const gDeg = s.highlightedPart === 'sls-rs25' ? (s.inspector?.gimbalDeg ?? 0) : 0;
+      const gRad = (gDeg * Math.PI) / 180;
+      lc.rs25EngineGroups.forEach((eng, idx) => {
+        const targetZ = gRad;
+        const targetX = (idx < 2 ? 1 : -1) * gRad * 0.35;
+        eng.rotation.z += (targetZ - eng.rotation.z) * (1 - Math.exp(-12 * dt));
+        eng.rotation.x += (targetX - eng.rotation.x) * (1 - Math.exp(-12 * dt));
+      });
+
+      const esmFoldPct =
+        stageSpec?.esmSolarFoldPct ?? (s.highlightedPart === 'sls-esm' ? (s.inspector?.deployPct ?? 70) : 0);
+      const targetWingAngle = -(Math.PI * 0.44) * (esmFoldPct / 100);
+      for (let i = 0; i < lc.esmSolarPivots.length; i++) {
+        const p = lc.esmSolarPivots[i];
+        p.rotation.x += (targetWingAngle - p.rotation.x) * (1 - Math.exp(-8 * dt));
+      }
+
+      lc.icpsFlame.visible = Boolean(stageSpec?.icpsThrusting);
+      lc.srbLeftBsm.visible = Boolean(stageSpec && stageSpec.step === 1);
+      lc.srbRightBsm.visible = Boolean(stageSpec && stageSpec.step === 1);
+      lc.lasFlame.visible = Boolean(stageSpec && stageSpec.step === 2);
+    } else if (!isInspector) {
+      this.launchComplex.rs25EngineGroups.forEach((eng) => {
+        eng.rotation.set(0, 0, 0);
+      });
+    }
   }
 
   private syncQuality(quality: QualityPreset = 'high') {
@@ -1183,7 +1466,7 @@ export class SpaceSceneManager {
       (phase === 'gameover' && s.crashFx.kind !== 'space') ||
       phase === 'briefing' ||
       (phase === 'title' && s.showcase !== 'rocket' && s.showcase !== 'satellite' && s.showcase !== 'jwst' && s.showcase !== 'voyager') ||
-      (phase === 'inspector' && (s.showcase === 'lander' || s.showcase === 'outpost'));
+      (phase === 'inspector' && s.showcase === 'lander');
 
     this.roverModel.group.visible =
       phase === 'rover' ||
@@ -1192,7 +1475,27 @@ export class SpaceSceneManager {
       (phase === 'gameover' && s.crashFx.kind === 'rover') ||
       phase === 'briefing' ||
       (phase === 'title' && (s.showcase === 'rover' || s.showcase === 'outpost')) ||
-      (phase === 'inspector' && (s.showcase === 'rover' || s.showcase === 'outpost'));
+      (phase === 'inspector' && s.showcase === 'rover');
+
+    this.lunarEnv.habGroup.visible = phase !== 'inspector' || s.showcase === 'outpost';
+
+    this.bayRimLight.intensity = phase === 'inspector' ? 1.2 : 0;
+    if (phase === 'inspector') {
+      if (s.showcase === 'rocket') {
+        this.bayTurntable.visible = true;
+        this.bayTurntable.position.set(0, 1.65, 0);
+        this.bayTurntable.scale.setScalar(1.85);
+      } else if (s.showcase === 'satellite' || s.showcase === 'jwst' || s.showcase === 'voyager') {
+        this.bayTurntable.visible = true;
+        this.bayTurntable.position.set(0, -3.2, 0);
+        this.bayTurntable.scale.setScalar(1.25);
+      } else {
+        this.bayTurntable.visible = false;
+      }
+    } else {
+      this.bayTurntable.visible = false;
+      this.lastInspectShowcase = null;
+    }
 
     // Rotate Earth gently in Lunar Sky & update custom atmospheric scattering + separate Fresnel blue rim mesh
     this.lunarEnv.earthGlobe.rotation.y += dt * 0.008;
@@ -1219,9 +1522,14 @@ export class SpaceSceneManager {
       1.0
     );
 
-    // Highlight parts during Vehicle Inspector
-    this.updatePartHighlight(s.highlightedPart, phase);
-    this.applyExplodeAndIsolate(s);
+    // Highlight parts & smoothly actuate exploded / stage-sep / gimbal subsystems during Vehicle Inspector
+    this.updatePartHighlight(
+      s.highlightedPart,
+      phase,
+      s.inspector?.hoveredPartId ?? null,
+      s.inspector?.selectedSubEngine ?? null
+    );
+    this.applyExplodeAndIsolate(s, dt);
 
     // Hide landing helpers unless in landing phase
     this.guideLine.visible = false;
@@ -1266,29 +1574,90 @@ export class SpaceSceneManager {
     this.updateParticles(dt, particleGrav, windX);
   }
 
+  private applyInspectorOrbitCamera(
+    s: SceneSimulationBridge,
+    dt: number,
+    baseFocusX: number,
+    baseFocusY: number,
+    baseFocusZ: number,
+    minDist: number,
+    maxDist: number,
+    minCamY = -50
+  ) {
+    if (this.lastInspectShowcase !== s.showcase) {
+      this.lastInspectShowcase = s.showcase;
+      this.inspectFocusCurrent.set(baseFocusX, baseFocusY, baseFocusZ);
+    }
+
+    const stageStep = s.showcase === 'rocket' ? (s.inspector?.stageSepStep ?? 0) : 0;
+    if (stageStep >= 3) {
+      this.camLookTarget.set(0, 17.8, 0);
+    } else {
+      const foundPart = s.highlightedPart
+        ? this.computeInspectorPartWorldCenter(s.showcase, s.highlightedPart, this.scratchVec)
+        : false;
+      if (foundPart) {
+        this.camLookTarget.copy(this.scratchVec);
+      } else {
+        this.camLookTarget.set(baseFocusX, baseFocusY, baseFocusZ);
+      }
+    }
+
+    if (s.panOffset) {
+      this.camLookTarget.x += s.panOffset.x;
+      this.camLookTarget.y += s.panOffset.y;
+      this.camLookTarget.z += s.panOffset.z;
+    }
+
+    const focusAlpha = 1 - Math.exp(-8.5 * dt);
+    this.inspectFocusCurrent.lerp(this.camLookTarget, focusAlpha);
+
+    const explodeZoomBoost =
+      s.showcase === 'rocket' && !s.highlightedPart && stageStep === 0
+        ? 1 + this.currentExplodeT * 0.34
+        : 1;
+    const rawDist = stageStep >= 3 ? Math.max(s.orbitDistance, 25) : s.orbitDistance * explodeZoomBoost;
+    const dist = Math.min(maxDist, Math.max(minDist, rawDist));
+    const camX = this.inspectFocusCurrent.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+    const camZ = this.inspectFocusCurrent.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
+    const rawCamY = this.inspectFocusCurrent.y + Math.sin(s.orbitPitch) * dist;
+    const camY = Math.max(minCamY, rawCamY);
+
+    this.camPosTarget.set(camX, camY, camZ);
+    const camAlpha = 1 - Math.exp(-11.5 * dt);
+    this.camera.position.lerp(this.camPosTarget, camAlpha);
+    this.camLookCurrent.copy(this.inspectFocusCurrent);
+    this.camera.lookAt(this.camLookCurrent);
+  }
+
   private syncSpacecraftShowcaseScene(
     s: SceneSimulationBridge,
     dt: number,
     kind: 'satellite' | 'jwst' | 'voyager'
   ) {
-    (this.scene.background as THREE.Color).setHex(0x020617);
+    const isInspector = s.phase === 'inspector';
+    (this.scene.background as THREE.Color).setHex(isInspector ? 0x050914 : 0x020617);
     this.ambientLight.color.setHex(0x93c5fd);
     this.ambientLight.groundColor.setHex(0x1e293b);
-    this.ambientLight.intensity = 0.55;
+    this.ambientLight.intensity = isInspector ? 0.68 : 0.55;
     this.sunLight.color.setHex(0xfffbeb);
     this.sunLight.position.set(90, 72, 60);
-    this.sunLight.intensity = 2.75;
+    this.sunLight.intensity = isInspector ? 2.85 : 2.75;
 
     // Stationary 3D showcase spacecraft — the camera orbits smoothly around them
     if (kind === 'satellite') {
       const sat = this.showcaseSatellite;
       sat.group.position.set(0, 0, 0);
       sat.group.rotation.set(0.18, 0.35, 0);
-      sat.solarLeftPivot.scale.x = 1;
-      sat.solarRightPivot.scale.x = 1;
+      const wingScale =
+        isInspector && s.highlightedPart === 'sat-solar'
+          ? 0.25 + 0.75 * ((s.inspector?.deployPct ?? 100) / 100)
+          : 1;
+      sat.solarLeftPivot.scale.x = wingScale;
+      sat.solarRightPivot.scale.x = wingScale;
       sat.umbrellaLeft.scale.setScalar(1);
       sat.umbrellaRight.scale.setScalar(1);
-      sat.linkBeam.visible = false;
+      sat.linkBeam.visible = isInspector && s.highlightedPart === 'sat-dish';
     } else if (kind === 'jwst') {
       this.jwstModel.group.position.set(0, 0.2, 0);
       this.jwstModel.group.rotation.set(0.12, 0.45, 0);
@@ -1298,7 +1667,9 @@ export class SpaceSceneManager {
     }
 
     const focusY = kind === 'satellite' ? 0 : 0.2;
-    if (s.phase === 'title' && !s.userOrbitActive) {
+    if (isInspector) {
+      this.applyInspectorOrbitCamera(s, dt, 0, focusY, 0, 2.8, 32);
+    } else if (s.phase === 'title' && !s.userOrbitActive) {
       const dist = kind === 'satellite' ? 8.8 : kind === 'jwst' ? 10.8 : 11.2;
       const a = this.titleOrbitAngle;
       const camX = Math.sin(a) * dist;
@@ -1342,11 +1713,46 @@ export class SpaceSceneManager {
     // Gentle horizon cloud drift
     lc.cloudLayer.rotation.y = Math.sin(elapsedSec * 0.03) * 0.05;
 
-    if (s.phase === 'title' || s.phase === 'inspector') {
+    if (s.phase === 'inspector') {
+      lc.groundGroup.visible = false;
+      lc.earthLimb.visible = false;
+      lc.moonMesh.visible = false;
+      lc.cloudLayer.visible = false;
+      lc.leoOrbitRing.visible = false;
+      lc.rocketFull.position.set(0, 2.5, 0);
+      lc.rocketFull.rotation.set(0, 0, 0);
+      lc.srbLeft.visible = true;
+      lc.srbLeft.rotation.set(0, 0, 0);
+      lc.srbRight.visible = true;
+      lc.srbRight.rotation.set(0, 0, 0);
+      lc.coreGroup.visible = true;
+      lc.coreGroup.rotation.set(0, 0, 0);
+      lc.rs25Group.visible = true;
+      lc.rs25Group.rotation.set(0, 0, 0);
+      lc.abortTower.visible = true;
+      lc.abortTower.rotation.set(0, 0, 0);
+      lc.machCone.visible = false;
+      lc.flameGroup.visible = false;
+      lc.trenchLight.intensity = 0;
+      const stageSepOn = (s.inspector?.stageSepStep ?? 0) === 4;
+      lc.rocketEngineGlow.intensity = stageSepOn ? 3.8 : 0;
+      lc.rocketEngineGlow.color.setHex(0x38bdf8);
+      lc.rocketEngineGlow.position.set(0, 16.5, 0);
+      lc.padSpotlight.intensity = 0;
+      lc.skyDomeMat.opacity = 0;
+      this.ambientLight.intensity = 0.68;
+      this.sunLight.intensity = 2.85;
+      this.launchPitchVisualRad = 0;
+      (this.scene.background as THREE.Color).setHex(0x050914);
+      this.applyInspectorOrbitCamera(s, dt, 0, 12.2, 0, 5.5, 68);
+      return;
+    }
+
+    if (s.phase === 'title') {
       lc.groundGroup.visible = true;
       lc.groundGroup.position.set(0, 0, 0);
       lc.earthLimb.visible = false;
-      lc.moonMesh.visible = s.phase === 'title';
+      lc.moonMesh.visible = true;
       lc.cloudLayer.visible = true;
       lc.crewAccessArm.rotation.y = 0;
       lc.rocketFull.position.set(0, 2.5, 0);
@@ -1360,6 +1766,9 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.coreGroup.rotation.set(0, 0, 0);
+      lc.rs25Group.visible = true;
+      lc.rs25Group.position.set(0, 0, 0);
+      lc.rs25Group.rotation.set(0, 0, 0);
       lc.abortTower.visible = true;
       lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
@@ -1381,7 +1790,7 @@ export class SpaceSceneManager {
       this.launchPitchVisualRad = 0;
       (this.scene.background as THREE.Color).setHex(0x0b132b);
 
-      if (s.phase === 'title' && !s.userOrbitActive) {
+      if (!s.userOrbitActive) {
         // Cinematic 360-degree camera orbit framing stationary SLS on the right/center stage
         const a = this.titleOrbitAngle;
         const dist = 32;
@@ -1405,7 +1814,7 @@ export class SpaceSceneManager {
           Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
         );
         this.camLookTarget.set(0, 12.0, 0);
-        const rate = s.phase === 'title' ? 1 - Math.exp(-12 * dt) : 1;
+        const rate = 1 - Math.exp(-12 * dt);
         this.camera.position.lerp(this.camPosTarget, rate);
         this.camLookCurrent.lerp(this.camLookTarget, rate);
         this.camera.lookAt(this.camLookCurrent);
@@ -1438,6 +1847,9 @@ export class SpaceSceneManager {
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.coreGroup.rotation.set(0, 0, 0);
+      lc.rs25Group.visible = true;
+      lc.rs25Group.position.set(0, 0, 0);
+      lc.rs25Group.rotation.set(0, 0, 0);
       lc.abortTower.visible = true;
       lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
@@ -1724,18 +2136,24 @@ export class SpaceSceneManager {
       lc.srbRight.rotation.set(0, 0, 0);
     }
 
-    // Core separation (MECO cutoff + downward tumble)
+    // Core separation (MECO cutoff + downward tumble, keeping RS-25 engine cluster attached)
     if (L.coreSeparated) {
       if (this.coreDetachedTime < 0) this.coreDetachedTime = elapsedSec;
       const tCore = elapsedSec - this.coreDetachedTime;
       lc.coreGroup.visible = tCore < 4.5;
       lc.coreGroup.position.set(0, -tCore * tCore * 3.0, -tCore * 0.7);
       lc.coreGroup.rotation.z = tCore * 0.18;
+      lc.rs25Group.visible = lc.coreGroup.visible;
+      lc.rs25Group.position.copy(lc.coreGroup.position);
+      lc.rs25Group.rotation.copy(lc.coreGroup.rotation);
     } else {
       this.coreDetachedTime = -1;
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.coreGroup.rotation.set(0, 0, 0);
+      lc.rs25Group.visible = true;
+      lc.rs25Group.position.set(0, 0, 0);
+      lc.rs25Group.rotation.set(0, 0, 0);
     }
 
     // LAS Tower Jettison Rocket-Away Animation
@@ -2527,7 +2945,12 @@ export class SpaceSceneManager {
         focusZ = -13;
       }
 
-      if (s.phase === 'title' && !s.userOrbitActive) {
+      if (s.phase === 'inspector') {
+        const roverY = getSurfaceTerrainHeight('moon', rx, rz);
+        const minCamFloor =
+          s.showcase === 'rover' ? roverY + 0.55 : s.showcase === 'lander' ? 0.45 : 1.2;
+        this.applyInspectorOrbitCamera(s, dt, focusX, focusY, focusZ, 2.8, 62, minCamFloor);
+      } else if (s.phase === 'title' && !s.userOrbitActive) {
         const isOutpost = s.showcase === 'outpost';
         const angle = this.titleOrbitAngle;
         const rad = isOutpost ? 24.5 : s.showcase === 'rover' ? 7.5 : 11;

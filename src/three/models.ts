@@ -28,8 +28,15 @@ import {
 } from './planetMaps';
 import type { ProceduralTextureSet } from './textures';
 
-export function tagPart(obj: THREE.Object3D, partId: string) {
+export function tagPart(
+  obj: THREE.Object3D,
+  partId: string,
+  explodeAxisOverride?: [number, number, number]
+) {
   obj.userData.explodePartId = partId;
+  if (explodeAxisOverride) {
+    obj.userData.explodeAxisOverride = explodeAxisOverride;
+  }
   if (!obj.userData.basePos) {
     obj.userData.basePos = obj.position.clone();
   }
@@ -1756,7 +1763,7 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), darkMetal);
     elbowJoint.position.copy(elbow);
     arm.add(elbowJoint);
-    tagPart(arm, 'rover-mobility');
+    tagPart(arm, 'rover-mobility', [side * 0.85, -0.45, forward * 0.6]);
     group.add(arm);
 
     // Vertical Steering Knuckle fork above wheel
@@ -1793,7 +1800,7 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     spin.add(hub);
 
     pivot.add(spin);
-    tagPart(pivot, 'rover-mobility');
+    tagPart(pivot, 'rover-mobility', [side * 0.95, -0.55, forward * 0.65]);
     group.add(pivot);
 
     wheelModules.push({ pivot, spin, arm, knuckle, side, forward, baseY: 0.34 });
@@ -1831,13 +1838,17 @@ export interface LaunchComplexHandles {
   crewAccessArm: THREE.Group;
   rocketFull: THREE.Group;
   coreGroup: THREE.Group;
+  rs25Group: THREE.Group;
+  rs25EngineGroups: THREE.Group[];
   srbLeft: THREE.Group;
   srbRight: THREE.Group;
   srbLeftBsm: THREE.Mesh;
   srbRightBsm: THREE.Mesh;
   upperGroup: THREE.Group;
   icpsFlame: THREE.Group;
+  esmGroup: THREE.Group;
   esmSolarPivots: THREE.Group[];
+  orionGroup: THREE.Group;
   machCone: THREE.Mesh;
   abortTower: THREE.Group;
   lasFlame: THREE.Mesh;
@@ -2478,12 +2489,12 @@ export function createLaunchComplexAndSLS(
   sysTunnel.position.set(0, 8.95, 1.07);
   coreGroup.add(sysTunnel);
 
-  // 4 Detailed RS-25 Engine Bells + Turbopump Gimbal Collars + Glowing Throats
+  // 4 Detailed RS-25 Engine Bells + Turbopump Gimbal Collars + Glowing Throats (own group for sls-rs25)
   const rs25Positions: Array<[number, number, number]> = [
-    [-0.42, 0.9, -0.42],
-    [0.42, 0.9, -0.42],
-    [-0.42, 0.9, 0.42],
-    [0.42, 0.9, 0.42],
+    [-0.42, 1.06, -0.42],
+    [0.42, 1.06, -0.42],
+    [-0.42, 1.06, 0.42],
+    [0.42, 1.06, 0.42],
   ];
   const bellMat = new THREE.MeshStandardMaterial({
     color: 0x94a3b8,
@@ -2493,18 +2504,28 @@ export function createLaunchComplexAndSLS(
   });
   const collarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
   const throatMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-  rs25Positions.forEach(([px, py, pz]) => {
+  const rs25Group = new THREE.Group();
+  const rs25EngineGroups: THREE.Group[] = [];
+  rs25Positions.forEach(([px, py, pz], engIdx) => {
+    const engGroup = new THREE.Group();
+    engGroup.position.set(px, py, pz);
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.26, 14), collarMat);
-    collar.position.set(px, py + 0.16, pz);
-    coreGroup.add(collar);
+    collar.position.set(0, 0, 0);
+    engGroup.add(collar);
     const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.42, 0.9, 22, 1, true), bellMat);
-    bell.position.set(px, py - 0.32, pz);
-    coreGroup.add(bell);
+    bell.position.set(0, -0.48, 0);
+    engGroup.add(bell);
     const throat = new THREE.Mesh(new THREE.CircleGeometry(0.15, 14), throatMat);
     throat.rotation.x = Math.PI / 2;
-    throat.position.set(px, py - 0.04, pz);
-    coreGroup.add(throat);
+    throat.position.set(0, -0.2, 0);
+    engGroup.add(throat);
+    engGroup.traverse((c) => {
+      c.userData.subEngineIndex = engIdx + 1;
+    });
+    rs25Group.add(engGroup);
+    rs25EngineGroups.push(engGroup);
   });
+  tagPart(rs25Group, 'sls-rs25');
 
   // Launch Vehicle Stage Adapter (LVSA) stays attached to Core Stage upon MECO separation,
   // cleanly exposing ICPS + RL10B-2 vacuum nozzle bell on the remaining upper stage!
@@ -2576,7 +2597,7 @@ export function createLaunchComplexAndSLS(
     bsm.visible = false;
     g.add(bsm);
 
-    tagPart(g, 'sls-boosters');
+    tagPart(g, 'sls-boosters', [Math.sign(xOffset) * 4.2, -0.4, 0]);
     return { g, bsm };
   };
   const srbLeftBuilt = makeSrb(-1.55);
@@ -2688,12 +2709,13 @@ export function createLaunchComplexAndSLS(
   upperGroup.add(icpsGroup);
 
   const orionStack = new THREE.Group();
+  const esmGroup = new THREE.Group();
   const stageAdapter = new THREE.Mesh(
     new THREE.CylinderGeometry(0.63, 0.64, 0.44, 28),
     new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.32, metalness: 0.4 })
   );
   stageAdapter.position.y = 20.62;
-  orionStack.add(stageAdapter);
+  esmGroup.add(stageAdapter);
 
   // European Service Module (ESM) cylindrical bus + unfolding 4-wing X-Wing Solar Arrays & RCS quads
   const esmBody = new THREE.Mesh(
@@ -2701,7 +2723,7 @@ export function createLaunchComplexAndSLS(
     new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.68 })
   );
   esmBody.position.y = 21.22;
-  orionStack.add(esmBody);
+  esmGroup.add(esmBody);
 
   const esmSolarPivots: THREE.Group[] = [];
   const esmWingMat = new THREE.MeshStandardMaterial({
@@ -2725,12 +2747,12 @@ export function createLaunchComplexAndSLS(
     hingePivot.add(wingMesh, wingBoom);
 
     yawWrap.add(hingePivot);
-    orionStack.add(yawWrap);
+    esmGroup.add(yawWrap);
     esmSolarPivots.push(hingePivot);
 
     const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), collarMat);
     rcsPod.position.set(Math.sin(ea) * 0.67, 21.38, Math.cos(ea) * 0.67);
-    orionStack.add(rcsPod);
+    esmGroup.add(rcsPod);
   });
 
   const heatshieldRing = new THREE.Mesh(
@@ -2738,15 +2760,18 @@ export function createLaunchComplexAndSLS(
     new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.48, metalness: 0.45 })
   );
   heatshieldRing.position.y = 21.68;
-  orionStack.add(heatshieldRing);
+  esmGroup.add(heatshieldRing);
+  tagPart(esmGroup, 'sls-esm');
+  orionStack.add(esmGroup);
 
   // Orion Crew Module frustum seated flush atop ESM (5.02m dia = 0.628u max radius)
+  const orionGroup = new THREE.Group();
   const orion = new THREE.Mesh(
     new THREE.CylinderGeometry(0.32, 0.64, 0.86, 28),
     new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
   );
   orion.position.y = 22.18;
-  orionStack.add(orion);
+  orionGroup.add(orion);
 
   // Orion Crew Cockpit Windows & Forward Docking Collar (exposed cleanly once LAS jettisons!)
   const windowMat = new THREE.MeshStandardMaterial({
@@ -2760,14 +2785,16 @@ export function createLaunchComplexAndSLS(
     const win = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.04), windowMat);
     win.position.set(wx, 22.28, 0.47);
     win.rotation.x = -0.36;
-    orionStack.add(win);
+    orionGroup.add(win);
   });
   const dockingCollar = new THREE.Mesh(
     new THREE.CylinderGeometry(0.24, 0.32, 0.16, 20),
     new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.72, roughness: 0.25 })
   );
   dockingCollar.position.y = 22.68;
-  orionStack.add(dockingCollar);
+  orionGroup.add(dockingCollar);
+  tagPart(orionGroup, 'sls-orion');
+  orionStack.add(orionGroup);
 
   // Transonic Mach-1 Condensation Vapor Cone
   const machCone = new THREE.Mesh(
@@ -2786,7 +2813,7 @@ export function createLaunchComplexAndSLS(
 
   // Launch Abort System (LAS) Ogive Fairing & Escape Tower -> Tip reaches y = 25.47 (height = 24.57u = 98.3m)
   const abortTower = new THREE.Group();
-  abortTower.position.y = 22.58;
+  abortTower.position.y = 23.02;
   const lasBody = new THREE.Mesh(
     new THREE.CylinderGeometry(0.14, 0.35, 1.38, 24),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
@@ -2820,9 +2847,9 @@ export function createLaunchComplexAndSLS(
   lasFlame.position.y = -0.38;
   lasFlame.visible = false;
   abortTower.add(lasFlame);
+  tagPart(abortTower, 'sls-las');
   orionStack.add(abortTower);
 
-  tagPart(orionStack, 'sls-upper');
   upperGroup.add(orionStack);
 
   // Multi-Layer Incandescent Exhaust Plume Group (RS-25 Mach Blue + White Core & SRB Blazing Amber)
@@ -2907,7 +2934,7 @@ export function createLaunchComplexAndSLS(
   rocketEngineGlow.position.set(0, -1.2, 1.5);
   rocketFull.add(rocketEngineGlow);
 
-  rocketFull.add(coreGroup, srbLeft, srbRight, upperGroup);
+  rocketFull.add(coreGroup, rs25Group, srbLeft, srbRight, upperGroup);
   group.add(rocketFull);
 
   return {
@@ -2925,13 +2952,17 @@ export function createLaunchComplexAndSLS(
     crewAccessArm,
     rocketFull,
     coreGroup,
+    rs25Group,
+    rs25EngineGroups,
     srbLeft,
     srbRight,
     srbLeftBsm,
     srbRightBsm,
     upperGroup,
     icpsFlame,
+    esmGroup,
     esmSolarPivots,
+    orionGroup,
     machCone,
     abortTower,
     lasFlame,
@@ -3072,7 +3103,7 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
     pivot.add(tipCap);
     pivot.add(createStrutBetween(new THREE.Vector3(0, 0.06, 0), new THREE.Vector3(dir * 0.45, 0.02, 0.16), 0.018, 0.018, frameMat));
     pivot.add(createStrutBetween(new THREE.Vector3(0, 0.06, 0), new THREE.Vector3(dir * 0.45, 0.02, -0.16), 0.018, 0.018, frameMat));
-    tagPart(pivot, 'sat-solar');
+    tagPart(pivot, 'sat-solar', [dir * 2.4, 0, 0]);
     return pivot;
   };
   const solarLeftPivot = createWing(-1);
@@ -3122,7 +3153,7 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
     reflector.add(subFeed);
 
     arm.add(reflector);
-    tagPart(arm, 'sat-dish');
+    tagPart(arm, 'sat-dish', [side * 1.4, 1.5, 0.85]);
     return arm;
   };
   const umbrellaLeft = buildUmbrellaDish(-1);
@@ -3164,7 +3195,7 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
   linkBeam.visible = false;
   dishPivot.add(linkBeam);
 
-  tagPart(dishPivot, 'sat-dish');
+  tagPart(dishPivot, 'sat-dish', [0, 1.85, 0.95]);
   group.add(dishPivot);
 
   const beaconMesh = new THREE.Mesh(

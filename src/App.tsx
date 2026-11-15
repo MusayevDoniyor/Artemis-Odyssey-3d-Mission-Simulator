@@ -174,6 +174,16 @@ const DEFAULT_INSPECTOR_UI: InspectorUiState = {
   quizTargetId: null,
   quizFeedback: null,
   quizScore: 0,
+  hoveredPartId: null,
+  activeEduLevel: 1,
+  activeRightTab: 'overview',
+  selectedSubEngine: null,
+  gimbalDeg: 0,
+  stageSepStep: 0,
+  deployPct: 85,
+  propulsionThrottlePct: 100,
+  focusNonce: 0,
+  doubleClickZoom: false,
 };
 
 const EMPTY_INPUT: InputState = {
@@ -255,6 +265,7 @@ export default function App() {
     spaceCameraMode: 'track',
     localAnchorId: 'earth',
     quality: 'high',
+    panOffset: { x: 0, y: 0, z: 0 },
   });
 
   const payloadRef = useRef<PayloadId>('oxygen-tanks');
@@ -680,13 +691,12 @@ export default function App() {
         s.phase = 'inspector';
         s.showcase = 'rocket';
         const craft = HARDWARE_CATALOG.rocket;
-        const firstPart = craft.parts[0];
-        s.highlightedPart = firstPart.id;
+        s.highlightedPart = null;
+        s.panOffset = { x: 0, y: 0, z: 0 };
         s.inspector = { ...DEFAULT_INSPECTOR_UI };
         setInspectorLabels([]);
-        unlockFieldNote(firstPart.unlockNoteId);
         s.orbitYaw = 0.65;
-        s.orbitPitch = 0.18;
+        s.orbitPitch = 0.14;
         s.orbitDistance = craft.defaultCameraDist;
         s.userOrbitActive = true;
         soundSynth.setThrustVolume(0);
@@ -1959,35 +1969,134 @@ export default function App() {
     syncUiNow,
   ]);
 
-  // Universal 360° drag-to-orbit + scroll-wheel zoom across every 3D stage & model
-  const dragStateRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number }>({
+  const selectInspectorSubsystem = useCallback(
+    (
+      partId: string | null,
+      options?: { focusZoom?: boolean; subEngineIndex?: number }
+    ) => {
+      const s = simRef.current;
+      const craft = HARDWARE_CATALOG[s.showcase];
+      s.panOffset = { x: 0, y: 0, z: 0 };
+
+      if (!partId) {
+        s.highlightedPart = null;
+        s.orbitDistance = craft.defaultCameraDist;
+        if (s.inspector) {
+          s.inspector = {
+            ...s.inspector,
+            isolatePart: false,
+            selectedSubEngine: null,
+            doubleClickZoom: false,
+          };
+        }
+        syncUiNow();
+        return;
+      }
+
+      const part = craft.parts.find((p) => p.id === partId);
+      s.highlightedPart = partId;
+      s.userOrbitActive = true;
+      if (part) {
+        unlockFieldNote(part.unlockNoteId);
+        const zoomFactor = options?.focusZoom ? 0.68 : 1.0;
+        s.orbitDistance = Math.max(3.2, part.cameraFocusDist * zoomFactor);
+        if (typeof part.cameraFocusYaw === 'number') {
+          s.orbitYaw = part.cameraFocusYaw;
+        }
+        if (typeof part.cameraFocusPitch === 'number') {
+          s.orbitPitch = part.cameraFocusPitch;
+        }
+      }
+      if (s.inspector) {
+        s.inspector = {
+          ...s.inspector,
+          selectedSubEngine:
+            partId === 'sls-rs25'
+              ? (options?.subEngineIndex ?? s.inspector.selectedSubEngine ?? 1)
+              : null,
+          doubleClickZoom: Boolean(options?.focusZoom),
+        };
+      }
+      syncUiNow();
+    },
+    [syncUiNow, unlockFieldNote]
+  );
+
+  // Universal 360° drag-to-orbit + right/Shift pan + hover preview + scroll-wheel zoom
+  const dragStateRef = useRef<{
+    active: boolean;
+    mode: 'orbit' | 'pan';
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+  }>({
     active: false,
+    mode: 'orbit',
     x: 0,
     y: 0,
     startX: 0,
     startY: 0,
   });
+  const lastHoverPickRef = useRef<number>(0);
 
   useEffect(() => {
     const onWindowPointerMove = (e: PointerEvent) => {
-      if (!dragStateRef.current.active) return;
-      const dx = e.clientX - dragStateRef.current.x;
-      const dy = e.clientY - dragStateRef.current.y;
-      dragStateRef.current.x = e.clientX;
-      dragStateRef.current.y = e.clientY;
-      if (Math.abs(dx) + Math.abs(dy) < 0.25) return;
-
       const s = simRef.current;
-      s.userOrbitActive = true;
-      s.orbitYaw -= dx * 0.0085;
-      s.orbitPitch = clamp(s.orbitPitch + dy * 0.0068, -1.35, 1.42);
-      if (s.phase === 'title') {
-        if (titleIdleTimerRef.current !== null) window.clearTimeout(titleIdleTimerRef.current);
-        titleIdleTimerRef.current = window.setTimeout(() => {
-          if (simRef.current.phase === 'title') {
-            simRef.current.userOrbitActive = false;
-          }
-        }, 5000);
+      if (dragStateRef.current.active) {
+        const dx = e.clientX - dragStateRef.current.x;
+        const dy = e.clientY - dragStateRef.current.y;
+        dragStateRef.current.x = e.clientX;
+        dragStateRef.current.y = e.clientY;
+        if (Math.abs(dx) + Math.abs(dy) < 0.25) return;
+
+        s.userOrbitActive = true;
+        if (dragStateRef.current.mode === 'pan' && s.phase === 'inspector') {
+          const panScale = Math.max(0.008, s.orbitDistance * 0.0014);
+          const rightX = Math.cos(s.orbitYaw);
+          const rightZ = -Math.sin(s.orbitYaw);
+          const curPan = s.panOffset || { x: 0, y: 0, z: 0 };
+          s.panOffset = {
+            x: clamp(curPan.x - rightX * dx * panScale, -22, 22),
+            y: clamp(curPan.y + dy * panScale, -18, 18),
+            z: clamp(curPan.z - rightZ * dx * panScale, -22, 22),
+          };
+          return;
+        }
+
+        s.orbitYaw -= dx * 0.0085;
+        s.orbitPitch = clamp(s.orbitPitch + dy * 0.0068, -1.35, 1.42);
+        if (s.phase === 'title') {
+          if (titleIdleTimerRef.current !== null) window.clearTimeout(titleIdleTimerRef.current);
+          titleIdleTimerRef.current = window.setTimeout(() => {
+            if (simRef.current.phase === 'title') {
+              simRef.current.userOrbitActive = false;
+            }
+          }, 5000);
+        }
+        return;
+      }
+
+      // Hover preview raycasting inside Hardware Bay
+      if (
+        s.phase === 'inspector' &&
+        !menuOpenRef.current &&
+        !modalOpenRef.current &&
+        e.target === containerRef.current?.querySelector('canvas')
+      ) {
+        const now = performance.now();
+        if (now - lastHoverPickRef.current < 45) return;
+        lastHoverPickRef.current = now;
+        const hit = sceneMgrRef.current?.pickInspectorHit(e.clientX, e.clientY, s.showcase);
+        const nextHover = hit?.partId ?? null;
+        const el = containerRef.current;
+        if (el) {
+          el.style.cursor = nextHover ? 'pointer' : 'grab';
+        }
+        if (s.inspector && s.inspector.hoveredPartId !== nextHover) {
+          s.inspector = { ...s.inspector, hoveredPartId: nextHover };
+          setInspectorUi({ ...s.inspector });
+        }
       }
     };
 
@@ -2008,7 +2117,7 @@ export default function App() {
   }, []);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
     if (
       nasaModalOpen ||
       fieldNotebookOpen ||
@@ -2019,8 +2128,12 @@ export default function App() {
     ) {
       return;
     }
+    const isPanGesture =
+      simRef.current.phase === 'inspector' &&
+      (e.button === 2 || e.button === 1 || e.shiftKey);
     dragStateRef.current = {
       active: true,
+      mode: isPanGesture ? 'pan' : 'orbit',
       x: e.clientX,
       y: e.clientY,
       startX: e.clientX,
@@ -2085,39 +2198,59 @@ export default function App() {
         unlockFieldNote(LAUNCH_PART_DETAILS[partId]?.unlockNoteId);
       }
       syncUiNow();
-    } else if (travel < 6 && simRef.current.phase === 'inspector') {
+    } else if (travel < 6 && e.button === 0 && simRef.current.phase === 'inspector') {
       const s = simRef.current;
-      const partId = sceneMgrRef.current?.pickInspectorPart(e.clientX, e.clientY, s.showcase) || null;
-      if (partId) {
+      const hit = sceneMgrRef.current?.pickInspectorHit(e.clientX, e.clientY, s.showcase);
+      if (hit?.partId) {
         soundSynth.init();
         soundSynth.playClick();
-        s.highlightedPart = partId;
         const catalog = HARDWARE_CATALOG[s.showcase];
-        const part = catalog.parts.find((p) => p.id === partId);
-        unlockFieldNote(part?.unlockNoteId);
+        const part = catalog.parts.find((p) => p.id === hit.partId);
 
         if (s.inspector?.quizMode && s.inspector.quizTargetId) {
-          if (partId === s.inspector.quizTargetId) {
-            const others = catalog.parts.filter((p) => p.id !== partId);
-            const nextTarget =
-              others.length > 0 ? others[Math.floor(Math.random() * others.length)] : part;
+          if (hit.partId === s.inspector.quizTargetId) {
+            const idx = catalog.parts.findIndex((p) => p.id === hit.partId);
+            const nextTarget = catalog.parts[(idx + 1) % catalog.parts.length];
             soundSynth.playSuccess();
             s.inspector = {
               ...s.inspector,
               quizScore: s.inspector.quizScore + 1,
               quizTargetId: nextTarget?.id ?? null,
-              quizFeedback: `Correct! Identified ${part?.name}. Next challenge loaded.`,
+              quizFeedback: `Correct: ${part?.name}. Next challenge loaded.`,
             };
           } else {
             soundSynth.playTone(230, 0.14, 'triangle', 0.12);
             s.inspector = {
               ...s.inspector,
-              quizFeedback: `Selected ${part?.name || partId} — keep looking for the target subsystem!`,
+              quizFeedback: `Selected ${part?.name || hit.partId} — keep locating the target subsystem.`,
             };
           }
         }
-        syncUiNow();
+        selectInspectorSubsystem(hit.partId, { subEngineIndex: hit.subEngineIndex });
+      } else {
+        // Click outside model to deselect & return smoothly to full assembly view
+        if (s.highlightedPart || s.inspector?.isolatePart) {
+          selectInspectorSubsystem(null);
+        }
       }
+    }
+  };
+
+  const handleCanvasDoubleClick = (e: React.MouseEvent) => {
+    if (simRef.current.phase !== 'inspector') return;
+    if (menuOpen || nasaModalOpen || fieldNotebookOpen) return;
+    const hit = sceneMgrRef.current?.pickInspectorHit(
+      e.clientX,
+      e.clientY,
+      simRef.current.showcase
+    );
+    if (hit?.partId) {
+      soundSynth.init();
+      soundSynth.playClick();
+      selectInspectorSubsystem(hit.partId, {
+        focusZoom: true,
+        subEngineIndex: hit.subEngineIndex,
+      });
     }
   };
 
@@ -2143,7 +2276,9 @@ export default function App() {
             : 4.5
           : s.phase === 'landing'
             ? 5.5
-            : 3.2;
+            : s.phase === 'inspector'
+              ? 2.8
+              : 3.2;
     const maxD =
       s.phase === 'launch'
         ? 88
@@ -2193,11 +2328,13 @@ export default function App() {
             ? 4.5
             : s.phase === 'landing'
               ? 5.5
-              : s.phase === 'title' || s.phase === 'inspector'
-                ? s.showcase === 'rover' || s.showcase === 'satellite'
-                  ? 3.8
-                  : 8
-                : 3.2;
+              : s.phase === 'inspector'
+                ? 2.8
+                : s.phase === 'title'
+                  ? s.showcase === 'rover' || s.showcase === 'satellite'
+                    ? 3.8
+                    : 8
+                  : 3.2;
       const maxD =
         s.phase === 'launch' || s.phase === 'space'
           ? 88
@@ -2239,8 +2376,9 @@ export default function App() {
       s.orbitDistance = 5.4;
     } else if (s.phase === 'inspector') {
       s.userOrbitActive = true;
+      s.panOffset = { x: 0, y: 0, z: 0 };
       s.orbitYaw = 0.65;
-      s.orbitPitch = 0.18;
+      s.orbitPitch = 0.14;
       s.orbitDistance = HARDWARE_CATALOG[s.showcase].defaultCameraDist;
     } else {
       s.userOrbitActive = false;
@@ -2300,7 +2438,7 @@ export default function App() {
       ...current,
       quizMode: nextQuizMode,
       quizTargetId: nextQuizMode ? target.id : null,
-      quizFeedback: nextQuizMode ? 'Click the matching 3D part in the bay!' : null,
+      quizFeedback: nextQuizMode ? 'Click the matching 3D subsystem directly!' : null,
     };
     s.inspector = next;
     setInspectorUi(next);
@@ -2390,6 +2528,7 @@ export default function App() {
         ref={containerRef}
         onPointerDown={handleCanvasPointerDown}
         onPointerUp={handleCanvasPointerUp}
+        onDoubleClick={handleCanvasDoubleClick}
         onWheel={handleCanvasWheel}
         onContextMenu={(e) => e.preventDefault()}
         className="fixed inset-0 z-0 cursor-grab active:cursor-grabbing"
@@ -2470,32 +2609,42 @@ export default function App() {
             const craft = HARDWARE_CATALOG[v];
             simRef.current.showcase = v;
             simRef.current.userOrbitActive = true;
+            simRef.current.panOffset = { x: 0, y: 0, z: 0 };
+            simRef.current.orbitYaw = 0.65;
+            simRef.current.orbitPitch = 0.14;
             simRef.current.orbitDistance = craft.defaultCameraDist;
+            simRef.current.highlightedPart = null;
             const firstPart = craft.parts[0];
-            simRef.current.highlightedPart = firstPart.id;
-            if (simRef.current.inspector) {
-              simRef.current.inspector = {
-                ...simRef.current.inspector,
-                quizTargetId: simRef.current.inspector.quizMode ? firstPart.id : null,
-                quizFeedback: simRef.current.inspector.quizMode
-                  ? 'New craft loaded—click the matching target part!'
-                  : null,
-              };
-            }
-            unlockFieldNote(firstPart.unlockNoteId);
+            simRef.current.inspector = {
+              ...DEFAULT_INSPECTOR_UI,
+              showLabels: simRef.current.inspector?.showLabels ?? false,
+              quizMode: simRef.current.inspector?.quizMode ?? false,
+              quizScore: simRef.current.inspector?.quizScore ?? 0,
+              quizTargetId: simRef.current.inspector?.quizMode ? firstPart.id : null,
+              quizFeedback: simRef.current.inspector?.quizMode
+                ? 'New craft loaded — click the matching target subsystem!'
+                : null,
+            };
             setShowcase(v);
             syncUiNow();
           }}
-          onSelectPart={(id) => {
-            simRef.current.highlightedPart = id;
-            const part = HARDWARE_CATALOG[showcase].parts.find((p) => p.id === id);
-            unlockFieldNote(part?.unlockNoteId);
-            setHighlightedPart(id);
-            syncUiNow();
+          onSelectPart={(id, opts) => {
+            soundSynth.init();
+            soundSynth.playClick();
+            selectInspectorSubsystem(id, opts);
           }}
-          onSetCameraPreset={handleSetCameraPreset}
-          onZoomCamera={handleZoomCamera}
-          onResetCamera={handleResetCamera}
+          onResetCamera={() => {
+            if (simRef.current.inspector) {
+              simRef.current.inspector = {
+                ...simRef.current.inspector,
+                explodePct: 0,
+                isolatePart: false,
+                stageSepStep: 0,
+                gimbalDeg: 0,
+              };
+            }
+            handleResetCamera();
+          }}
           onBackTitle={() => jumpToPhase('title')}
           onStartMission={() => jumpToPhase('briefing')}
           onOpenNotebook={() => setFieldNotebookOpen(true)}

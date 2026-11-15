@@ -516,8 +516,11 @@ export type QualityPreset = 'low' | 'med' | 'high';
 export interface InspectorLabelPoint {
   partId: string;
   name: string;
+  role?: string;
   xPct: number;
   yPct: number;
+  anchorXPct?: number;
+  anchorYPct?: number;
   visible: boolean;
 }
 
@@ -531,6 +534,16 @@ export interface InspectorUiState {
   quizTargetId: string | null;
   quizFeedback: string | null;
   quizScore: number;
+  hoveredPartId?: string | null;
+  activeEduLevel?: 1 | 2 | 3;
+  activeRightTab?: 'overview' | 'lab' | 'quiz';
+  selectedSubEngine?: number | null;
+  gimbalDeg?: number;
+  stageSepStep?: number;
+  deployPct?: number;
+  propulsionThrottlePct?: number;
+  focusNonce?: number;
+  doubleClickZoom?: boolean;
 }
 
 export interface LandedPose {
