@@ -105,3 +105,26 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **Transonic Condensation Cone**: Modeled Prandtl-Glauert vapour cone dynamically rendered between Mach 0.92 and 1.18 (peaking at Mach 1.02).
   - **Cryogenic Frost Shedding**: Emitted white tumbling ice flake particles falling from core tank during liftoff (0-220 m).
   - **Acoustic Load Camera Shake**: Capped at 0.06 Three.js units and completely disabled if `prefersReducedMotion` or `reducedMotion` is true.
+
+---
+
+## 2026-11-16T03:56:00+05:00 - Phase 4 Completed: Real Rocket Sound & Multi-Layer Acoustics
+- **Phase Objective**: Replace synthetic sound with authentic aerospace acoustics grounded in physical power spectra (370 MW for SLS), supersonic shear crackle, solid booster roar, Max-Q transonic buffeting, cockpit hull transmission filtering, and authentic NASA launch audio recordings.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 82 tests passing, 0 failing (duration 1382 ms).
+  - `npm run build`: dist/index.html (1.18 kB), dist/assets/index.css (114.63 kB), dist/assets/index.js (1637.82 kB).
+  - Asset size limits: `rocket-launch-roar.ogg` (947 KB < 1.5 MB), `rocket-launch-distant.ogg` (1.08 MB < 1.5 MB).
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/rocket_acoustics_and_audio.md`: Acoustic power calculation (~370 MW for SLS Block 1 liftoff), supersonic shear layer crackle physics with non-linear Mach wave coalescing, aluminum oxide particulate roar from polybutadiene acrylonitrile solid propellant, transonic boundary layer buffeting, cockpit hull transmission attenuation (~380 Hz lowpass filter), speed of sound propagation delay ($t = d / 343$), and Doppler frequency shifts.
+  - Test suites:
+    - `src/sim/audio/rocketAcoustics.test.ts`: 8 unit tests covering sub-bass scaling, supersonic crackle atmospheric decay, SRB roar gating, Max-Q dynamic pressure buffeting, cockpit hull filtering, speed of sound delay, air absorption rolloff, and Doppler shift.
+    - `src/game/audio.test.ts`: 4 unit tests covering SoundSynth settings initialization, clamping, headless safe execution, and launch acoustics integration.
+- **Features Implemented & Verified**:
+  - **Sim Acoustics Module**: Pure mathematical functions in `src/sim/audio/rocketAcoustics.ts` computing all 5 acoustic layers, propagation delay, and Doppler shift without DOM or Web Audio dependencies.
+  - **Multi-Layer Web Audio Synthesizer**: Enhanced `SoundSynth` in `src/game/audio.ts` with sub-bass oscillator + lowpass noise, supersonic shear bandpass crackle filter, SRB solid motor roar filter + 110 Hz harmonic oscillator, Max-Q aerodynamic buffeting filter, and authentic NASA sample bus.
+  - **Dynamic Filtering Chain**: Master launch bus feeds into `launchCockpitFilter` (380 Hz in cockpit mode, 18,000 Hz in exterior views) and `launchAirAbsorptionFilter` (high-frequency rolloff over distance).
+  - **Authentic NASA Audio**: Sourced and integrated STS-82 twin SRB + SSME launch recording (`public/audio/rocket-launch-roar.ogg`) and distant pad acoustic recording (`public/audio/rocket-launch-distant.ogg`) from Internet Archive Public Domain collections.
+  - **Mechanical SFX Polish**: Upgraded `playStageSep()` with heavy pyrotechnic 120->36 Hz low-end thud + pneumatic venting hiss + metallic ping; added `playRcsPuff()` for attitude control thruster firing.
+

@@ -4,6 +4,33 @@ This file records all architectural, engineering, and asset decisions made auton
 
 ---
 
+## Decision D4: Rocket Acoustics & Web Audio Synthesis Architecture (Phase 4)
+- **Date**: 2026-11-16T03:55:00+05:00
+- **Decision**:
+  1. **Multi-Layer Acoustics Engine**:
+     - Modeled rocket acoustics not as a flat synthesized tone or simple looping sound effect, but as a composite 5-layer physical system derived from aerospace acoustic literature:
+       - **Layer 1: Sub-Bass Rumble (30–80 Hz)**: Large-scale turbulent eddy shedding; mechanical structure-borne conduction preserved into vacuum ($p_{amb} \approx 0$).
+       - **Layer 2: Supersonic Exhaust Shear Crackle (1200–3500 Hz)**: Non-linear acoustic shock waves (Mach wave radiation) with skewness $S > 0.4$, rapidly decaying with ambient atmospheric air density $\rho \approx \rho_0 e^{-h/8.2}$.
+       - **Layer 3: Solid Rocket Booster Roar (150–800 Hz)**: Aluminum oxide particulate turbulent combustion noise; active only while SRBs burn, cutting to zero upon SRB staging ($h \approx 45\text{ km}$).
+       - **Layer 4: Aerodynamic Buffeting**: Transonic boundary layer pressure fluctuations peaking near Maximum Dynamic Pressure (Max-Q, $q \approx 33\text{ kPa}$), decaying cleanly above 40 km.
+       - **Layer 5: Cockpit Hull Transmission Low-pass Filter**: Dynamic Biquad lowpass filtering (380 Hz in cockpit mode, 18,000 Hz in exterior view).
+  2. **Propagation Physics & Environmental Effects**:
+     - Speed-of-sound propagation delay ($t = d / 343\text{ m/s}$), capped at 0.85s for responsive gameplay feedback.
+     - High-frequency air absorption ($18\text{ kHz} \to 750\text{ Hz}$ rolloff over distance).
+     - Doppler frequency pitch shifting for moving listener cameras.
+  3. **Authentic NASA Audio Integration**:
+     - Integrated authentic Public Domain NASA acoustic launch recordings from Internet Archive (`/audio/rocket-launch-roar.ogg`, 947 KB, STS-82 twin SRB + SSME acoustic power, and `/audio/rocket-launch-distant.ogg`, 1.08 MB).
+     - Multi-tier playback: procedural synthesis + sample playback mixed seamlessly via the Web Audio graph with graceful offline fallback.
+  4. **Transient Mechanical Effects**:
+     - Upgraded `playStageSep()` with a 120 Hz $\to$ 36 Hz pyrotechnic punch + 1450 Hz pneumatic venting hiss + metallic ping.
+     - Added `playRcsPuff()` for attitude control thruster firing (2200 Hz bandpass noise pulse, 85 ms decay).
+- **Why**: Replaces synthetic buzz with authentic aerospace sound design grounded in physical acoustic principles, while strictly respecting file size constraints (<1.5 MB audio limit).
+- **Alternatives Considered**:
+  - Playing only a single static recorded WAV (rejected: cannot dynamically adapt to atmospheric density, Mach number, Max-Q dynamic pressure, or camera distance).
+  - Pure synthesizer without authentic NASA launch recordings (rejected: fails to capture the exact acoustic timbre of solid propellant particulate crackle and twin solid booster roar).
+
+---
+
 ## Decision D3: Launch Vehicles Architecture & Plume Aerodynamics (Phase 3)
 - **Date**: 2026-11-16T03:38:00+05:00
 - **Decision**:

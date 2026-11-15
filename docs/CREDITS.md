@@ -60,3 +60,9 @@ The following fonts are bundled locally under the SIL Open Font License 1.1 (OFL
   - 3D model of the Apollo Saturn V launch vehicle.
   - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Saturn%20V)
   - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
+- **NASA Space Launch System Audio Recordings (Public Domain)**:
+  - Authentic acoustic launch recordings of Space Shuttle missions (STS-82 twin solid rocket boosters + RS-25 cluster acoustic roar, and STS-61 distant acoustic recording).
+  - Source: NASA Audio Collection / Internet Archive (https://archive.org/details/NasaLaunchAudio)
+  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
+  - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Saturn%20V)
+  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).

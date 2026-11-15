@@ -30,11 +30,11 @@
   - [x] 3.4 Visual effects: transparent hydrolox plumes + Mach diamonds, sooty SRB plumes, plume expansion in vacuum, condensation cone, pad smoke deluge.
   - [x] 3.5 Verify and tag `overnight-phase-3-green`.
 
-- [ ] **PHASE 4: Real rocket sound (not synthetic slop)**
-  - [ ] 4.1 Source authentic public-domain/CC0 rocket audio recordings (Apollo/Shuttle/NASA archives).
-  - [ ] 4.2 Multi-layer audio engine: LF rumble, crackle, transonic buffeting, cabin vs external distance-delay filtering.
-  - [ ] 4.3 Web Audio buses (master, sfx, music, voice, ui) under budget (<1.5 MB per file).
-  - [ ] 4.4 Verify and tag `overnight-phase-4-green`.
+- [x] **PHASE 4: Real rocket sound (not synthetic slop)**
+  - [x] 4.1 Source authentic public-domain/CC0 rocket audio recordings (NASA STS launch audio from Internet Archive).
+  - [x] 4.2 Multi-layer audio engine: LF rumble, supersonic shear crackle, SRB particulate roar, transonic buffeting, cabin cockpit lowpass filter (380 Hz) vs exterior, distance delay, air absorption.
+  - [x] 4.3 Web Audio buses (master, sfx, music) strictly under budget (<1.5 MB per file; `rocket-launch-roar.ogg` is 947 KB, `rocket-launch-distant.ogg` is 1.08 MB).
+  - [x] 4.4 Verify and tag `overnight-phase-4-green`.
 
 - [ ] **PHASE 5: Capsule, spacecraft and other hardware**
   - [ ] 5.1 Research & source: Orion + ESM (solar wings, RCS), Apollo LM, concept lander, VIPER / Perseverance, JWST, Voyager, ISS, satellites.

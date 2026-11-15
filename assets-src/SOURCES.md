@@ -20,3 +20,5 @@ All production assets are optimized (`gltf-transform`, WebP compression, audio n
 | 2026-11-16 | Neptune 2K Texture | https://www.solarsystemscope.com/textures/download/2k_neptune.jpg | JPG / 241 KB | CC-BY 4.0 (Solar System Scope) |
 | 2026-11-16 | Ceres 2K Texture | https://www.solarsystemscope.com/textures/download/2k_ceres_fictional.jpg | JPG / 1.12 MB | CC-BY 4.0 (Solar System Scope) |
 | 2026-11-16 | Saturn V Launch Vehicle | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Saturn%20V/Saturn%20V.glb | GLB / 927 KB | Public Domain (NASA) |
+| 2026-11-16 | STS-82 Launch Audio Roar | https://archive.org/download/NasaLaunchAudio/sts-82_launch.ogg | OGG / 947 KB | Public Domain (NASA / Internet Archive) |
+| 2026-11-16 | STS-61 Distant Launch Audio | https://archive.org/download/NasaLaunchAudio/sts-61_launch.ogg | OGG / 1.08 MB | Public Domain (NASA / Internet Archive) |

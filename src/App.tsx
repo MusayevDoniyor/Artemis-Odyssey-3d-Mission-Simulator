@@ -1053,6 +1053,9 @@ export default function App() {
         s.launch = stepLaunchPhysics(s.launch, launchInput, dt);
         soundSynth.setLaunchAtmosphere(s.launch.altitudeKm, s.launch.dynamicPressureKpa);
 
+        const isCockpit = s.cameraMode === 'cockpit';
+        const camDistM = isCockpit ? 3 : s.cameraMode === 'chase' ? 38 : s.cameraMode === 'orbit' ? 65 : 85;
+
         if (s.launch.launchSequence === 'COUNTDOWN') {
           const digit = Math.max(1, Math.ceil(s.launch.countdownSec));
           if (digit !== launchPrevCountdownDigitRef.current) {
@@ -1102,6 +1105,16 @@ export default function App() {
           if (nextLeo.readyForSpaceTransition) {
             soundSynth.setThrustVolume(0);
             soundSynth.resetAtmosphere();
+            soundSynth.updateLaunchAcoustics({
+              throttle: 0,
+              altitudeKm: s.launch.altitudeKm,
+              dynamicPressureKpa: 0,
+              machNumber: 0,
+              srbSeparated: true,
+              coreSeparated: true,
+              isCockpit: false,
+              cameraDistanceM: 50,
+            });
             soundSynth.playSuccess();
             scoreRef.current += 500;
             s.phase = 'space';
@@ -1133,7 +1146,22 @@ export default function App() {
             return;
           }
         } else {
-          soundSynth.setThrustVolume(s.launch.ignited && s.launch.fuelPct > 0 ? s.launch.throttle : 0);
+          const engineActive = s.launch.ignited && s.launch.fuelPct > 0;
+          const throttleVal = engineActive ? s.launch.throttle : 0;
+          soundSynth.setThrustVolume(throttleVal);
+          soundSynth.updateLaunchAcoustics({
+            throttle: throttleVal,
+            altitudeKm: s.launch.altitudeKm,
+            dynamicPressureKpa: s.launch.dynamicPressureKpa,
+            machNumber:
+              s.launch.machNumber ??
+              Math.hypot(s.launch.verticalSpeedMs, s.launch.horizontalSpeedMs) / 340,
+            srbSeparated: s.launch.srbSeparated,
+            coreSeparated: s.launch.coreSeparated,
+            isCockpit,
+            cameraDistanceM: camDistM,
+            radialVelocityMs: s.launch.verticalSpeedMs,
+          });
         }
       } else if (s.phase === 'space') {
         const prevTargets = s.space.visitedTargets.length;
@@ -1677,6 +1705,14 @@ export default function App() {
         e.preventDefault();
       }
       soundSynth.init();
+
+      if (
+        !e.repeat &&
+        simRef.current.phase === 'landing' &&
+        ['KeyA', 'KeyD', 'KeyQ', 'KeyS', 'ArrowLeft', 'ArrowRight', 'ArrowDown'].includes(e.code)
+      ) {
+        soundSynth.playRcsPuff();
+      }
 
       const s = simRef.current;
       const isGameplay =

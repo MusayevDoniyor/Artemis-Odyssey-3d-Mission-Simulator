@@ -1,4 +1,9 @@
 import type { AudioSettings, GamePhase } from './types';
+import {
+  computeRocketAcoustics,
+  type RocketAcousticsInput,
+  type RocketAcousticsOutput,
+} from '../sim/audio/rocketAcoustics';
 
 export type MusicTrackId = 'menu' | 'space';
 
@@ -104,6 +109,39 @@ class SoundSynth {
   private padChordIndex = 0;
   private padNoteStep = 0;
 
+  // Phase 4: Multi-Layer Rocket Acoustics & Authentic NASA Audio Engine
+  private noiseBuffer: AudioBuffer | null = null;
+  private launchBusPreFilter: GainNode | null = null;
+  private launchCockpitFilter: BiquadFilterNode | null = null;
+  private launchAirAbsorptionFilter: BiquadFilterNode | null = null;
+  private launchMasterGain: GainNode | null = null;
+
+  // Layer 1: Sub-bass rumble (30-80 Hz)
+  private subBassOsc: OscillatorNode | null = null;
+  private subBassGain: GainNode | null = null;
+  private subBassNoiseGain: GainNode | null = null;
+  private subBassFilter: BiquadFilterNode | null = null;
+
+  // Layer 2: Supersonic shear crackle (1200-3500 Hz)
+  private crackleFilter: BiquadFilterNode | null = null;
+  private crackleGain: GainNode | null = null;
+
+  // Layer 3: Solid rocket booster roar (150-800 Hz)
+  private srbOsc: OscillatorNode | null = null;
+  private srbFilter: BiquadFilterNode | null = null;
+  private srbGain: GainNode | null = null;
+
+  // Layer 4: Aerodynamic buffeting (Max-Q boundary layer)
+  private buffetFilter: BiquadFilterNode | null = null;
+  private buffetGain: GainNode | null = null;
+
+  // Authentic NASA audio sample loop
+  private launchSampleBuffer: AudioBuffer | null = null;
+  private launchSampleSource: AudioBufferSourceNode | null = null;
+  private launchSampleGain: GainNode | null = null;
+  private launchSampleLoading = false;
+  private launchSamplePlaying = false;
+
   init(): boolean {
     if (typeof window === 'undefined') return false;
     if (!this.ctx) {
@@ -119,6 +157,7 @@ class SoundSynth {
       for (let i = 0; i < bufferSize; i++) {
         data[i] = Math.random() * 2 - 1;
       }
+      this.noiseBuffer = buffer;
 
       const noise = this.ctx.createBufferSource();
       noise.buffer = buffer;
@@ -593,6 +632,253 @@ class SoundSynth {
     this.thrustGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.06);
   }
 
+  private ensureLaunchAudioNodes(): boolean {
+    if (!this.ctx || this.ctx.state !== 'running') {
+      if (this.ctx?.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    }
+    if (!this.ctx) return false;
+    if (this.launchMasterGain) return true;
+
+    try {
+      this.launchBusPreFilter = this.ctx.createGain();
+      this.launchBusPreFilter.gain.value = 1.0;
+
+      this.launchCockpitFilter = this.ctx.createBiquadFilter();
+      this.launchCockpitFilter.type = 'lowpass';
+      this.launchCockpitFilter.frequency.value = 18000;
+      this.launchCockpitFilter.Q.value = 0.7;
+
+      this.launchAirAbsorptionFilter = this.ctx.createBiquadFilter();
+      this.launchAirAbsorptionFilter.type = 'lowpass';
+      this.launchAirAbsorptionFilter.frequency.value = 18000;
+      this.launchAirAbsorptionFilter.Q.value = 0.7;
+
+      this.launchMasterGain = this.ctx.createGain();
+      this.launchMasterGain.gain.value = 0;
+
+      this.launchBusPreFilter.connect(this.launchCockpitFilter);
+      this.launchCockpitFilter.connect(this.launchAirAbsorptionFilter);
+      this.launchAirAbsorptionFilter.connect(this.launchMasterGain);
+      this.launchMasterGain.connect(this.ctx.destination);
+
+      if (this.noiseBuffer) {
+        this.subBassFilter = this.ctx.createBiquadFilter();
+        this.subBassFilter.type = 'lowpass';
+        this.subBassFilter.frequency.value = 72;
+        this.subBassNoiseGain = this.ctx.createGain();
+        this.subBassNoiseGain.gain.value = 0;
+
+        const noiseSub = this.ctx.createBufferSource();
+        noiseSub.buffer = this.noiseBuffer;
+        noiseSub.loop = true;
+        noiseSub.connect(this.subBassFilter);
+        this.subBassFilter.connect(this.subBassNoiseGain);
+        this.subBassNoiseGain.connect(this.launchBusPreFilter);
+        noiseSub.start(0);
+
+        this.crackleFilter = this.ctx.createBiquadFilter();
+        this.crackleFilter.type = 'bandpass';
+        this.crackleFilter.frequency.value = 2200;
+        this.crackleFilter.Q.value = 1.5;
+        this.crackleGain = this.ctx.createGain();
+        this.crackleGain.gain.value = 0;
+
+        const noiseCrackle = this.ctx.createBufferSource();
+        noiseCrackle.buffer = this.noiseBuffer;
+        noiseCrackle.loop = true;
+        noiseCrackle.connect(this.crackleFilter);
+        this.crackleFilter.connect(this.crackleGain);
+        this.crackleGain.connect(this.launchBusPreFilter);
+        noiseCrackle.start(0);
+
+        this.srbFilter = this.ctx.createBiquadFilter();
+        this.srbFilter.type = 'bandpass';
+        this.srbFilter.frequency.value = 380;
+        this.srbFilter.Q.value = 1.2;
+        this.srbGain = this.ctx.createGain();
+        this.srbGain.gain.value = 0;
+
+        const noiseSrb = this.ctx.createBufferSource();
+        noiseSrb.buffer = this.noiseBuffer;
+        noiseSrb.loop = true;
+        noiseSrb.connect(this.srbFilter);
+        this.srbFilter.connect(this.srbGain);
+        this.srbGain.connect(this.launchBusPreFilter);
+        noiseSrb.start(0);
+
+        this.buffetFilter = this.ctx.createBiquadFilter();
+        this.buffetFilter.type = 'bandpass';
+        this.buffetFilter.frequency.value = 120;
+        this.buffetFilter.Q.value = 2.0;
+        this.buffetGain = this.ctx.createGain();
+        this.buffetGain.gain.value = 0;
+
+        const noiseBuffet = this.ctx.createBufferSource();
+        noiseBuffet.buffer = this.noiseBuffer;
+        noiseBuffet.loop = true;
+        noiseBuffet.connect(this.buffetFilter);
+        this.buffetFilter.connect(this.buffetGain);
+        this.buffetGain.connect(this.launchBusPreFilter);
+        noiseBuffet.start(0);
+      }
+
+      this.subBassOsc = this.ctx.createOscillator();
+      this.subBassOsc.type = 'sine';
+      this.subBassOsc.frequency.value = 44;
+      this.subBassGain = this.ctx.createGain();
+      this.subBassGain.gain.value = 0;
+      this.subBassOsc.connect(this.subBassGain);
+      this.subBassGain.connect(this.launchBusPreFilter);
+      this.subBassOsc.start(0);
+
+      this.srbOsc = this.ctx.createOscillator();
+      this.srbOsc.type = 'sawtooth';
+      this.srbOsc.frequency.value = 110;
+      const srbSawGain = this.ctx.createGain();
+      srbSawGain.gain.value = 0.35;
+      this.srbOsc.connect(srbSawGain);
+      if (this.srbGain) {
+        srbSawGain.connect(this.srbGain);
+      }
+      this.srbOsc.start(0);
+
+      this.launchSampleGain = this.ctx.createGain();
+      this.launchSampleGain.gain.value = 0;
+      this.launchSampleGain.connect(this.launchBusPreFilter);
+      this.loadLaunchSample();
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private loadLaunchSample() {
+    if (typeof window === 'undefined' || !this.ctx || this.launchSampleBuffer || this.launchSampleLoading) return;
+    this.launchSampleLoading = true;
+    fetch('/audio/rocket-launch-roar.ogg')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.arrayBuffer();
+      })
+      .then((arr) => {
+        if (!this.ctx) return;
+        return this.ctx.decodeAudioData(arr);
+      })
+      .then((audioBuf) => {
+        if (!audioBuf) return;
+        this.launchSampleBuffer = audioBuf;
+        this.launchSampleLoading = false;
+        if (this.launchSamplePlaying) {
+          this.startLaunchSampleSource();
+        }
+      })
+      .catch(() => {
+        this.launchSampleLoading = false;
+      });
+  }
+
+  private startLaunchSampleSource() {
+    if (!this.ctx || !this.launchSampleBuffer || !this.launchSampleGain) return;
+    if (this.launchSampleSource) {
+      try {
+        this.launchSampleSource.stop();
+        this.launchSampleSource.disconnect();
+      } catch {}
+      this.launchSampleSource = null;
+    }
+    try {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.launchSampleBuffer;
+      src.loop = true;
+      src.connect(this.launchSampleGain);
+      src.start(0);
+      this.launchSampleSource = src;
+      this.launchSamplePlaying = true;
+    } catch {}
+  }
+
+  updateLaunchAcoustics(input: RocketAcousticsInput): RocketAcousticsOutput {
+    const telemetry = computeRocketAcoustics(input);
+    if (!this.ctx) {
+      this.init();
+    }
+    if (!this.ctx) return telemetry;
+
+    this.ensureLaunchAudioNodes();
+    const now = this.ctx.currentTime;
+    const isMuted = this.settings.muted || this.settings.masterVolume <= 0.001;
+
+    if (isMuted || input.throttle <= 0.01) {
+      if (this.launchMasterGain) {
+        this.launchMasterGain.gain.setTargetAtTime(0, now, 0.05);
+      }
+      if (this.launchSampleGain) {
+        this.launchSampleGain.gain.setTargetAtTime(0, now, 0.05);
+      }
+      return telemetry;
+    }
+
+    const sfxVol = this.settings.masterVolume * this.settings.sfxVolume;
+
+    if (this.launchCockpitFilter) {
+      this.launchCockpitFilter.frequency.setTargetAtTime(
+        telemetry.cabinFilterCutoffHz,
+        now,
+        0.08
+      );
+    }
+    if (this.launchAirAbsorptionFilter) {
+      this.launchAirAbsorptionFilter.frequency.setTargetAtTime(
+        telemetry.airAbsorptionCutoffHz,
+        now,
+        0.08
+      );
+    }
+
+    if (this.launchMasterGain) {
+      const targetMaster = Math.min(0.85, telemetry.totalEngineGain * sfxVol * 0.75);
+      this.launchMasterGain.gain.setTargetAtTime(targetMaster, now, 0.06);
+    }
+
+    if (this.subBassGain) {
+      this.subBassGain.gain.setTargetAtTime(telemetry.subBassRumbleGain * 0.28, now, 0.08);
+    }
+    if (this.subBassNoiseGain) {
+      this.subBassNoiseGain.gain.setTargetAtTime(telemetry.subBassRumbleGain * 0.32, now, 0.08);
+    }
+
+    if (this.crackleGain) {
+      this.crackleGain.gain.setTargetAtTime(telemetry.exhaustCrackleGain * 0.38, now, 0.05);
+    }
+
+    if (this.srbGain) {
+      this.srbGain.gain.setTargetAtTime(telemetry.srbRoarGain * 0.35, now, 0.05);
+    }
+
+    if (this.buffetGain) {
+      this.buffetGain.gain.setTargetAtTime(telemetry.buffetGain * 0.32, now, 0.08);
+    }
+    if (this.buffetFilter) {
+      this.buffetFilter.frequency.setTargetAtTime(telemetry.buffetFreqHz, now, 0.08);
+    }
+
+    if (!this.launchSamplePlaying && this.launchSampleBuffer) {
+      this.startLaunchSampleSource();
+    }
+    if (this.launchSampleGain) {
+      const sampleTarget = Math.min(
+        0.65,
+        (telemetry.srbRoarGain * 0.48 + telemetry.exhaustCrackleGain * 0.28) * sfxVol
+      );
+      this.launchSampleGain.gain.setTargetAtTime(sampleTarget, now, 0.08);
+    }
+
+    return telemetry;
+  }
+
   playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume = 0.14) {
     if (this.settings.muted) return;
     this.init();
@@ -616,8 +902,74 @@ class SoundSynth {
   }
 
   playStageSep() {
-    this.playTone(135, 0.4, 'sawtooth', 0.22);
-    setTimeout(() => this.playTone(540, 0.18, 'sine', 0.16), 110);
+    if (this.settings.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const effVol = Math.max(0.01, 0.35 * this.settings.masterVolume * this.settings.sfxVolume);
+
+    // 1. Heavy mechanical low-end punch / pyrotechnic thud (120 Hz -> 36 Hz)
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(36, now + 0.38);
+    oscGain.gain.setValueAtTime(effVol * 0.9, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc.connect(oscGain);
+    oscGain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.46);
+
+    // 2. High pressure pneumatic venting hiss (bandpass noise at 1450 Hz)
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1450;
+      bp.Q.value = 1.6;
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.001, now + 0.04);
+      noiseGain.gain.linearRampToValueAtTime(effVol * 0.45, now + 0.08);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      noise.connect(bp);
+      bp.connect(noiseGain);
+      noiseGain.connect(this.ctx.destination);
+      noise.start(now + 0.04);
+      noise.stop(now + 0.36);
+    }
+
+    // 3. Metallic clamp ping transient
+    this.playTone(620, 0.12, 'triangle', 0.18);
+  }
+
+  playRcsPuff() {
+    if (this.settings.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const effVol = Math.max(0.005, 0.16 * this.settings.masterVolume * this.settings.sfxVolume);
+
+    // Cold gas / hypergolic thrust burst: crisp 2200 Hz bandpass noise pulse
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 2200;
+      bp.Q.value = 2.0;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(effVol, now);
+      g.gain.exponentialRampToValueAtTime(0.0005, now + 0.085);
+      noise.connect(bp);
+      bp.connect(g);
+      g.connect(this.ctx.destination);
+      noise.start(now);
+      noise.stop(now + 0.09);
+    } else {
+      this.playTone(1800, 0.06, 'triangle', 0.08);
+    }
   }
 
   playSuccess() {
