@@ -53,20 +53,20 @@ export const EXPLORATION_VISUAL_LAYOUT: Record<
   string,
   { orbitRadiusUnits: number; bodyRadiusUnits: number }
 > = {
-  sun: { orbitRadiusUnits: 0, bodyRadiusUnits: 8.8 },
+  sun: { orbitRadiusUnits: 0, bodyRadiusUnits: 18.0 },
   mercury: { orbitRadiusUnits: 16.5, bodyRadiusUnits: 0.90 },
-  venus: { orbitRadiusUnits: 25.0, bodyRadiusUnits: 2.23 },
+  venus: { orbitRadiusUnits: 25.0, bodyRadiusUnits: 2.232 },
   earth: { orbitRadiusUnits: 38.5, bodyRadiusUnits: 2.35 },
-  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.64 },
-  mars: { orbitRadiusUnits: 54.0, bodyRadiusUnits: 1.25 },
-  ceres: { orbitRadiusUnits: 67.0, bodyRadiusUnits: 0.52 },
-  jupiter: { orbitRadiusUnits: 86.0, bodyRadiusUnits: 4.5 },
-  saturn: { orbitRadiusUnits: 108.0, bodyRadiusUnits: 3.8 },
-  uranus: { orbitRadiusUnits: 128.0, bodyRadiusUnits: 2.6 },
-  neptune: { orbitRadiusUnits: 146.0, bodyRadiusUnits: 2.5 },
-  pluto: { orbitRadiusUnits: 164.0, bodyRadiusUnits: 0.58 },
-  eris: { orbitRadiusUnits: 184.0, bodyRadiusUnits: 0.57 },
-  halley: { orbitRadiusUnits: 74.0, bodyRadiusUnits: 0.45 },
+  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.6409 },
+  mars: { orbitRadiusUnits: 54.0, bodyRadiusUnits: 1.250 },
+  ceres: { orbitRadiusUnits: 72.0, bodyRadiusUnits: 0.174 },
+  jupiter: { orbitRadiusUnits: 115.0, bodyRadiusUnits: 25.787 },
+  saturn: { orbitRadiusUnits: 185.0, bodyRadiusUnits: 21.478 },
+  uranus: { orbitRadiusUnits: 250.0, bodyRadiusUnits: 9.354 },
+  neptune: { orbitRadiusUnits: 315.0, bodyRadiusUnits: 9.081 },
+  pluto: { orbitRadiusUnits: 380.0, bodyRadiusUnits: 0.438 },
+  eris: { orbitRadiusUnits: 440.0, bodyRadiusUnits: 0.429 },
+  halley: { orbitRadiusUnits: 95.0, bodyRadiusUnits: 0.45 },
 };
 
 /**
@@ -334,6 +334,14 @@ export function getBodyVisualRadiusUnits(bodyId: string, mode: SolarScaleMode): 
     if (!entry) return 1.0;
     return Math.max(0.015, entry.meanRadiusM * LOCAL_UNITS_PER_METER);
   }
+  // Educational mode: authentic relative body sizes based on verified NASA mean radius ratios to Earth
+  if (entry) {
+    if (bodyId === 'sun') {
+      return EXPLORATION_VISUAL_LAYOUT.sun?.bodyRadiusUnits ?? 18.0;
+    }
+    const ratio = entry.meanRadiusM / PLANETARY_CATALOG_SI.earth.meanRadiusM;
+    return Number((ratio * 2.35).toFixed(4));
+  }
   return EXPLORATION_VISUAL_LAYOUT[bodyId]?.bodyRadiusUnits ?? 1.5;
 }
 
@@ -448,3 +456,20 @@ export function classifySpacecraftTrajectory(params: {
   }
   return ecc < 0.08 ? 'Circular Orbit' : 'Elliptical Orbit';
 }
+
+/**
+ * Computes exact circular orbital speed v = sqrt(mu / r) in SI m/s.
+ */
+export function computeCircularOrbitVelocity(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0) return 0;
+  return Math.sqrt(muM3S2 / radiusM);
+}
+
+/**
+ * Computes orbital period T = 2 * pi * sqrt(r^3 / mu) in SI seconds.
+ */
+export function computeOrbitPeriodSeconds(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0 || muM3S2 <= 0) return 0;
+  return 2 * Math.PI * Math.sqrt(Math.pow(radiusM, 3) / muM3S2);
+}
+

@@ -26,12 +26,119 @@ import {
   classifySpacecraftTrajectory,
   computeBodyCartesianSI,
   getBodyVisualRadiusUnits,
+  LOCAL_UNITS_PER_METER,
+  SCIENTIFIC_EARTH_RADIUS_UNITS,
+  type OrbitalTrajectoryRegime,
 } from '../../game/orbitalMechanics';
 import { clamp } from '../common/math';
 
+export interface SpaceHandoffState {
+  shipX: number;
+  shipZ: number;
+  vx: number;
+  vz: number;
+  headingRad?: number;
+  orbitalSpeedKmS?: number;
+  trajectoryRegime?: OrbitalTrajectoryRegime;
+}
+
+export function computeLaunchOrbitHandoffState(
+  launch: {
+    altitudeKm: number;
+    downrangeKm?: number;
+    horizontalSpeedMs: number;
+    verticalSpeedMs: number;
+    orbitReached?: boolean;
+  },
+  missionId: CampaignMissionId = 'artemis-2',
+  scaleMode: SolarScaleMode = 'exploration',
+  epochYears = 0,
+  localAnchorId = 'earth',
+  tliBurnActive = false,
+  tliDeltaVAppliedMs = 0
+): SpaceHandoffState {
+  const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+  const earthPos = computeKeplerBodyPosition(
+    earthSpec,
+    epochYears,
+    scaleMode,
+    SOLAR_SUN_ORIGIN_X,
+    SOLAR_SUN_ORIGIN_Z,
+    localAnchorId
+  );
+
+  const rEarthKm = 6371.0;
+  const altKm = Math.max(150, launch.altitudeKm || 165);
+  const rOrbitKm = rEarthKm + altKm;
+
+  // Visual radius of orbit in scene units
+  const earthVisualRadius = getBodyVisualRadiusUnits('earth', scaleMode);
+  const orbitVisualRadius =
+    scaleMode === 'scientific'
+      ? (rOrbitKm / rEarthKm) * SCIENTIFIC_EARTH_RADIUS_UNITS
+      : scaleMode === 'local'
+        ? rOrbitKm * LOCAL_UNITS_PER_METER
+        : earthVisualRadius * (1 + (altKm / rEarthKm) * 0.45 + 0.12);
+
+  // Downrange orbital angle theta in radians around Earth
+  const downrangeRad = ((launch.downrangeKm ?? 0) * 1000) / (rEarthKm * 1000);
+  // Inclination 28.5 deg (LC-39B Kennedy Space Center eastward launch)
+  const inclRad = 28.5 * (Math.PI / 180);
+
+  // Position in orbital plane projected into XZ scene plane
+  const dx = orbitVisualRadius * Math.cos(downrangeRad);
+  const dz = orbitVisualRadius * Math.sin(downrangeRad) * Math.cos(inclRad);
+
+  const shipX = earthPos.x + dx;
+  const shipZ = earthPos.z + dz;
+
+  // Orbital velocity
+  const muEarth = PLANETARY_CATALOG_SI.earth.muM3S2;
+  const vCircMs = Math.sqrt(muEarth / (rOrbitKm * 1000));
+  const baseSpeedKmS = (launch.horizontalSpeedMs > 5000 ? launch.horizontalSpeedMs : vCircMs) / 1000;
+  const effectiveSpeedKmS = baseSpeedKmS + tliDeltaVAppliedMs / 1000;
+
+  // Velocity direction is prograde tangential (-sin theta, cos theta * cos i)
+  const fwdX = -Math.sin(downrangeRad);
+  const fwdZ = Math.cos(downrangeRad) * Math.cos(inclRad);
+  const fwdLen = Math.max(0.0001, Math.hypot(fwdX, fwdZ));
+  const dirX = fwdX / fwdLen;
+  const dirZ = fwdZ / fwdLen;
+
+  // Scale scene speed unit for smooth gameplay motion
+  const sceneSpeed =
+    scaleMode === 'scientific'
+      ? (effectiveSpeedKmS / 1000) * 0.4
+      : scaleMode === 'local'
+        ? effectiveSpeedKmS * 0.35
+        : Math.min(3.8, Math.max(1.8, (effectiveSpeedKmS / 7.8) * 2.8));
+
+  const vx = dirX * sceneSpeed;
+  const vz = dirZ * sceneSpeed;
+  const headingRad = Math.atan2(vx, vz);
+
+  const trajectoryRegime: OrbitalTrajectoryRegime =
+    tliDeltaVAppliedMs > 2500
+      ? 'Transfer Trajectory'
+      : launch.orbitReached
+        ? 'Circular Orbit'
+        : 'Elliptical Orbit';
+
+  return {
+    shipX,
+    shipZ,
+    vx,
+    vz,
+    headingRad,
+    orbitalSpeedKmS: Number(effectiveSpeedKmS.toFixed(2)),
+    trajectoryRegime,
+  };
+}
+
 export function createInitialSpaceFlightState(
   missionId: CampaignMissionId = 'artemis-2',
-  carryover?: Partial<CampaignCarryoverState>
+  carryover?: Partial<CampaignCarryoverState>,
+  handoff?: SpaceHandoffState
 ): SpaceFlightState {
   const defaultTarget: SpaceTargetId =
     missionId === 'artemis-4'
@@ -55,12 +162,22 @@ export function createInitialSpaceFlightState(
   const satAlreadyOnline = Boolean(carryover?.relaySatelliteOnline);
   const earthSi = computeBodyCartesianSI('earth', 0).state;
 
+  const startX = handoff ? handoff.shipX : spawn.x;
+  const startZ = handoff ? handoff.shipZ : spawn.z;
+  const startVx = handoff ? handoff.vx : 0;
+  const startVz = handoff ? handoff.vz : 0;
+  const startHeading =
+    handoff?.headingRad ??
+    (Math.hypot(startVx, startVz) > 0.001
+      ? Math.atan2(startVx, startVz)
+      : Math.atan2(liveTarget.x - startX, liveTarget.z - startZ));
+
   return {
-    shipX: spawn.x,
-    shipZ: spawn.z,
-    vx: 0,
-    vz: 0,
-    headingRad: Math.atan2(liveTarget.x - spawn.x, liveTarget.z - spawn.z),
+    shipX: startX,
+    shipZ: startZ,
+    vx: startVx,
+    vz: startVz,
+    headingRad: startHeading,
     targetId: defaultTarget,
     autoPilot: false,
     boostActive: false,
@@ -87,8 +204,8 @@ export function createInitialSpaceFlightState(
       ? `Course ready for ${target.name}. Fly cleanly to orbital capture!`
       : 'Fly to HERMES Relay Orbit and hold [E / SPACE] to deploy & align the Orbital Satellite!',
     navBodyId: null,
-    trajectoryRegime: 'Circular Orbit',
-    orbitalSpeedKmS: 1.02,
+    trajectoryRegime: handoff?.trajectoryRegime ?? 'Circular Orbit',
+    orbitalSpeedKmS: handoff?.orbitalSpeedKmS ?? 1.02,
     distanceFromSunAu: Math.round(metersToAu(earthSi.rM) * 1000) / 1000,
     distanceToTargetKm: 384400,
   };

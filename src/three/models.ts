@@ -3277,6 +3277,7 @@ export interface SolarSystemHandles {
   spaceDust: THREE.Points;
   spaceDustSeeds: Float32Array;
   targetBeacon: THREE.Mesh;
+  shipBeacon: THREE.Mesh;
   courseLine: THREE.Line;
 }
 
@@ -3893,6 +3894,19 @@ export function createSolarSystemScene(
   targetBeacon.rotation.x = Math.PI / 2;
   group.add(targetBeacon);
 
+  const shipBeacon = new THREE.Mesh(
+    new THREE.RingGeometry(0.18, 0.28, 6),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+  );
+  shipBeacon.visible = false;
+  group.add(shipBeacon);
+
   // 3D NASA Orion MPCV Crew Capsule + European Service Module (ESM)
   const shipGroup = new THREE.Group();
   shipGroup.scale.setScalar(0.62);
@@ -4315,6 +4329,7 @@ export function createSolarSystemScene(
     spaceDust,
     spaceDustSeeds,
     targetBeacon,
+    shipBeacon,
     courseLine,
   };
 }

@@ -29,3 +29,22 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **B3 (Rover speed bug)**:
     - Root cause in `src/sim/rover/roverPhysics.ts`: `stepRoverPhysics` does not accept or apply `speedScale`. `speedScale === 'REAL_SPEED'` is only used in `computeRoverDisplaySpeed` for UI formatting, leaving actual simulation position advancement identical at ~6.8 m/s.
     - Added characterization test: `src/game/characterization.test.ts` ("CHARACTERIZATION [KNOWN_DEFECT: B3]: Rover physics step displacement does not scale with telemetry speedScale").
+
+---
+
+### [2026-11-16T02:42:00+05:00] Phase 1: Scale, Coordinates & Continuous Flight (Fixes B1 & B2)
+- **Verification Commands Executed**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 66 tests passing, 0 failing (duration 1394 ms).
+  - `npm run build`: dist/index.html (1.18 kB), dist/assets/index.css (114.15 kB), dist/assets/index.js (1521.67 kB).
+  - Browser verification (Puppeteer 1440x900):
+    - Title -> Briefing -> Launch pad -> 165 km Earth parking orbit -> TLI burn -> Space flight.
+    - Console errors: 0.
+- **Artifacts & Screens Generated**:
+  - `docs/overnight/research/celestial_dimensions.md`: NASA planetary fact sheet reference data.
+  - `docs/overnight/screens/b1-scale-bug-after.png`: Educational & Scientific views showing true relative body sizes.
+  - `docs/overnight/screens/b2-parking-orbit-continuous.png`: Continuous LEO parking orbit (165 km, 7.81 km/s).
+  - `docs/overnight/screens/b2-space-continuous-post-tli.png`: Seamless cislunar spaceflight following TLI burn.
+- **Bug Fixes Verified**:
+  - **B1**: Orion scale corrected from 0.62 to 0.048; close chase camera calibrated to 0.85u offset; billboarded tactical beacon reticle added when distance > 6u. Educational mode body radii now match true NASA physical ratios.
+  - **B2**: `computeLaunchOrbitHandoffState` and continuous parking orbit coasting implemented. Spacecraft enters orbit at 165 km altitude, 7.81 km/s, 87.7 min period, downrange advancing continuously. Phase handoff preserves Cartesian state without teleportation.

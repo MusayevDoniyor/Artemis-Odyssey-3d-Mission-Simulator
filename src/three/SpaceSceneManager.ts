@@ -403,6 +403,7 @@ export class SpaceSceneManager {
       antialias: !this.isSoftwareGl,
       powerPreference: 'high-performance',
       alpha: false,
+      logarithmicDepthBuffer: true,
     });
     this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
@@ -417,7 +418,7 @@ export class SpaceSceneManager {
     this.scene.background = new THREE.Color(0x020617);
 
     const aspect = (container.clientWidth || window.innerWidth) / Math.max(1, container.clientHeight || window.innerHeight);
-    this.camera = new THREE.PerspectiveCamera(54, aspect, 0.2, 42000);
+    this.camera = new THREE.PerspectiveCamera(54, aspect, 0.05, 5000000);
     this.camera.position.set(14, 10, 24);
 
     // RoomEnvironment PBR reflections
@@ -2497,7 +2498,8 @@ export class SpaceSceneManager {
     ss.relayStageRing.scale.setScalar(isSci ? 0.14 : isLocal ? 0.85 : 1.0);
     ss.gatewayGroup.position.set(gatewayPos.x, gatewayPos.y, gatewayPos.z);
     ss.gatewayGroup.scale.setScalar(isSci ? 0.06 : isLocal ? 0.42 : 0.45);
-    ss.shipGroup.scale.setScalar(isSci ? 0.045 : isLocal ? 0.24 : 0.62);
+    const targetShipScale = isSci ? 0.012 : isLocal ? 0.032 : 0.048;
+    ss.shipGroup.scale.setScalar(targetShipScale);
 
     // Sync transfer arc curves without per-frame allocations
     const updateArcLine = (
@@ -2659,6 +2661,16 @@ export class SpaceSceneManager {
     posAttr.setXYZ(0, sp.shipX, shipY, sp.shipZ);
     posAttr.setXYZ(1, beaconX, beaconY, beaconZ);
     posAttr.needsUpdate = true;
+
+    // Tactical navigation beacon for Orion when zoomed out
+    const shipDistToCam = this.camera.position.distanceTo(ss.shipGroup.position);
+    const showShipBeacon = shipDistToCam > 6.0;
+    ss.shipBeacon.visible = showShipBeacon;
+    if (showShipBeacon) {
+      ss.shipBeacon.position.copy(ss.shipGroup.position);
+      ss.shipBeacon.scale.setScalar(Math.max(0.35, shipDistToCam * 0.04));
+      ss.shipBeacon.quaternion.copy(this.camera.quaternion);
+    }
 
     // Update all Solar System bodies: 3D Keplerian coordinates + physical radius scale + sidereal rotation
     let hasFocus = false;
@@ -2836,10 +2848,10 @@ export class SpaceSceneManager {
       const fwdZ = Math.cos(sp.headingRad);
       const rightX = Math.cos(sp.headingRad);
       const rightZ = -Math.sin(sp.headingRad);
-      const chBack = isSci ? 0.56 : isLocal ? 3.4 : 7.6;
-      const chSide = isSci ? 0.1 : isLocal ? 0.6 : 1.35;
-      const chUp = isSci ? 0.2 : isLocal ? 1.2 : 2.75;
-      const chLook = isSci ? 0.28 : isLocal ? 1.7 : 3.8;
+      const chBack = isSci ? 0.32 : isLocal ? 0.65 : 0.85;
+      const chSide = isSci ? 0.08 : isLocal ? 0.16 : 0.20;
+      const chUp = isSci ? 0.12 : isLocal ? 0.24 : 0.30;
+      const chLook = isSci ? 0.18 : isLocal ? 0.36 : 0.45;
       this.camPosTarget.set(
         shipCamSpaceX - fwdX * chBack + rightX * chSide,
         shipCamSpaceY + chUp,

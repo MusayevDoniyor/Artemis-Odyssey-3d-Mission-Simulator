@@ -379,7 +379,7 @@ export function GameMenuModal({
                           solarScaleMode === 'exploration' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                         }`}
                       >
-                        Explore Scale
+                        Educational Scale
                       </button>
                       <button
                         type="button"
@@ -388,7 +388,7 @@ export function GameMenuModal({
                           solarScaleMode === 'scientific' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                         }`}
                       >
-                        Real AU Scale
+                        True Scale (1:1 AU)
                       </button>
                       <button
                         type="button"
@@ -397,7 +397,7 @@ export function GameMenuModal({
                           solarScaleMode === 'local' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                         }`}
                       >
-                        Local Mission Scale
+                        Local Mission View
                       </button>
                     </div>
                     <label className="flex items-center gap-2 text-sm text-slate-200">

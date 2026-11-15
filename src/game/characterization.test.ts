@@ -7,6 +7,7 @@ import {
   createInitialLaunchState,
   createInitialRoverState,
   createInitialSpaceFlightState,
+  computeLaunchOrbitHandoffState,
   evaluateTouchdown,
   getSurfaceTerrainHeight,
   separateLaunchStage,
@@ -225,24 +226,27 @@ test('CHARACTERIZATION [KNOWN_DEFECT: M4]: LEO parking TLI burn progression and 
   assert.ok(leo.tliBurnProgressPct > 0, 'TLI progress should increase');
 });
 
-// KNOWN_DEFECT: Fixed in Phase 1 (Bug B2)
-// Launch orbit handoff: when launch reaches 165 km altitude and orbitReached=true,
-// transition to space abruptly spawns Orion at getShipSpawnForMission with vx=0, vz=0
-// rather than preserving continuous orbital velocity (~7.8 km/s) and orbital Cartesian coordinates.
-test('CHARACTERIZATION [KNOWN_DEFECT: B2]: Launch to orbit phase transition teleports spacecraft discontinuous with launch trajectory', () => {
+// RESOLVED IN PHASE 1 (Bug B2):
+// Launch orbit handoff generates continuous coordinates and preserves ~7.8 km/s orbital speed
+test('Launch to orbit phase transition handoff provides continuous orbital velocity and coordinates (Fixes B2)', () => {
   // 1. In launch state at orbital insertion:
   let L = createInitialLaunchState();
   L.altitudeKm = 165;
-  L.horizontalSpeedMs = 7800;
+  L.horizontalSpeedMs = 7809;
+  L.downrangeKm = 1500;
   L.orbitReached = true;
 
-  // 2. Initial space state created by phase transition:
-  const space = createInitialSpaceFlightState('artemis-2');
+  // 2. Compute continuous orbital handoff:
+  const handoff = computeLaunchOrbitHandoffState(L, 'artemis-2', 'exploration', 0, 'earth', false, 0);
 
-  // Space flight state spawns at a canned offset from Earth, with vx=0, vz=0:
-  assert.equal(space.vx, 0, 'Space flight initial velocity vx is zero (teleported stationary)');
-  assert.equal(space.vz, 0, 'Space flight initial velocity vz is zero (teleported stationary)');
-  // It does not inherit launch.horizontalSpeedMs (~7800 m/s) or continuous inertial position
+  // 3. Space flight state created with handoff:
+  const space = createInitialSpaceFlightState('artemis-2', undefined, handoff);
+
+  assert.equal(space.shipX, handoff.shipX);
+  assert.equal(space.shipZ, handoff.shipZ);
+  assert.equal(space.orbitalSpeedKmS, 7.81);
+  assert.ok(Math.hypot(space.vx, space.vz) > 1.0, 'Space flight velocity is continuous with orbit');
+  assert.equal(space.trajectoryRegime, 'Circular Orbit');
 });
 
 test('CHARACTERIZATION: Campaign carryover state tracking', () => {

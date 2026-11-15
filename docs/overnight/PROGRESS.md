@@ -7,13 +7,13 @@
   - [x] 0.4 Reproduce B3 (Rover speed bug): verify `speedScale === 'REAL_SPEED'` vs actual `stepRoverKinematics` speed multiplier, write failing test proving simulated speed does not change.
   - [x] 0.5 Tag `overnight-phase-0-green`.
 
-- [ ] **PHASE 1: Scale, coordinates and continuous flight (fixes B1 and B2)**
-  - [ ] 1.1 Verified reference data for Sun, planets, Moon, distances (AU/km).
-  - [ ] 1.2 Implement camera-relative rendering (floating origin) and dual scale modes ("True scale" vs "Educational scale").
-  - [ ] 1.3 Spacecraft rendered at true scale with pin/marker and zoom-to-vehicle camera.
-  - [ ] 1.4 Continuous inertial Earth-centred coordinates from pad liftoff to orbit coasting (no teleport).
-  - [ ] 1.5 Real drawn Earth parking orbit (~165 km, 7.8 km/s, ~87 min period) with apsis markers before TLI burn.
-  - [ ] 1.6 Verify and tag `overnight-phase-1-green`.
+- [x] **PHASE 1: Scale, coordinates and continuous flight (fixes B1 and B2)**
+  - [x] 1.1 Verified reference data for Sun, planets, Moon, distances (AU/km).
+  - [x] 1.2 Implement camera-relative rendering (floating origin) and dual scale modes ("True scale" vs "Educational scale").
+  - [x] 1.3 Spacecraft rendered at true scale with pin/marker and zoom-to-vehicle camera.
+  - [x] 1.4 Continuous inertial Earth-centred coordinates from pad liftoff to orbit coasting (no teleport).
+  - [x] 1.5 Real drawn Earth parking orbit (~165 km, 7.8 km/s, ~87 min period) with apsis markers before TLI burn.
+  - [x] 1.6 Verify and tag `overnight-phase-1-green`.
 
 - [ ] **PHASE 2: Celestial bodies (Sun, planets, Moon, Pluto, asteroids)**
   - [ ] 2.1 Research and source real NASA/USGS maps (Sun, Mercury, Venus, Earth Blue Marble + specular/clouds, Moon LOLA, Mars MOLA, Outer Gas Giants, Pluto).

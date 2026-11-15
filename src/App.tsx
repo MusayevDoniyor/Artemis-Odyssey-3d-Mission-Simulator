@@ -62,6 +62,7 @@ import {
   createInitialLaunchState,
   createInitialRoverState,
   createInitialSpaceFlightState,
+  computeLaunchOrbitHandoffState,
   getSurfaceTerrainHeight,
   separateLaunchStage,
   stepLandingPhysics,
@@ -1113,25 +1114,20 @@ export default function App() {
             phaseTimerRef.current = 0;
             activeAnomalyRef.current = null;
             s.solarEpochYears = 0;
+            const handoff = computeLaunchOrbitHandoffState(
+              s.launch,
+              s.campaignMission,
+              s.solarScaleMode ?? 'exploration',
+              s.solarEpochYears ?? 0,
+              s.localAnchorId ?? 'earth',
+              Boolean(nextLeo.tliBurnActive),
+              nextLeo.tliDeltaVAppliedMs ?? 0
+            );
             const nextSpace = createInitialSpaceFlightState(
               s.campaignMission,
-              carryoverRef.current
+              carryoverRef.current,
+              handoff
             );
-            const liveTargetPos = getLiveSolarTargetPosition(
-              nextSpace.targetId,
-              0,
-              s.solarScaleMode ?? 'exploration',
-              SOLAR_SUN_ORIGIN_X,
-              SOLAR_SUN_ORIGIN_Z,
-              s.localAnchorId ?? 'earth'
-            );
-            const depDx = liveTargetPos.x - nextSpace.shipX;
-            const depDz = liveTargetPos.z - nextSpace.shipZ;
-            const depDist = Math.max(0.001, Math.hypot(depDx, depDz));
-            const depSpeed = s.campaignMission === 'mars-pathfinder' ? 3.8 : 2.9;
-            nextSpace.vx = (depDx / depDist) * depSpeed;
-            nextSpace.vz = (depDz / depDist) * depSpeed;
-            nextSpace.headingRad = Math.atan2(depDx, depDz);
             s.space = nextSpace;
             syncUiNow();
             return;

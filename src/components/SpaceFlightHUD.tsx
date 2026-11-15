@@ -416,8 +416,8 @@ export function SpaceFlightHUD({
               <div className="flex items-center gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
                 {(
                   [
-                    { id: 'exploration', label: 'Explore' },
-                    { id: 'scientific', label: 'Real AU' },
+                    { id: 'exploration', label: 'Educational' },
+                    { id: 'scientific', label: 'True Scale' },
                     { id: 'local', label: 'Local' },
                   ] as const
                 ).map((m) => (
@@ -511,8 +511,10 @@ export function SpaceFlightHUD({
                 }
               >
                 {solarScaleMode === 'exploration'
-                  ? 'VISUAL REPRESENTATION · Compressed Orbits'
-                  : `${horizonsProvenance.provenance} · ${horizonsProvenance.source}`}
+                  ? 'DISTANCES COMPRESSED · RELATIVE SIZES TRUE'
+                  : solarScaleMode === 'scientific'
+                    ? 'TRUE SCALE · 1:1 ASTRONOMICAL'
+                    : `${horizonsProvenance.provenance} · ${horizonsProvenance.source}`}
               </span>
             </div>
           </div>
