@@ -30,7 +30,7 @@ export function CenteredEventCard({
       <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center p-4">
         <div
           data-testid="apollo-1202-banner"
-          className="hud-soft-alert animate-modal-enter pointer-events-auto w-full max-w-lg rounded-2xl p-5 text-stone-100"
+          className="hud-soft-alert animate-modal-enter pointer-events-auto w-full max-w-lg rounded-2xl p-5 text-slate-100"
         >
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -41,16 +41,16 @@ export function CenteredEventCard({
               type="button"
               onClick={() => setOpenHelpIdx((v) => (v === 0 ? null : 0))}
               aria-label="Explain Alarm 1202"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-amber-300 hover:border-amber-300"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-400/25 text-amber-300 hover:border-amber-300"
             >
               <HelpCircle className="h-4 w-4" />
             </button>
           </div>
-          <p className="text-base leading-snug text-stone-200">
+          <p className="text-base leading-snug text-slate-200">
             Rendezvous radar flooded the guidance computer, but priority scheduling kept engine control alive.
           </p>
           {openHelpIdx === 0 && (
-            <p className="mt-2.5 rounded-xl bg-black/40 px-3 py-2 text-sm text-amber-200">
+            <p className="mt-2.5 rounded-xl bg-slate-950/75 px-3 py-2 text-sm text-amber-200">
               Program 1202 means the computer restarted low-priority tasks while protecting critical landing thrust.
             </p>
           )}
@@ -59,14 +59,14 @@ export function CenteredEventCard({
               type="button"
               data-testid="ack-1202-btn"
               onClick={onAckApollo1202}
-              className="rounded-xl bg-amber-500 px-4 py-3 text-base font-bold text-stone-950 transition hover:bg-amber-400"
+              className="rounded-xl bg-amber-500 px-4 py-3 text-base font-bold text-slate-950 transition hover:bg-amber-400"
             >
               Keep Landing
             </button>
             <button
               type="button"
               onClick={onAckApollo1202}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-base font-semibold text-stone-100 transition hover:border-amber-300"
+              className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-3 text-base font-semibold text-slate-100 transition hover:border-amber-300"
             >
               Reset Radar
             </button>
@@ -89,7 +89,7 @@ export function CenteredEventCard({
     <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center p-4">
       <div
         data-testid="centered-event-card"
-        className="hud-soft animate-modal-enter pointer-events-auto w-full max-w-lg rounded-2xl border-amber-400/45 p-5 text-stone-100"
+        className="hud-soft animate-modal-enter pointer-events-auto w-full max-w-lg rounded-2xl border-amber-400/45 p-5 text-slate-100"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -107,7 +107,7 @@ export function CenteredEventCard({
                   className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-semibold ${
                     openHelpIdx === idx
                       ? 'border-amber-400 bg-amber-500/20 text-amber-200'
-                      : 'border-white/15 text-stone-300 hover:border-amber-300'
+                      : 'border-sky-400/25 text-slate-300 hover:border-amber-300'
                   }`}
                 >
                   <HelpCircle className="h-3.5 w-3.5" />
@@ -118,10 +118,10 @@ export function CenteredEventCard({
           )}
         </div>
 
-        <p className="text-base leading-snug text-stone-200">{anomaly.context}</p>
+        <p className="text-base leading-snug text-slate-200">{anomaly.context}</p>
 
         {openHelpIdx !== null && helpTerms[openHelpIdx] && (
-          <div className="mt-2.5 rounded-xl bg-black/40 px-3 py-2 text-sm text-amber-200">
+          <div className="mt-2.5 rounded-xl bg-slate-950/75 px-3 py-2 text-sm text-amber-200">
             <strong className="text-amber-300">{helpTerms[openHelpIdx].term}: </strong>
             {helpTerms[openHelpIdx].definition}
           </div>
@@ -135,7 +135,7 @@ export function CenteredEventCard({
                 key={choice.id}
                 type="button"
                 onClick={() => onResolveAnomaly(anomaly.id, choice.id)}
-                className="flex flex-col justify-between rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-500/15"
+                className="flex flex-col justify-between rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-500/15"
               >
                 <span className="text-base font-bold text-white">{shortVerbLabel(choice)}</span>
                 {chips.length > 0 && (

@@ -14,13 +14,13 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
   const dosePct = Math.min(100, Math.round((carryover.radiationDoseMsv / 150) * 100));
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
       <div className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-6">
-        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-cyan-500/20 pb-3">
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-sky-400/20 pb-3">
           <div className="flex items-center gap-2.5">
             <BookOpen className="h-5 w-5 text-amber-300" />
             <div>
-              <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
+              <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-sky-300 uppercase">
                 ISRU Carryover &amp; Field Rules
               </p>
               <h2 className="font-display text-2xl font-bold text-white uppercase">
@@ -31,7 +31,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-cyan-500/30 bg-slate-900 p-2 text-slate-300 hover:border-cyan-400 hover:text-white"
+            className="rounded-xl border border-sky-400/25 bg-slate-900/75 p-2 text-slate-300 hover:border-sky-400/60 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -39,8 +39,8 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-2">
           {/* Carryover ISRU & Hardware Assets Grid */}
-          <div className="mb-5 rounded-xl border border-cyan-400/30 bg-slate-900/95 p-4">
-            <div className="mb-2.5 flex items-center justify-between font-hud text-xs font-bold tracking-wider text-cyan-300 uppercase">
+          <div className="mb-5 rounded-xl border border-sky-400/25 bg-slate-900/65 p-4">
+            <div className="mb-2.5 flex items-center justify-between font-hud text-xs font-bold tracking-wider text-sky-300 uppercase">
               <span>Campaign Hardware &amp; ISRU Reserves</span>
               <span className="font-mono-tech text-[10px] text-emerald-300">
                 BERM TIER {carryover.regolithShieldLevel}
@@ -48,7 +48,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-2.5">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5">
                 <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                   HERMES Sat
                 </span>
@@ -60,15 +60,15 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   {carryover.relaySatelliteOnline ? 'ONLINE' : 'STOWED'}
                 </span>
               </div>
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-2.5">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5">
                 <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                   ISRU H₂O
                 </span>
-                <span className="font-mono-tech text-sm font-bold text-cyan-300">
+                <span className="font-mono-tech text-sm font-bold text-sky-300">
                   {carryover.isruWaterKg} kg
                 </span>
               </div>
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-2.5">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5">
                 <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                   Fuel Bonus
                 </span>
@@ -76,7 +76,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   +{carryover.isruFuelBonusPct}%
                 </span>
               </div>
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-2.5">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5">
                 <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                   Solar Grid
                 </span>
@@ -84,7 +84,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   {carryover.solarGridKw} kW
                 </span>
               </div>
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-2.5">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5">
                 <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                   Mars Cores
                 </span>
@@ -95,7 +95,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
             </div>
 
             {/* Illustrated 150 mSv NASA Crew Dose Safety Scale */}
-            <div className="mt-3 rounded-lg border border-cyan-500/25 bg-slate-950/95 p-3">
+            <div className="mt-3 rounded-lg border border-sky-400/20 bg-slate-950/65 p-3">
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="font-hud font-bold tracking-wide text-slate-200 uppercase">
                   Cumulative Crew Dose vs NASA Limit
@@ -136,8 +136,8 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   key={note.id}
                   className={`rounded-xl border p-3 ${
                     unlocked
-                      ? 'border-emerald-400/45 bg-slate-900/95'
-                      : 'border-slate-800 bg-slate-950/95'
+                      ? 'border-emerald-400/45 bg-slate-900/65'
+                      : 'border-sky-400/15 bg-slate-950/65'
                   }`}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -149,7 +149,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                       )}
                       {note.title}
                     </span>
-                    <span className="font-mono-tech text-[10px] font-bold text-cyan-300 uppercase">
+                    <span className="font-mono-tech text-[10px] font-bold text-sky-300 uppercase">
                       {note.category}
                     </span>
                   </div>
@@ -157,7 +157,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   {unlocked ? (
                     <>
                       <p className="mb-1.5 text-xs text-slate-200">{note.summary}</p>
-                      <p className="rounded bg-slate-950/95 px-2 py-1 text-[11px] font-semibold text-amber-200">
+                      <p className="rounded bg-slate-950/75 px-2 py-1 text-[11px] font-semibold text-amber-200">
                         Apply: {note.appliedRule}
                       </p>
                     </>
@@ -172,7 +172,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
           </div>
 
           {/* Solved Campaign Anomalies */}
-          <h3 className="mb-2 font-display text-sm font-bold tracking-wider text-cyan-300 uppercase">
+          <h3 className="mb-2 font-display text-sm font-bold tracking-wider text-sky-300 uppercase">
             Flight Crisis Log ({carryover.solvedAnomalies.length}/{CAMPAIGN_ANOMALIES.length})
           </h3>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -181,7 +181,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
               return (
                 <div
                   key={anom.id}
-                  className="rounded-lg border border-cyan-500/25 bg-slate-900/95 p-2.5 text-xs"
+                  className="rounded-lg border border-sky-400/20 bg-slate-900/65 p-2.5 text-xs"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-hud font-bold text-white">{anom.title}</span>

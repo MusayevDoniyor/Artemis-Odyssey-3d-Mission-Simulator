@@ -1,15 +1,18 @@
 import {
   BookOpen,
+  CheckCircle2,
   Compass,
   Database,
   DoorOpen,
   HelpCircle,
   Home,
+  Lock,
   Map,
   Play,
   RotateCcw,
   Settings,
   Sliders,
+  Trophy,
   Wrench,
   X,
 } from 'lucide-react';
@@ -41,6 +44,7 @@ interface GameMenuModalProps {
   activeTab: GameMenuTab;
   phase: GamePhase;
   carryover: CampaignCarryoverState;
+  exploredSolarBodyIds: string[];
   rover: RoverState;
   objectives: RoverObjective[];
   marsQueue: MarsQueueState;
@@ -80,6 +84,7 @@ export function GameMenuModal({
   activeTab,
   phase,
   carryover,
+  exploredSolarBodyIds,
   rover,
   objectives,
   marsQueue,
@@ -129,10 +134,56 @@ export function GameMenuModal({
   const phaseFacts = CONTEXTUAL_FACTS[factKey] || CONTEXTUAL_FACTS.rover;
   const glossaryList = Object.values(GLOSSARY_ENTRIES);
 
+  const achievements = [
+    {
+      id: 'ach-solar-explorer',
+      title: 'Solar System Explorer',
+      desc: 'Inspect at least 5 worlds across the Solar System.',
+      unlocked: exploredSolarBodyIds.length >= 5,
+      progress: `${Math.min(5, exploredSolarBodyIds.length)} / 5`,
+    },
+    {
+      id: 'ach-hermes',
+      title: 'Artemis II Relay',
+      desc: 'Deploy and lock the HERMES orbital communications link.',
+      unlocked: carryover.relaySatelliteOnline || carryover.completedMissions.includes('artemis-2'),
+      progress: carryover.relaySatelliteOnline ? 'Complete' : 'Pending',
+    },
+    {
+      id: 'ach-shackleton',
+      title: 'Lunar South Pole',
+      desc: 'Complete Artemis III ice coring and polar outpost setup.',
+      unlocked: carryover.completedMissions.includes('artemis-3'),
+      progress: `${carryover.isruWaterKg} kg H₂O`,
+    },
+    {
+      id: 'ach-gateway',
+      title: 'Gateway Navigator',
+      desc: 'Dock with Lunar Gateway in NRHO during Artemis IV.',
+      unlocked: carryover.completedMissions.includes('artemis-4'),
+      progress: carryover.completedMissions.includes('artemis-4') ? 'Docked' : 'Pending',
+    },
+    {
+      id: 'ach-mars',
+      title: 'Jezero Pathfinder',
+      desc: 'Land through Mars 0.38g EDL and collect rover science cores.',
+      unlocked: carryover.completedMissions.includes('mars-pathfinder') || carryover.marsSamplesCached >= 4,
+      progress: `${carryover.marsSamplesCached} / 4 Cores`,
+    },
+    {
+      id: 'ach-notes',
+      title: 'Chief Field Engineer',
+      desc: 'Unlock 4 NASA engineering field notes in your Astronaut Notebook.',
+      unlocked: carryover.unlockedFieldNotes.length >= 4,
+      progress: `${carryover.unlockedFieldNotes.length} Notes`,
+    },
+  ];
+
   const tabs: Array<{ id: GameMenuTab; label: string; icon: typeof Map }> = [
     { id: 'map', label: phase === 'rover' ? 'Topo Map' : phase === 'space' ? 'Solar Map' : 'Flight Map', icon: Map },
     { id: 'outpost', label: 'Base Console', icon: DoorOpen },
     { id: 'ledger', label: 'Field Ledger', icon: BookOpen },
+    { id: 'achievements', label: 'Achievements', icon: Trophy },
     { id: 'nasa', label: 'NASA Data', icon: Database },
     { id: 'glossary', label: 'Glossary & Facts', icon: HelpCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -141,22 +192,22 @@ export function GameMenuModal({
   return (
     <div
       data-testid="unified-game-menu"
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4"
     >
-      <div className="hud-soft animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-5 text-stone-100">
+      <div className="hud-soft animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-5 text-slate-100">
         {/* Top Bar */}
         <div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
           <div>
             <h2 className="text-xl font-bold text-white">Mission Menu</h2>
-            <p className="text-sm text-stone-300">
-              Simulation paused — check maps, science notes, hardware, or settings.
+            <p className="text-sm text-slate-300">
+              Simulation paused — review maps, achievements, science notes, hardware, or settings.
             </p>
           </div>
           <button
             type="button"
             aria-label="Close Menu"
             onClick={onClose}
-            className="rounded-xl border border-white/15 bg-white/5 p-2 text-stone-200 hover:border-amber-400 hover:text-white"
+            className="rounded-xl border border-white/15 bg-white/5 p-2 text-slate-200 hover:border-sky-400 hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -173,10 +224,10 @@ export function GameMenuModal({
                 type="button"
                 data-testid={`menu-tab-${tab.id}`}
                 onClick={() => onSelectTab(tab.id)}
-                className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-base font-semibold transition ${
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                   active
-                    ? 'bg-amber-500 text-stone-950'
-                    : 'border border-white/10 bg-white/5 text-stone-200 hover:border-amber-400/50'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'border border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/50'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -190,7 +241,7 @@ export function GameMenuModal({
               onClose();
               onJumpToInspector();
             }}
-            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-base font-semibold text-amber-300 hover:border-amber-400"
+            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-amber-300 hover:border-amber-400"
           >
             <Wrench className="h-4 w-4" />
             Hardware Bay
@@ -217,12 +268,12 @@ export function GameMenuModal({
                         : undefined
                     }
                   />
-                  <div className="flex flex-col justify-between gap-3 rounded-xl border border-white/10 bg-black/35 p-4">
+                  <div className="flex flex-col justify-between gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                     <div>
                       <h3 className="text-lg font-bold text-white">
                         {isMarsRover ? 'Mars Command Queue (14-Min Lag)' : 'Surface Waypoints'}
                       </h3>
-                      <p className="mt-1 text-base text-stone-300">
+                      <p className="mt-1 text-base text-slate-300">
                         {isMarsRover
                           ? 'Click anywhere on the map or pick a science site to queue rover moves, then transmit.'
                           : 'Track your 4 polar sampling sites and Base Camp shelter.'}
@@ -236,7 +287,7 @@ export function GameMenuModal({
                               key={o.id}
                               className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base"
                             >
-                              <span className={o.completed ? 'text-stone-400 line-through' : 'font-semibold text-white'}>
+                              <span className={o.completed ? 'text-slate-400 line-through' : 'font-semibold text-white'}>
                                 {o.siteName}
                               </span>
                               <div className="flex items-center gap-2">
@@ -245,7 +296,7 @@ export function GameMenuModal({
                                   <button
                                     type="button"
                                     onClick={() => onQueueMarsPoint(o.x, o.z, o.siteName, o.id)}
-                                    className="rounded-lg bg-amber-500 px-2.5 py-1 text-sm font-bold text-stone-950 hover:bg-amber-400"
+                                    className="rounded-lg bg-amber-500 px-2.5 py-1 text-sm font-bold text-slate-950 hover:bg-amber-400"
                                   >
                                     Queue
                                   </button>
@@ -264,7 +315,7 @@ export function GameMenuModal({
                           <button
                             type="button"
                             onClick={onClearMarsQueue}
-                            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-stone-200 hover:border-rose-400"
+                            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-slate-200 hover:border-rose-400"
                           >
                             Clear
                           </button>
@@ -276,7 +327,7 @@ export function GameMenuModal({
                               onTransmitMarsQueue();
                               onClose();
                             }}
-                            className="rounded-lg bg-amber-500 px-4 py-1.5 text-sm font-bold text-stone-950 disabled:opacity-40"
+                            className="rounded-lg bg-amber-500 px-4 py-1.5 text-sm font-bold text-slate-950 disabled:opacity-40"
                           >
                             Send Batch ({marsQueue.queue.length})
                           </button>
@@ -289,13 +340,13 @@ export function GameMenuModal({
 
               {phase === 'space' && (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/35 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-3">
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => onChangeSolarScaleMode('exploration')}
                         className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
-                          solarScaleMode === 'exploration' ? 'bg-amber-500 text-stone-950' : 'bg-white/10 text-stone-200'
+                          solarScaleMode === 'exploration' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                         }`}
                       >
                         Explore Scale
@@ -304,13 +355,13 @@ export function GameMenuModal({
                         type="button"
                         onClick={() => onChangeSolarScaleMode('scientific')}
                         className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
-                          solarScaleMode === 'scientific' ? 'bg-amber-500 text-stone-950' : 'bg-white/10 text-stone-200'
+                          solarScaleMode === 'scientific' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                         }`}
                       >
                         Real AU Scale
                       </button>
                     </div>
-                    <label className="flex items-center gap-2 text-sm text-stone-200">
+                    <label className="flex items-center gap-2 text-sm text-slate-200">
                       <span>Orbit Speed</span>
                       <input
                         type="range"
@@ -341,7 +392,7 @@ export function GameMenuModal({
                         className={`rounded-xl border px-3 py-2.5 text-base font-bold ${
                           space.targetId === t.id
                             ? 'border-amber-400 bg-amber-500/20 text-amber-200'
-                            : 'border-white/10 bg-white/5 text-stone-200'
+                            : 'border-white/10 bg-white/5 text-slate-200'
                         }`}
                       >
                         Course: {t.label}
@@ -352,9 +403,12 @@ export function GameMenuModal({
                   <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-4">
                     <button
                       type="button"
-                      onClick={() => onFocusSolarBody(null)}
+                      onClick={() => {
+                        onFocusSolarBody(null);
+                        onClose();
+                      }}
                       className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold ${
-                        !focusedSolarBodyId ? 'border-amber-400 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-stone-300'
+                        !focusedSolarBodyId ? 'border-amber-400 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-slate-300'
                       }`}
                     >
                       Orion Spacecraft
@@ -363,11 +417,14 @@ export function GameMenuModal({
                       <button
                         key={b.id}
                         type="button"
-                        onClick={() => onFocusSolarBody(b.id)}
+                        onClick={() => {
+                          onFocusSolarBody(b.id);
+                          onClose();
+                        }}
                         className={`rounded-xl border px-3 py-2 text-left text-sm ${
                           focusedSolarBodyId === b.id
-                            ? 'border-amber-400 bg-amber-500/20 text-white'
-                            : 'border-white/10 bg-white/5 text-stone-300'
+                            ? 'border-sky-400 bg-sky-500/20 text-white'
+                            : 'border-white/10 bg-white/5 text-slate-300'
                         }`}
                       >
                         <div className="font-bold text-white">{b.name}</div>
@@ -381,7 +438,7 @@ export function GameMenuModal({
               )}
 
               {phase === 'landing' && (
-                <div className="space-y-3 rounded-xl border border-white/10 bg-black/35 p-4">
+                <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                   <h3 className="text-lg font-bold text-white">Landing Zone Selector</h3>
                   <div className="grid gap-2.5 sm:grid-cols-3">
                     {getLandingZones(landing.planet).map((z) => (
@@ -392,19 +449,19 @@ export function GameMenuModal({
                         className={`rounded-xl border p-3 text-left ${
                           landing.targetZoneId === z.id
                             ? 'border-amber-400 bg-amber-500/20 text-white'
-                            : 'border-white/10 bg-white/5 text-stone-200'
+                            : 'border-white/10 bg-white/5 text-slate-200'
                         }`}
                       >
                         <div className="text-base font-bold">{z.name}</div>
                         <div className="text-sm text-amber-300">Score ×{z.multiplier}</div>
-                        <div className="mt-1 text-sm text-stone-300">{z.hint}</div>
+                        <div className="mt-1 text-sm text-slate-300">{z.hint}</div>
                       </button>
                     ))}
                   </div>
                   <button
                     type="button"
                     onClick={onToggleAutoCutoff}
-                    className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-stone-100"
+                    className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-slate-100"
                   >
                     Contact Light Auto-Cut: {landing.autoCutoff ? 'Armed' : 'Off'}
                   </button>
@@ -412,7 +469,7 @@ export function GameMenuModal({
               )}
 
               {phase === 'launch' && (
-                <div className="rounded-xl border border-white/10 bg-black/35 p-4 text-base text-stone-200">
+                <div className="rounded-xl border border-sky-400/20 bg-slate-950/60 p-4 text-base text-slate-200">
                   <div className="flex items-center gap-2 font-bold text-white">
                     <Compass className="h-5 w-5 text-amber-400" />
                     LC-39B Ascent Profile
@@ -425,10 +482,42 @@ export function GameMenuModal({
             </div>
           )}
 
+          {activeTab === 'achievements' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {achievements.map((ach) => (
+                <div
+                  key={ach.id}
+                  className={`flex items-start gap-3 rounded-xl border p-4 ${
+                    ach.unlocked
+                      ? 'border-amber-400/50 bg-amber-500/10'
+                      : 'border-sky-400/20 bg-slate-950/60'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                      ach.unlocked ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-slate-400'
+                    }`}
+                  >
+                    {ach.unlocked ? <CheckCircle2 className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-bold text-white">{ach.title}</h3>
+                      <span className="text-xs font-semibold text-amber-300 tabular-nums">
+                        {ach.progress}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-300">{ach.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {activeTab === 'outpost' && (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-white/10 bg-black/35 p-5">
+            <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
               <h3 className="text-lg font-bold text-white">Base Camp Airlock &amp; Power Console</h3>
-              <p className="text-base text-stone-300">
+              <p className="text-base text-slate-300">
                 Pressurize the airlock to inspect crew quarters, lab, greenhouse, Kilopower fission, and review your Sol summary.
               </p>
               <button
@@ -438,7 +527,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenOutpostConsole();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
               >
                 Open Base Console
               </button>
@@ -446,9 +535,9 @@ export function GameMenuModal({
           )}
 
           {activeTab === 'ledger' && (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-white/10 bg-black/35 p-5">
+            <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
               <h3 className="text-lg font-bold text-white">Astronaut Field Ledger</h3>
-              <p className="text-base text-stone-300">
+              <p className="text-base text-slate-300">
                 {carryover.unlockedFieldNotes.length} engineering notes unlocked · {carryover.isruWaterKg} kg water · {carryover.radiationDoseMsv} mSv dose.
               </p>
               <button
@@ -457,7 +546,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenFieldLedger();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
               >
                 Open Full Ledger
               </button>
@@ -465,9 +554,9 @@ export function GameMenuModal({
           )}
 
           {activeTab === 'nasa' && (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-white/10 bg-black/35 p-5">
+            <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
               <h3 className="text-lg font-bold text-white">NASA DONKI, OSDR &amp; JPL Data Sources</h3>
-              <p className="text-base text-stone-300">
+              <p className="text-base text-slate-300">
                 Inspect live space weather alerts, biological shielding studies, and solar system light-time data.
               </p>
               <button
@@ -476,7 +565,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenNasaModal();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
               >
                 Open NASA Data Center
               </button>
@@ -485,9 +574,9 @@ export function GameMenuModal({
 
           {activeTab === 'glossary' && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-white/10 bg-black/35 p-4">
+              <div className="rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                 <h3 className="mb-2 text-lg font-bold text-amber-300">Phase &ldquo;Did you know?&rdquo; Facts</h3>
-                <ul className="space-y-2 text-base text-stone-200">
+                <ul className="space-y-2 text-base text-slate-200">
                   {phaseFacts.map((f) => (
                     <li key={f.text} className="rounded-lg bg-white/5 px-3 py-2">
                       {f.text}
@@ -497,14 +586,14 @@ export function GameMenuModal({
               </div>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {glossaryList.map((entry) => (
-                  <div key={entry.id} className="rounded-xl border border-white/10 bg-black/35 p-3">
+                  <div key={entry.id} className="rounded-xl border border-sky-400/20 bg-slate-950/60 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-base font-bold text-white">{entry.term}</span>
                       <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-amber-300">
                         {entry.badge}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-stone-300">{entry.definition}</p>
+                    <p className="mt-1 text-sm text-slate-300">{entry.definition}</p>
                   </div>
                 ))}
               </div>
@@ -513,7 +602,7 @@ export function GameMenuModal({
 
           {activeTab === 'settings' && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-3 rounded-xl border border-white/10 bg-black/35 p-4">
+              <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                 <h3 className="flex items-center gap-2 text-lg font-bold text-white">
                   <Sliders className="h-5 w-5 text-amber-400" />
                   Audio &amp; Quality
@@ -532,7 +621,7 @@ export function GameMenuModal({
                       type="button"
                       onClick={() => onChangeQuality(q)}
                       className={`rounded-lg px-3 py-1.5 text-sm font-bold uppercase ${
-                        qualityPreset === q ? 'bg-amber-500 text-stone-950' : 'bg-white/10 text-stone-200'
+                        qualityPreset === q ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
                       }`}
                     >
                       {q}
@@ -541,7 +630,7 @@ export function GameMenuModal({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-xl border border-white/10 bg-black/35 p-4">
+              <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                 <h3 className="text-lg font-bold text-white">Rover Speed &amp; Camera</h3>
                 <button
                   type="button"
@@ -557,7 +646,7 @@ export function GameMenuModal({
                 <button
                   type="button"
                   onClick={onResetCamera}
-                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-base font-semibold text-stone-200 hover:border-amber-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-base font-semibold text-slate-200 hover:border-amber-400"
                 >
                   Reset Chase Camera
                 </button>
@@ -572,7 +661,7 @@ export function GameMenuModal({
             <button
               type="button"
               onClick={onRestartStage}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-stone-200 hover:border-amber-400"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-slate-200 hover:border-amber-400"
             >
               <RotateCcw className="h-4 w-4" />
               Restart Stage
@@ -580,7 +669,7 @@ export function GameMenuModal({
             <button
               type="button"
               onClick={onBackToTitle}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-stone-200 hover:border-amber-400"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-slate-200 hover:border-amber-400"
             >
               <Home className="h-4 w-4" />
               Command Deck
@@ -590,9 +679,9 @@ export function GameMenuModal({
             type="button"
             data-testid="resume-from-menu-btn"
             onClick={onClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
           >
-            <Play className="h-4 w-4 fill-stone-950" />
+            <Play className="h-4 w-4 fill-slate-950" />
             Resume
           </button>
         </div>

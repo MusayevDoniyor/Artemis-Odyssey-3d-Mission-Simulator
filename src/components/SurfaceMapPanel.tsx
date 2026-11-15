@@ -82,7 +82,7 @@ export function SurfaceMapPanel({
           data-testid="toggle-surface-map-btn"
           onClick={onToggleExpand}
           title="Expand / Collapse Map"
-          className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-stone-200 hover:border-amber-400"
+          className="inline-flex items-center gap-1 rounded-lg border border-sky-400/25 bg-slate-900/75 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-amber-400"
         >
           {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
         </button>
@@ -94,11 +94,11 @@ export function SurfaceMapPanel({
           <Satellite className="h-3.5 w-3.5" />
           {relayOnline ? 'HERMES High-Res Contours' : 'Coarse Survey Grid'}
         </span>
-        <span className="font-mono-tech text-stone-300">±{PHYSICS.SURFACE_BOUND_M}m</span>
+        <span className="font-mono-tech text-slate-300">±{PHYSICS.SURFACE_BOUND_M}m</span>
       </div>
 
       {/* SVG Topographic Arena */}
-      <div className="relative overflow-hidden rounded-xl border border-white/15 bg-stone-950">
+      <div className="relative overflow-hidden rounded-xl border border-sky-400/25 bg-slate-950">
         <svg
           width={sizePx}
           height={sizePx}

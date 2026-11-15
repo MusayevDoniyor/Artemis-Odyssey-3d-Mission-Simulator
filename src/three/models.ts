@@ -2902,6 +2902,7 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
 
 export interface SolarSystemHandles {
   group: THREE.Group;
+  sun: THREE.Mesh;
   shipGroup: THREE.Group;
   shipFlame: THREE.Mesh;
   shipShieldShell: THREE.Mesh;
@@ -2917,6 +2918,7 @@ export interface SolarSystemHandles {
   planets: Record<SpaceTargetId, THREE.Mesh>;
   extraBodies: Record<string, THREE.Group>;
   orbitRings: Record<string, THREE.Mesh>;
+  selectionRing: THREE.Group;
   halleyTail: THREE.Mesh;
   kuiperBelt: THREE.Points;
   oortCloud: THREE.Points;
@@ -3102,98 +3104,130 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const group = new THREE.Group();
   group.visible = false;
 
-  // Sun at (-48, 0, -36) with Textured Granulation Plasma + Volumetric Dual Corona
+  const markSolarBody = (obj: THREE.Object3D, bodyId: string) => {
+    obj.userData.solarBodyId = bodyId;
+    obj.traverse((child) => {
+      child.userData.solarBodyId = bodyId;
+    });
+  };
+
+  // Deep-Space Milky Way Nebula Sky Dome
+  const nebulaDome = new THREE.Mesh(
+    new THREE.SphereGeometry(560, 32, 24),
+    new THREE.MeshBasicMaterial({
+      map: tex.nebulaSky,
+      side: THREE.BackSide,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.9,
+    })
+  );
+  group.add(nebulaDome);
+
+  // Sun at (-48, 0, -36) with Granulation Plasma + Volumetric Corona + Additive Glow Sprite
   const sunPos = new THREE.Vector3(-48, 0, -36);
   const sun = new THREE.Mesh(
     new THREE.SphereGeometry(11.4, 36, 28),
     new THREE.MeshBasicMaterial({ map: tex.sunAlbedo, color: 0xffffff })
   );
   sun.position.copy(sunPos);
+  markSolarBody(sun, 'sun');
   group.add(sun);
 
   const sunCorona = new THREE.Mesh(
-    new THREE.SphereGeometry(13.6, 28, 24),
-    new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.24, depthWrite: false })
+    new THREE.SphereGeometry(13.2, 28, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xf97316,
+      transparent: true,
+      opacity: 0.22,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
   );
   sunCorona.position.copy(sunPos);
   group.add(sunCorona);
 
-  const sunOuterGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(16.2, 24, 20),
-    new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.1, depthWrite: false })
+  const sunOuterGlow = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: tex.sunGlowSprite,
+      color: 0xffedd5,
+      transparent: true,
+      opacity: 0.78,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
   );
   sunOuterGlow.position.copy(sunPos);
+  sunOuterGlow.scale.set(42, 42, 1);
   group.add(sunOuterGlow);
 
-  // Solar Coronal Prominence Loops
+  // Subtle Solar Coronal Prominence Loops
   [0.35, -0.55].forEach((rotY, idx) => {
     const prom = new THREE.Mesh(
-      new THREE.TorusGeometry(12.2 + idx * 0.9, 0.22, 8, 42, Math.PI * 0.85),
-      new THREE.MeshBasicMaterial({ color: 0xfb923c, transparent: true, opacity: 0.55 })
+      new THREE.TorusGeometry(12.1 + idx * 0.7, 0.14, 8, 42, Math.PI * 0.8),
+      new THREE.MeshBasicMaterial({
+        color: 0xfb923c,
+        transparent: true,
+        opacity: 0.42,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
     prom.position.copy(sunPos);
     prom.rotation.set(0.4 + idx * 0.6, rotY, idx * 1.1);
     group.add(prom);
   });
 
-  const sunLight = new THREE.PointLight(0xfde68a, 4.2, 240);
+  const sunLight = new THREE.PointLight(0xfde68a, 4.4, 280);
   sunLight.position.copy(sunPos);
   group.add(sunLight);
 
-  // Solar Radiation Storm Ring
+  // Subtle Solar Radiation Boundary Ring (glows brighter only during active solar flare)
   const stormRing = new THREE.Mesh(
-    new THREE.RingGeometry(31, 33.2, 72),
+    new THREE.RingGeometry(31.4, 32.1, 72),
     new THREE.MeshBasicMaterial({
       color: 0xf43f5e,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.14,
       side: THREE.DoubleSide,
+      depthWrite: false,
     })
   );
   stormRing.rotation.x = -Math.PI / 2;
-  stormRing.position.set(sunPos.x, -0.5, sunPos.z);
+  stormRing.position.set(sunPos.x, -0.05, sunPos.z);
   group.add(stormRing);
-
-  // Precision Ecliptic Navigation Grid (calm reference plane so trajectories & ships pop cleanly)
-  const grid = new THREE.GridHelper(220, 24, 0x1e293b, 0x0f172a);
-  grid.position.y = -4.2;
-  const gridMats = Array.isArray(grid.material) ? grid.material : [grid.material];
-  gridMats.forEach((m) => {
-    m.transparent = true;
-    m.opacity = 0.36;
-  });
-  group.add(grid);
 
   // Earth Departure World (-22, -2, 26) with Continents + Rotating Cloud Sphere + Atmospheric Rayleigh Halo
   const earthGroup = new THREE.Group();
   earthGroup.position.set(-22, -2, 26);
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(4.6, 32, 26),
-    new THREE.MeshStandardMaterial({ map: tex.earthAlbedo, color: 0xffffff, roughness: 0.48, metalness: 0.08 })
+    new THREE.SphereGeometry(4.6, 36, 28),
+    new THREE.MeshStandardMaterial({ map: tex.earthAlbedo, color: 0xffffff, roughness: 0.45, metalness: 0.08 })
   );
   earthGroup.add(earth);
   const earthClouds = new THREE.Mesh(
-    new THREE.SphereGeometry(4.74, 30, 24),
+    new THREE.SphereGeometry(4.74, 32, 24),
     new THREE.MeshStandardMaterial({
       map: tex.earthClouds,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.74,
       roughness: 0.85,
       depthWrite: false,
     })
   );
   earthGroup.add(earthClouds);
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(5.05, 28, 22),
+    new THREE.SphereGeometry(5.12, 28, 22),
     new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.2,
       side: THREE.BackSide,
       depthWrite: false,
     })
   );
   earthGroup.add(earthAtmo);
+  markSolarBody(earthGroup, 'earth');
   group.add(earthGroup);
 
   // Dashed TLI & Mars Hohmann Transfer Trajectory Arcs
@@ -3208,7 +3242,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
     const line = new THREE.Line(
       arcGeo,
-      new THREE.LineDashedMaterial({ color, dashSize: 1.6, gapSize: 0.9, transparent: true, opacity: 0.52 })
+      new THREE.LineDashedMaterial({ color, dashSize: 1.6, gapSize: 0.9, transparent: true, opacity: 0.36 })
     );
     line.computeLineDistances();
     return line;
@@ -3277,6 +3311,8 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(spec.x, 0, spec.z);
     if (id === 'gateway' || id === 'relay-orbit') mesh.visible = false;
+    if (id === 'mars') markSolarBody(mesh, 'mars');
+    else if (id === 'moon') markSolarBody(mesh, 'earth');
     group.add(mesh);
     planets[id] = mesh;
 
@@ -3304,42 +3340,48 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
 
     const orbitDist = Math.hypot(spec.x - sunPos.x, spec.z - sunPos.z);
     const orbit = new THREE.Mesh(
-      new THREE.RingGeometry(orbitDist - 0.15, orbitDist + 0.15, 96),
+      new THREE.RingGeometry(orbitDist - 0.1, orbitDist + 0.1, 112),
       new THREE.MeshBasicMaterial({
-        color: id === 'mars' ? 0xf97316 : 0x22d3ee,
+        color: id === 'mars' ? 0xfb923c : 0x38bdf8,
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.14,
         side: THREE.DoubleSide,
+        depthWrite: false,
       })
     );
     orbit.rotation.x = -Math.PI / 2;
-    orbit.position.set(sunPos.x, -4.0, sunPos.z);
+    orbit.position.set(sunPos.x, -0.04, sunPos.z);
     group.add(orbit);
   });
 
-  // Main Asteroid Belt Ring (150 instanced rocky asteroids slowly orbiting deep space)
-  const beltCount = 150;
+  // Main Asteroid Belt Ring (220 tinted rocky asteroids orbiting between Mars and Jupiter)
+  const beltCount = 220;
   const asteroidBelt = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.45, 0),
-    new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.88, metalness: 0.12 }),
+    new THREE.DodecahedronGeometry(0.42, 0),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0.12 }),
     beltCount
   );
   asteroidBelt.position.copy(sunPos);
   const dummy = new THREE.Object3D();
+  const astTint = new THREE.Color();
   for (let i = 0; i < beltCount; i++) {
-    const angle = (i / beltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+    const angle = (i / beltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.16;
     const rad = 52 + Math.random() * 14;
     dummy.position.set(
       Math.cos(angle) * rad,
-      (Math.random() - 0.5) * 3.5,
+      (Math.random() - 0.5) * 3.2,
       Math.sin(angle) * rad
     );
     dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    dummy.scale.set(0.6 + Math.random() * 1.1, 0.45 + Math.random() * 0.7, 0.6 + Math.random() * 1.0);
+    dummy.scale.set(0.55 + Math.random() * 1.15, 0.42 + Math.random() * 0.72, 0.55 + Math.random() * 1.05);
     dummy.updateMatrix();
     asteroidBelt.setMatrixAt(i, dummy.matrix);
+    const shade = 0.42 + (i % 5) * 0.08;
+    astTint.setRGB(shade * 1.08, shade * 0.96, shade * 0.86);
+    asteroidBelt.setColorAt(i, astTint);
   }
   asteroidBelt.instanceMatrix.needsUpdate = true;
+  if (asteroidBelt.instanceColor) asteroidBelt.instanceColor.needsUpdate = true;
   asteroidBelt.computeBoundingSphere();
   group.add(asteroidBelt);
 
@@ -3370,7 +3412,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   gatewayGroup.add(ppe, halo, iHab, dockNode, gwSolarL, gwRad);
   group.add(gatewayGroup);
 
-  // Orbital Staging Beacon Ring at HERMES Relay Orbit (visible before satellite deployment so sat doesn't appear prematurely)
+  // Orbital Staging Beacon Ring at HERMES Relay Orbit
   const relayStageRing = new THREE.Group();
   relayStageRing.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
   const stageOuter = new THREE.Mesh(
@@ -3398,18 +3440,17 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
 
   // Target Selection Beacon Ring
   const targetBeacon = new THREE.Mesh(
-    new THREE.TorusGeometry(4.8, 0.2, 10, 36),
-    new THREE.MeshBasicMaterial({ color: 0x34d399 })
+    new THREE.TorusGeometry(4.8, 0.16, 10, 36),
+    new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.72 })
   );
   targetBeacon.rotation.x = Math.PI / 2;
   group.add(targetBeacon);
 
-  // 3D NASA Orion MPCV Crew Capsule + European Service Module (ESM) with Iconic Swept X-Wing Solar Arrays
+  // 3D NASA Orion MPCV Crew Capsule + European Service Module (ESM)
   const shipGroup = new THREE.Group();
   const silverHull = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.68, roughness: 0.24 });
   const darkTrim = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
 
-  // European Service Module (ESM) cylindrical bus
   const esmBody = new THREE.Mesh(
     new THREE.CylinderGeometry(0.86, 0.84, 1.35, 24),
     silverHull
@@ -3434,7 +3475,6 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   aj10Bell.position.z = -1.78;
   shipGroup.add(aj10Bell);
 
-  // Heatshield collar & Conical White-Tiled Orion Crew Module
   const heatshield = new THREE.Mesh(new THREE.CylinderGeometry(0.94, 0.9, 0.18, 24), darkTrim);
   heatshield.rotation.x = Math.PI / 2;
   heatshield.position.z = 0.0;
@@ -3448,7 +3488,6 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   crewModule.position.z = 0.62;
   shipGroup.add(crewModule);
 
-  // Glowing Crew Module Cockpit Windows + Forward Docking Collar
   [-0.22, 0.22].forEach((wx, idx) => {
     const cWin = new THREE.Mesh(
       new THREE.PlaneGeometry(0.22, 0.14),
@@ -3464,14 +3503,12 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   dockingCollar.position.z = 1.28;
   shipGroup.add(dockingCollar);
 
-  // 4 ESM RCS Thruster Quads
   [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].forEach((ra) => {
     const rcs = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.28), darkTrim);
     rcs.position.set(Math.cos(ra) * 0.92, Math.sin(ra) * 0.92, -0.35);
     shipGroup.add(rcs);
   });
 
-  // 4 Swept X-Wing Orion ESM Solar Arrays
   const shipWingsGroup = new THREE.Group();
   const wingMat = new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xe0f2fe, metalness: 0.48, roughness: 0.2 });
   [0.52, -0.52, Math.PI - 0.52, Math.PI + 0.52].forEach((ang) => {
@@ -3484,7 +3521,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     pivot.add(strut);
     const panel = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.05, 0.62), wingMat);
     panel.position.set(1.65, 0, -0.22);
-    panel.rotation.y = 0.24; // Iconic aft sweep
+    panel.rotation.y = 0.24;
     pivot.add(panel);
     shipWingsGroup.add(pivot);
   });
@@ -3512,7 +3549,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
   const courseLine = new THREE.Line(
     lineGeo,
-    new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.65 })
+    new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.5 })
   );
   group.add(courseLine);
 
@@ -3521,6 +3558,30 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const orbitRings: Record<string, THREE.Mesh> = {};
   let halleyTail = new THREE.Mesh();
 
+  const textureForBody = (id: string) => {
+    switch (id) {
+      case 'mercury':
+        return tex.mercuryAlbedo;
+      case 'venus':
+        return tex.venusAlbedo;
+      case 'jupiter':
+        return tex.jupiterAlbedo;
+      case 'saturn':
+        return tex.saturnAlbedo;
+      case 'uranus':
+        return tex.uranusAlbedo;
+      case 'neptune':
+        return tex.neptuneAlbedo;
+      case 'pluto':
+        return tex.plutoAlbedo;
+      case 'ceres':
+      case 'eris':
+        return tex.moonSphereAlbedo;
+      default:
+        return undefined;
+    }
+  };
+
   SOLAR_SYSTEM_BODIES.forEach((b) => {
     if (b.id === 'sun') return;
     const bg = new THREE.Group();
@@ -3528,34 +3589,42 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       extraBodies[b.id] = earthGroup;
     } else if (b.id === 'mars') {
       bg.position.copy(planets.mars.position);
+      markSolarBody(bg, 'mars');
       extraBodies[b.id] = bg;
     } else {
-      const sphMat =
-        b.id === 'jupiter'
-          ? new THREE.MeshStandardMaterial({ color: 0xfdba74, roughness: 0.68, metalness: 0.05 })
-          : b.id === 'saturn'
-            ? new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.65, metalness: 0.05 })
-            : new THREE.MeshStandardMaterial({
-                color: b.color,
-                emissive: b.color,
-                emissiveIntensity: b.category === 'comet' ? 0.55 : 0.16,
-                roughness: 0.72,
-              });
-      const sph = new THREE.Mesh(new THREE.SphereGeometry(b.explorationBodySize, 24, 18), sphMat);
+      const mapTex = textureForBody(b.id);
+      const sphMat = new THREE.MeshStandardMaterial({
+        map: mapTex,
+        color: mapTex ? 0xffffff : b.color,
+        emissive: b.category === 'comet' ? b.color : 0x0f172a,
+        emissiveIntensity: b.category === 'comet' ? 0.5 : 0.14,
+        roughness: b.id === 'jupiter' || b.id === 'saturn' ? 0.58 : 0.72,
+        metalness: 0.05,
+      });
+      const sph = new THREE.Mesh(new THREE.SphereGeometry(b.explorationBodySize, 28, 22), sphMat);
       bg.add(sph);
 
       if (b.id === 'saturn') {
         const rings = new THREE.Mesh(
-          new THREE.RingGeometry(b.explorationBodySize * 1.35, b.explorationBodySize * 2.35, 48),
-          new THREE.MeshBasicMaterial({ color: 0xfef3c7, transparent: true, opacity: 0.72, side: THREE.DoubleSide })
+          new THREE.RingGeometry(b.explorationBodySize * 1.32, b.explorationBodySize * 2.45, 64),
+          new THREE.MeshBasicMaterial({
+            map: tex.saturnRingAlbedo,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.92,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
         );
-        rings.rotation.x = Math.PI / 2.4;
+        rings.rotation.x = Math.PI / 2.35;
+        rings.rotation.y = 0.18;
         bg.add(rings);
       } else if (b.id === 'uranus') {
         const uRing = new THREE.Mesh(
-          new THREE.RingGeometry(b.explorationBodySize * 1.4, b.explorationBodySize * 1.75, 36),
-          new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.52, side: THREE.DoubleSide })
+          new THREE.RingGeometry(b.explorationBodySize * 1.4, b.explorationBodySize * 1.72, 42),
+          new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.46, side: THREE.DoubleSide })
         );
+        uRing.rotation.y = 0.25;
         bg.add(uRing);
       } else if (b.id === 'jupiter') {
         for (let m = 0; m < 4; m++) {
@@ -3564,7 +3633,11 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
             new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 })
           );
           const ang = (m / 4) * Math.PI * 2;
-          moon.position.set(Math.cos(ang) * (b.explorationBodySize + 1.4 + m * 0.6), 0, Math.sin(ang) * (b.explorationBodySize + 1.4 + m * 0.6));
+          moon.position.set(
+            Math.cos(ang) * (b.explorationBodySize + 1.4 + m * 0.6),
+            0,
+            Math.sin(ang) * (b.explorationBodySize + 1.4 + m * 0.6)
+          );
           bg.add(moon);
         }
       } else if (b.id === 'pluto') {
@@ -3584,24 +3657,54 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
         bg.add(halleyTail);
       }
 
+      markSolarBody(bg, b.id);
       group.add(bg);
       extraBodies[b.id] = bg;
     }
 
     const rRing = new THREE.Mesh(
-      new THREE.RingGeometry(Math.max(2, b.explorationRadiusUnits - 0.14), b.explorationRadiusUnits + 0.14, 96),
+      new THREE.RingGeometry(Math.max(2, b.explorationRadiusUnits - 0.11), b.explorationRadiusUnits + 0.11, 128),
       new THREE.MeshBasicMaterial({
-        color: b.category === 'comet' ? 0x38bdf8 : b.category === 'dwarf' ? 0x64748b : 0x334155,
+        color: b.id === 'earth' ? 0x38bdf8 : b.category === 'comet' ? 0x38bdf8 : b.category === 'dwarf' ? 0x475569 : 0x64748b,
         transparent: true,
-        opacity: b.category === 'planet' ? 0.34 : 0.22,
+        opacity: b.id === 'earth' ? 0.34 : b.category === 'planet' ? 0.24 : 0.15,
         side: THREE.DoubleSide,
+        depthWrite: false,
       })
     );
     rRing.rotation.x = -Math.PI / 2;
-    rRing.position.set(sunPos.x, -4.0, sunPos.z);
+    rRing.position.set(sunPos.x, b.id === 'earth' ? -2.0 : -0.04, sunPos.z);
     group.add(rRing);
     orbitRings[b.id] = rRing;
   });
+
+  // Glowing Cyan Selection Halo Ring around focused planet (matches New Solar System Reference)
+  const selectionRing = new THREE.Group();
+  selectionRing.visible = false;
+  const selPrimary = new THREE.Mesh(
+    new THREE.TorusGeometry(1.42, 0.042, 12, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.92,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  selPrimary.rotation.x = Math.PI / 2 - 0.24;
+  const selOuter = new THREE.Mesh(
+    new THREE.TorusGeometry(1.62, 0.024, 10, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x7dd3fc,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  selOuter.rotation.x = Math.PI / 2 - 0.24;
+  selectionRing.add(selPrimary, selOuter);
+  group.add(selectionRing);
 
   // Kuiper Belt (30-55 AU scaled band) & Outer Oort Cloud Halo Points
   const makeBeltPoints = (count: number, minR: number, maxR: number, spherical: boolean, colHex: number) => {
@@ -3637,6 +3740,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
 
   return {
     group,
+    sun,
     shipGroup,
     shipFlame,
     shipShieldShell,
@@ -3652,6 +3756,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     planets,
     extraBodies,
     orbitRings,
+    selectionRing,
     halleyTail,
     kuiperBelt,
     oortCloud,

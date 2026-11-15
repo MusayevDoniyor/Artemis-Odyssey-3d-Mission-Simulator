@@ -33,7 +33,7 @@ export function RoverSpeedometer({
         >
           {isReal ? speedInfo.displayMs.toFixed(2) : speedInfo.displayMs.toFixed(1)}
         </span>
-        <span className="text-base font-semibold text-stone-300">m/s</span>
+        <span className="text-base font-semibold text-slate-300">m/s</span>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -46,7 +46,7 @@ export function RoverSpeedometer({
           </span>
           <span
             data-testid="viper-gear-label"
-            className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-bold text-stone-100"
+            className="rounded-md bg-sky-500/15 px-2 py-0.5 text-sm font-bold text-slate-100"
           >
             {tel.gearLabel}
           </span>
@@ -58,7 +58,7 @@ export function RoverSpeedometer({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-white/10">
+          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-800">
             <div
               className="h-full rounded-full bg-amber-400 transition-all"
               style={{ width: `${Math.max(4, fillPct)}%` }}
@@ -69,7 +69,7 @@ export function RoverSpeedometer({
               type="button"
               data-testid="toggle-speed-scale-btn"
               onClick={onToggleSpeedScale}
-              className="text-sm font-semibold text-stone-300 hover:text-amber-300"
+              className="text-sm font-semibold text-slate-300 hover:text-amber-300"
             >
               {isReal ? 'Real 1×' : 'Kid ×25'}
             </button>

@@ -79,10 +79,10 @@ export function VehicleInspectorOverlay({
                     left: `${Math.min(86, Math.max(14, pt.xPct))}%`,
                     top: `${Math.min(68, Math.max(16, pt.yPct))}%`,
                   }}
-                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded border px-2 py-0.5 font-hud text-[10px] font-bold whitespace-nowrap shadow transition ${
+                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border px-2 py-0.5 font-hud text-[10px] font-bold whitespace-nowrap shadow transition ${
                     isSelected
-                      ? 'border-amber-400 bg-slate-950/95 text-amber-300'
-                      : 'border-cyan-400/60 bg-slate-950/90 text-cyan-200 hover:border-amber-300'
+                      ? 'border-amber-400 bg-slate-950/90 text-amber-300'
+                      : 'border-sky-400/45 bg-slate-950/85 text-sky-200 hover:border-amber-300'
                   }`}
                 >
                   {pt.name}
@@ -99,13 +99,13 @@ export function VehicleInspectorOverlay({
             <button
               type="button"
               onClick={onBackTitle}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-100 uppercase hover:border-cyan-400/70"
+              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-xl px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-100 uppercase hover:border-sky-400/60"
             >
-              <ArrowLeft className="h-4 w-4 text-cyan-300" />
+              <ArrowLeft className="h-4 w-4 text-sky-300" />
               Command Deck
             </button>
 
-            <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg p-1">
+            <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl p-1">
               {HARDWARE_ORDER.map((id) => {
                 const spec = HARDWARE_CATALOG[id];
                 return (
@@ -117,9 +117,9 @@ export function VehicleInspectorOverlay({
                       onSelectVehicle(id);
                       onSelectPart(spec.parts[0].id);
                     }}
-                    className={`rounded-md px-2.5 py-1.5 font-hud text-xs font-bold whitespace-nowrap transition ${
+                    className={`rounded-lg px-2.5 py-1.5 font-hud text-xs font-bold whitespace-nowrap transition ${
                       showcase === id
-                        ? 'bg-cyan-400 text-slate-950'
+                        ? 'bg-sky-400 text-slate-950'
                         : 'text-slate-200 hover:bg-slate-800'
                     }`}
                   >
@@ -202,26 +202,26 @@ export function VehicleInspectorOverlay({
 
       {/* Bottom Compact Part Inspector & Engineering Controls */}
       <div className="relative z-10 mx-auto w-full max-w-5xl">
-        <div className="hud-panel tactical-frame pointer-events-auto rounded-xl p-3.5">
+        <div className="hud-panel tactical-frame pointer-events-auto rounded-2xl p-3.5">
           {/* Interactive CAD Controls Row */}
-          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5 border-b border-cyan-500/20 pb-2.5">
+          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2.5 border-b border-sky-400/20 pb-2.5">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-display text-base font-bold text-white uppercase">
                   {catalog.title}
                 </h2>
-                <span className="rounded border border-cyan-400/40 bg-cyan-500/15 px-1.5 py-0.5 font-mono-tech text-[10px] font-bold text-cyan-200">
+                <span className="rounded border border-sky-400/35 bg-sky-500/15 px-1.5 py-0.5 font-mono-tech text-[10px] font-bold text-sky-200">
                   {activePart.badge}
                 </span>
               </div>
-              <p className="font-mono-tech text-[11px] font-semibold text-cyan-300">
+              <p className="font-mono-tech text-[11px] font-semibold text-sky-300">
                 {catalog.subtitle}
               </p>
             </div>
 
             {/* Explode Slider + Toggles */}
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
-              <label className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1">
+              <label className="flex items-center gap-2 rounded-lg border border-sky-400/20 bg-slate-900/75 px-2.5 py-1">
                 <Layers className="h-3.5 w-3.5 text-amber-300" />
                 <span className="font-hud font-bold text-slate-200 uppercase">Explode</span>
                 <input
@@ -245,7 +245,7 @@ export function VehicleInspectorOverlay({
                 className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-hud font-bold uppercase ${
                   inspectorUi.isolatePart
                     ? 'bg-amber-500 text-slate-950'
-                    : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400'
+                    : 'border border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-sky-400/60'
                 }`}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -259,8 +259,8 @@ export function VehicleInspectorOverlay({
                 }
                 className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-hud font-bold uppercase ${
                   inspectorUi.showConnections
-                    ? 'bg-cyan-400 text-slate-950'
-                    : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400'
+                    ? 'bg-sky-400 text-slate-950'
+                    : 'border border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-sky-400/60'
                 }`}
               >
                 <Link2 className="h-3.5 w-3.5" />
@@ -273,7 +273,7 @@ export function VehicleInspectorOverlay({
                 className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-hud font-bold uppercase ${
                   inspectorUi.showLabels
                     ? 'bg-emerald-400 text-slate-950'
-                    : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400'
+                    : 'border border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-sky-400/60'
                 }`}
               >
                 <Tag className="h-3.5 w-3.5" />
@@ -286,7 +286,7 @@ export function VehicleInspectorOverlay({
                 className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-hud font-bold uppercase ${
                   inspectorUi.autoRotate
                     ? 'bg-sky-400 text-slate-950'
-                    : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400'
+                    : 'border border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-sky-400/60'
                 }`}
               >
                 <RotateCw className="h-3.5 w-3.5" />
@@ -323,14 +323,14 @@ export function VehicleInspectorOverlay({
                     onClick={() => onSelectPart(part.id)}
                     className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left font-hud text-xs font-bold transition ${
                       active
-                        ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                        : 'border-slate-700/80 bg-slate-900/95 text-slate-200 hover:border-cyan-500/40'
+                        ? 'border-sky-400 bg-sky-500/20 text-white'
+                        : 'border-sky-400/15 bg-slate-900/65 text-slate-200 hover:border-sky-400/45'
                     }`}
                   >
                     <span className="inline-flex items-center gap-2 truncate">
                       <span
                         className={`font-mono-tech text-[10px] ${
-                          active ? 'text-cyan-300' : 'text-slate-500'
+                          active ? 'text-sky-300' : 'text-slate-500'
                         }`}
                       >
                         0{idx + 1}
@@ -345,7 +345,7 @@ export function VehicleInspectorOverlay({
               })}
             </div>
 
-            <div className="flex flex-col justify-between rounded-lg border border-cyan-500/30 bg-slate-950/95 p-3">
+            <div className="flex flex-col justify-between rounded-xl border border-sky-400/20 bg-slate-950/70 p-3">
               <div>
                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-display text-sm font-bold text-amber-300 uppercase">
@@ -357,7 +357,7 @@ export function VehicleInspectorOverlay({
                         LOGGED
                       </span>
                     )}
-                    <span className="rounded bg-cyan-500/20 px-2 py-0.5 font-mono-tech text-[10px] font-bold text-cyan-200">
+                    <span className="rounded bg-sky-500/20 px-2 py-0.5 font-mono-tech text-[10px] font-bold text-sky-200">
                       {activePart.specLabel}
                     </span>
                   </div>
@@ -366,7 +366,7 @@ export function VehicleInspectorOverlay({
 
                 {inspectorUi.showConnections && connectedSpecs.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-800 pt-2">
-                    <span className="font-hud text-[10px] font-bold text-cyan-300 uppercase">
+                    <span className="font-hud text-[10px] font-bold text-sky-300 uppercase">
                       Connected To:
                     </span>
                     {connectedSpecs.map((c) => (
@@ -374,7 +374,7 @@ export function VehicleInspectorOverlay({
                         key={c.id}
                         type="button"
                         onClick={() => onSelectPart(c.id)}
-                        className="rounded border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 font-hud text-[10px] font-bold text-cyan-100 hover:border-amber-400"
+                        className="rounded border border-sky-400/35 bg-sky-500/10 px-2 py-0.5 font-hud text-[10px] font-bold text-sky-100 hover:border-amber-400"
                       >
                         {c.name}
                       </button>

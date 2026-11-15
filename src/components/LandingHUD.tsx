@@ -87,14 +87,14 @@ export function LandingHUD({
             </div>
           </div>
 
-          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-stone-100">
+          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
             <div className="flex items-center gap-2 text-base font-bold text-amber-400">
               <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
               <span>{isMars ? 'Mars Powered Descent' : 'Lunar Powered Descent'}</span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4">
-              <p className="text-base leading-snug text-stone-100">{objectiveLine}</p>
-              <span className="shrink-0 text-base font-bold text-stone-200 tabular-nums">
+              <p className="text-base leading-snug text-slate-100">{objectiveLine}</p>
+              <span className="shrink-0 text-base font-bold text-slate-200 tabular-nums">
                 {counterText}
               </span>
             </div>
@@ -103,32 +103,32 @@ export function LandingHUD({
 
         {/* GROUP 2: Top-Right 3 Meters + Pad Distance (+ Contextual Alert Chips only when needed) */}
         <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
-          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-white/10 rounded-2xl px-4 py-2.5 tabular-nums">
+          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-4 py-2.5 tabular-nums">
             <div className="flex items-center gap-2.5 pr-4">
               <Battery className="h-5 w-5 text-amber-400" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.power)}%
                 </span>
-                <span className="text-sm text-stone-400">Power</span>
+                <span className="text-sm text-slate-400">Power</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 px-4">
-              <Wind className="h-5 w-5 text-stone-200" />
+              <Wind className="h-5 w-5 text-sky-300" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.oxygen)}%
                 </span>
-                <span className="text-sm text-stone-400">Air</span>
+                <span className="text-sm text-slate-400">Air</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 px-4">
-              <Shield className="h-5 w-5 text-amber-400" />
+              <Shield className="h-5 w-5 text-emerald-300" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.shield)}%
                 </span>
-                <span className="text-sm text-stone-400">Shield</span>
+                <span className="text-sm text-slate-400">Shield</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 pl-4">
@@ -137,7 +137,7 @@ export function LandingHUD({
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(landing.distToPad)} m
                 </span>
-                <span className="text-sm text-stone-400">Pad Dist</span>
+                <span className="text-sm text-slate-400">Pad Dist</span>
               </div>
             </div>
           </div>
@@ -180,11 +180,11 @@ export function LandingHUD({
           data-testid="hud-group-radar"
           onClick={() => onOpenMenuTab('map')}
           title="Open Landing Zone Map [Tab]"
-          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-amber-400"
+          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-sky-400/60"
         >
           <svg viewBox="0 0 144 144" className="h-full w-full">
-            <circle cx="72" cy="72" r="60" fill="#131214" stroke="rgba(255,255,255,0.16)" strokeWidth="1.5" />
-            <circle cx="72" cy="72" r="30" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
+            <circle cx="72" cy="72" r="60" fill="#0b1222" stroke="rgba(56,189,248,0.28)" strokeWidth="1.5" />
+            <circle cx="72" cy="72" r="30" fill="none" stroke="rgba(148,163,184,0.16)" strokeWidth="1" />
             <circle cx="72" cy="72" r="6" fill="none" stroke="#f59e0b" strokeWidth="1.8" />
 
             {/* Predicted Touchdown Ring */}
@@ -203,10 +203,10 @@ export function LandingHUD({
               cy={72 + (relZ / 45) * 48}
               r="4.5"
               fill="#ffffff"
-              stroke="#f59e0b"
+              stroke="#38bdf8"
               strokeWidth="1.5"
             />
-            <text x="72" y="122" textAnchor="middle" fontSize="11" fontWeight="700" fill="#e7e5e4">
+            <text x="72" y="122" textAnchor="middle" fontSize="11" fontWeight="700" fill="#e2e8f0">
               {altM.toFixed(0)} m ALT
             </text>
           </svg>
@@ -223,7 +223,7 @@ export function LandingHUD({
                 <div className="font-bold text-amber-300">
                   {activeUnstowSpec?.title ?? 'Unstowing Rover'}
                 </div>
-                <div className="text-sm text-stone-300">
+                <div className="text-sm text-slate-300">
                   {activeUnstowSpec?.explanation ?? 'Deploying rocker-bogie wheels onto surface.'}
                 </div>
               </div>
@@ -231,7 +231,7 @@ export function LandingHUD({
                 type="button"
                 data-testid="skip-unstow-btn"
                 onClick={onSkipUnstow}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400"
               >
                 <FastForward className="h-4 w-4" />
                 Deploy Now
@@ -256,7 +256,7 @@ export function LandingHUD({
                     type="button"
                     data-testid="fast-forward-edl-btn"
                     onClick={onFastForwardEdl}
-                    className="rounded-lg bg-amber-500 px-3 py-1 font-bold text-stone-950 hover:bg-amber-400"
+                    className="rounded-lg bg-amber-500 px-3 py-1 font-bold text-slate-950 hover:bg-amber-400"
                   >
                     Skip to Terminal
                   </button>
@@ -270,7 +270,7 @@ export function LandingHUD({
                     <span className="text-xl font-bold text-white">
                       {descentSpeed.toFixed(1)} m/s
                     </span>
-                    <span className="text-sm text-stone-300">sink</span>
+                    <span className="text-sm text-slate-300">sink</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function LandingHUD({
                   <button
                     type="button"
                     onClick={onMatchHover}
-                    className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-sm font-semibold text-stone-100 hover:border-amber-400"
+                    className="rounded-lg border border-sky-400/25 bg-slate-900/75 px-2.5 py-1 text-sm font-semibold text-slate-100 hover:border-amber-400"
                   >
                     Hover
                   </button>
@@ -309,8 +309,8 @@ export function LandingHUD({
                     }
                     className={`rounded-lg px-3 py-1 text-sm font-bold ${
                       landing.guidanceMode === 'AUTOLAND'
-                        ? 'bg-amber-500 text-stone-950'
-                        : 'border border-white/15 bg-white/5 text-stone-100 hover:border-amber-400'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'border border-sky-400/25 bg-slate-900/75 text-slate-100 hover:border-amber-400'
                     }`}
                   >
                     Auto-Land
@@ -324,27 +324,27 @@ export function LandingHUD({
         {/* GROUP 4: Bottom-Right Max 3 Hints */}
         <div
           data-testid="hud-group-hints"
-          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-2.5 text-base"
+          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-base"
         >
           <button
             type="button"
             data-hold-keys="forward"
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               W/Z
             </span>
-            <span className="font-medium text-stone-200">Throttle</span>
+            <span className="font-medium text-slate-200">Throttle</span>
           </button>
           <button
             type="button"
             data-hold-keys="left"
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               A/D
             </span>
-            <span className="font-medium text-stone-200">Tilt</span>
+            <span className="font-medium text-slate-200">Tilt</span>
           </button>
           <button
             type="button"
@@ -353,10 +353,10 @@ export function LandingHUD({
             }
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               G
             </span>
-            <span className="font-medium text-stone-200">Auto-Land</span>
+            <span className="font-medium text-slate-200">Auto-Land</span>
           </button>
         </div>
       </div>

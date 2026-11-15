@@ -129,7 +129,7 @@ function PayloadBlueprintIcon({ id, active }: { id: PayloadId; active: boolean }
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
         active
           ? 'border-amber-400/70 bg-amber-500/15 text-amber-300'
-          : 'border-cyan-500/35 bg-slate-950 text-cyan-300'
+          : 'border-sky-400/25 bg-slate-950/75 text-sky-300'
       }`}
     >
       <Icon className="h-5 w-5" />
@@ -147,7 +147,7 @@ function MassPips({ massMultiplier }: { massMultiplier: number }) {
           <span
             key={idx}
             className={`h-1.5 w-3 rounded-sm ${
-              idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-cyan-400') : 'bg-slate-800'
+              idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-sky-400') : 'bg-slate-800'
             }`}
           />
         ))}
@@ -192,17 +192,17 @@ export function BriefingOverlay({
       : `Space Weather · ${donki.classType}`;
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/94 p-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/82 p-4">
       <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-4xl rounded-2xl p-5 md:p-6">
         {/* Top Bar */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-cyan-500/20 pb-3.5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-sky-400/20 pb-3.5">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="rounded-lg border border-cyan-500/30 bg-slate-900 px-3 py-2 font-hud text-xs font-bold text-slate-200 uppercase transition hover:border-cyan-400"
+              className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-3 py-2 font-hud text-xs font-bold text-slate-200 uppercase transition hover:border-sky-400/60"
             >
-              <ArrowLeft className="mr-1 inline h-3.5 w-3.5 text-cyan-300" />
+              <ArrowLeft className="mr-1 inline h-3.5 w-3.5 text-sky-300" />
               Command Deck
             </button>
             <div
@@ -217,7 +217,7 @@ export function BriefingOverlay({
               />
             </div>
             <div>
-              <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
+              <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-sky-300 uppercase">
                 {mission.code} · {mission.planet === 'mars' ? 'MARS 0.38g' : 'MOON 0.165g'}
               </p>
               <h2 className="font-display text-2xl font-bold text-white uppercase">
@@ -230,7 +230,7 @@ export function BriefingOverlay({
             <button
               type="button"
               onClick={onOpenNotebook}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-500/12 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-cyan-200 uppercase hover:bg-cyan-500/25"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-400/35 bg-sky-500/12 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-sky-200 uppercase hover:bg-sky-500/25"
             >
               <BookOpen className="h-3.5 w-3.5" />
               Ledger ({carryover.unlockedFieldNotes.length})
@@ -239,7 +239,7 @@ export function BriefingOverlay({
             <button
               type="button"
               onClick={onOpenNasaModal}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-amber-200 uppercase hover:bg-amber-500/25"
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-amber-200 uppercase hover:bg-amber-500/25"
             >
               <Database className="h-3.5 w-3.5" />
               {nasaBadgeText}
@@ -249,7 +249,7 @@ export function BriefingOverlay({
 
         {/* Mission Flight Profile Diagram + Carryover Loop Schematic */}
         <div className="mb-4 grid gap-3 md:grid-cols-[1.3fr_1fr]">
-          <div className="rounded-xl border border-cyan-500/25 bg-slate-900/95 p-3">
+          <div className="rounded-xl border border-sky-400/20 bg-slate-900/65 p-3">
             <div className="mb-2 flex flex-wrap gap-1.5">
               {CAMPAIGN_ORDER.map((id) => {
                 const m = CAMPAIGN_MISSIONS[id];
@@ -260,12 +260,12 @@ export function BriefingOverlay({
                     key={id}
                     type="button"
                     onClick={() => onSelectCampaignMission(id)}
-                    className={`rounded-md px-2.5 py-1 font-hud text-[11px] font-bold whitespace-nowrap transition ${
+                    className={`rounded-lg px-2.5 py-1 font-hud text-[11px] font-bold whitespace-nowrap transition ${
                       active
-                        ? 'bg-cyan-400 text-slate-950'
+                        ? 'bg-sky-400 text-slate-950'
                         : done
                           ? 'border border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
-                          : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                          : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700'
                     }`}
                   >
                     {m.shortLabel}
@@ -275,7 +275,7 @@ export function BriefingOverlay({
             </div>
 
             {/* Visual Mission Profile Arc */}
-            <div className="rounded-lg border border-slate-800 bg-slate-950/95 px-2 py-1">
+            <div className="rounded-lg border border-sky-400/15 bg-slate-950/75 px-2 py-1">
               <MissionProfileDiagram missionId={mission.id} planet={mission.planet} />
             </div>
 
@@ -285,7 +285,7 @@ export function BriefingOverlay({
           </div>
 
           {/* Carryover Flow Diagram */}
-          <div className="flex flex-col justify-between rounded-xl border border-emerald-400/30 bg-slate-900/95 p-3 text-xs">
+          <div className="flex flex-col justify-between rounded-xl border border-emerald-400/25 bg-slate-900/65 p-3 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-hud text-[11px] font-bold tracking-wider text-emerald-300 uppercase">
                 Campaign Carryover Link
@@ -300,8 +300,8 @@ export function BriefingOverlay({
               <div
                 className={`rounded-lg border px-2 py-2 ${
                   carryover.relaySatelliteOnline
-                    ? 'border-emerald-400/50 bg-emerald-950/90'
-                    : 'border-slate-700 bg-slate-950/95'
+                    ? 'border-emerald-400/50 bg-emerald-950/75'
+                    : 'border-sky-400/15 bg-slate-950/75'
                 }`}
               >
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
@@ -316,16 +316,16 @@ export function BriefingOverlay({
                 </span>
               </div>
 
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 px-2 py-2">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-950/75 px-2 py-2">
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
                   ISRU H₂O / Fuel
                 </span>
-                <span className="font-mono-tech text-xs font-bold text-cyan-300">
+                <span className="font-mono-tech text-xs font-bold text-sky-300">
                   {carryover.isruWaterKg}kg · +{carryover.isruFuelBonusPct}%
                 </span>
               </div>
 
-              <div className="rounded-lg border border-amber-500/25 bg-slate-950/95 px-2 py-2">
+              <div className="rounded-lg border border-amber-500/25 bg-slate-950/75 px-2 py-2">
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
                   Crew Dose
                 </span>
@@ -353,8 +353,8 @@ export function BriefingOverlay({
             {
               label: 'O₂ Reserve',
               val: previewResources.oxygen,
-              color: 'bg-cyan-400',
-              text: 'text-cyan-300',
+              color: 'bg-sky-400',
+              text: 'text-sky-300',
             },
             {
               label: 'Radiation Shield',
@@ -365,7 +365,7 @@ export function BriefingOverlay({
           ].map((r) => (
             <div
               key={r.label}
-              className="rounded-xl border border-cyan-500/20 bg-slate-900/95 p-2.5"
+              className="rounded-xl border border-sky-400/20 bg-slate-900/65 p-2.5"
             >
               <div className="mb-1 flex items-center justify-between text-xs font-semibold">
                 <span className="font-hud text-slate-200 uppercase">{r.label}</span>
@@ -389,8 +389,8 @@ export function BriefingOverlay({
                 onClick={() => onSelectPayload(p.id)}
                 className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
                   active
-                    ? 'border-amber-400 bg-amber-500/18 shadow-[0_0_24px_rgba(245,158,11,0.18)]'
-                    : 'border-cyan-500/25 bg-slate-900/95 hover:border-cyan-400/60'
+                    ? 'border-amber-400/80 bg-amber-500/18 shadow-[0_0_24px_rgba(245,158,11,0.18)]'
+                    : 'border-sky-400/20 bg-slate-900/65 hover:border-sky-400/55'
                 }`}
               >
                 <PayloadBlueprintIcon id={p.id} active={active} />
@@ -402,7 +402,7 @@ export function BriefingOverlay({
                     </span>
                     <span
                       className={`shrink-0 rounded px-2 py-0.5 font-mono-tech text-[10px] font-bold uppercase ${
-                        p.fragile ? 'bg-rose-500/20 text-rose-200' : 'bg-cyan-500/20 text-cyan-200'
+                        p.fragile ? 'bg-rose-500/20 text-rose-200' : 'bg-sky-500/20 text-sky-200'
                       }`}
                     >
                       {p.shortTag}

@@ -142,6 +142,8 @@ export class SpaceSceneManager {
   private camLookCurrent = new THREE.Vector3(0, 2, 0);
   private camLookTarget = new THREE.Vector3(0, 2, 0);
   private scratchVec = new THREE.Vector3();
+  private scratchFocusVec = new THREE.Vector3();
+  private scratchShipAnchor = new THREE.Vector3();
   private scratchColor = new THREE.Color();
   private crashDummy = new THREE.Object3D();
 
@@ -518,6 +520,69 @@ export class SpaceSceneManager {
       });
     });
     return out;
+  }
+
+  pickSolarBody(clientX: number, clientY: number): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNdc, this.camera);
+
+    const targets: THREE.Object3D[] = [
+      this.solarSystem.sun,
+      this.solarSystem.planets.moon,
+      this.solarSystem.planets.mars,
+      ...Object.values(this.solarSystem.extraBodies),
+    ];
+    const hits = this.raycaster.intersectObjects(targets, true);
+    for (const hit of hits) {
+      let cur: THREE.Object3D | null = hit.object;
+      while (cur) {
+        if (typeof cur.userData?.solarBodyId === 'string') {
+          return cur.userData.solarBodyId;
+        }
+        cur = cur.parent;
+      }
+    }
+    return null;
+  }
+
+  private getSolarVisualRadius(bodyId: string): number {
+    if (bodyId === 'sun') return 11.4;
+    if (bodyId === 'earth') return 4.75;
+    if (bodyId === 'mars') return SOLAR_TARGETS.mars.radius;
+    const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
+    return spec ? spec.explorationBodySize : 4.2;
+  }
+
+  getSelectedSolarBodyScreenPos(
+    bodyId: string | null
+  ): { xPct: number; yPct: number; visible: boolean } | null {
+    if (!bodyId) return null;
+    const radius = this.getSolarVisualRadius(bodyId);
+    const yOffset = bodyId === 'sun' ? 3.2 : 1.9;
+    if (bodyId === 'sun') {
+      this.scratchVec.set(-48, radius + yOffset, -36);
+    } else if (bodyId === 'mars') {
+      const m = this.solarSystem.planets.mars.position;
+      this.scratchVec.set(m.x, m.y + radius + yOffset, m.z);
+    } else {
+      const obj = this.solarSystem.extraBodies[bodyId];
+      if (!obj) return null;
+      this.scratchVec.set(obj.position.x, obj.position.y + radius + yOffset, obj.position.z);
+    }
+    this.scratchVec.project(this.camera);
+    const visible =
+      this.scratchVec.z >= -1 &&
+      this.scratchVec.z <= 1 &&
+      Math.abs(this.scratchVec.x) <= 0.94 &&
+      Math.abs(this.scratchVec.y) <= 0.88;
+    return {
+      xPct: Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10,
+      yPct: Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10,
+      visible,
+    };
   }
 
   resetWheelTracks() {
@@ -1347,9 +1412,10 @@ export class SpaceSceneManager {
     ss.sunCorona.scale.setScalar(1 + Math.sin(elapsedSec * 2.2) * 0.025);
     ss.asteroidBelt.rotation.y += dt * 0.015;
 
-    // Pulse solar storm ring radius
+    // Pulse solar storm ring gently; intensify only during active solar flare
     const stormScale = s.donkiFlareActive ? 1.5 : 1.0;
     ss.stormRing.scale.setScalar(stormScale + Math.sin(elapsedSec * 2.5) * 0.03);
+    (ss.stormRing.material as THREE.MeshBasicMaterial).opacity = s.donkiFlareActive ? 0.36 : 0.11;
 
     // Rotate planets gently & lock beacon onto active target
     (Object.keys(SOLAR_TARGETS) as Array<keyof typeof SOLAR_TARGETS>).forEach((id) => {
@@ -1358,6 +1424,8 @@ export class SpaceSceneManager {
     const targetSpec = SOLAR_TARGETS[sp.targetId];
     ss.targetBeacon.position.set(targetSpec.x, 0, targetSpec.z);
     ss.targetBeacon.scale.setScalar((targetSpec.radius / 3.4) * (1 + Math.sin(elapsedSec * 4) * 0.06));
+    ss.targetBeacon.visible = !s.freeExploreMode;
+    ss.courseLine.visible = !s.freeExploreMode;
 
     // Update live course line
     const posAttr = ss.courseLine.geometry.attributes.position as THREE.BufferAttribute;
@@ -1365,13 +1433,18 @@ export class SpaceSceneManager {
     posAttr.setXYZ(1, targetSpec.x, 0, targetSpec.z);
     posAttr.needsUpdate = true;
 
-    // Complete Solar System Keplerian Positioning & Scale Mode
+    // Complete Solar System Keplerian Positioning & Scale Mode (zero per-frame allocations)
     const scaleMode: SolarScaleMode = s.solarScaleMode ?? 'exploration';
     const epochYears = s.solarEpochYears ?? 0;
-    let focusPos: THREE.Vector3 | null = null;
+    let hasFocus = false;
+    let focusRadius = 4.5;
     SOLAR_SYSTEM_BODIES.forEach((b) => {
       if (b.id === 'sun') {
-        if (s.focusedSolarBodyId === 'sun') focusPos = new THREE.Vector3(-48, 0, -36);
+        if (s.focusedSolarBodyId === 'sun') {
+          this.scratchFocusVec.set(-48, 0, -36);
+          hasFocus = true;
+          focusRadius = b.explorationBodySize;
+        }
         return;
       }
       const pos = computeKeplerBodyPosition(b, epochYears, scaleMode);
@@ -1393,32 +1466,53 @@ export class SpaceSceneManager {
           bodyObj.position.set(marsSpec.x, 0, marsSpec.z);
         }
         if (b.id === 'halley') {
-          // Point comet tail radially away from Sun (-48, 0, -36)
           const dx = pos.x + 48;
           const dz = pos.z + 36;
           bodyObj.rotation.y = Math.atan2(dx, dz);
         }
         if (s.focusedSolarBodyId === b.id) {
-          focusPos = bodyObj.position.clone();
+          this.scratchFocusVec.copy(bodyObj.position);
+          hasFocus = true;
+          focusRadius = this.getSolarVisualRadius(b.id);
         }
       }
     });
 
-    // Camera: focused Solar System body OR elevated chase OR full 360° orbit + wheel zoom around Orion & Satellite
-    if (focusPos && !s.userOrbitActive) {
-      const dist = Math.min(140, Math.max(6.5, s.orbitDistance));
+    if (s.focusedSolarBodyId === 'sun') {
+      focusRadius = this.getSolarVisualRadius('sun');
+    }
+
+    // Sync glowing cyan selection ring around the focused Solar System body
+    if (hasFocus && s.focusedSolarBodyId) {
+      ss.selectionRing.visible = true;
+      ss.selectionRing.position.copy(this.scratchFocusVec);
+      ss.selectionRing.scale.setScalar(focusRadius * (1.0 + Math.sin(elapsedSec * 2.6) * 0.025));
+      ss.selectionRing.rotation.y += dt * 0.45;
+    } else {
+      ss.selectionRing.visible = false;
+    }
+
+    // Camera: focused Solar System body OR elevated chase OR full 360° orbit + wheel zoom
+    if (hasFocus && !s.userOrbitActive) {
+      const dist = Math.min(140, Math.max(7.2, s.orbitDistance));
       this.camPosTarget.set(
-        (focusPos as THREE.Vector3).x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        Math.max(2, Math.sin(s.orbitPitch) * dist + 4),
-        (focusPos as THREE.Vector3).z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        this.scratchFocusVec.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+        Math.max(2.2, this.scratchFocusVec.y + Math.sin(s.orbitPitch) * dist + 1.5),
+        this.scratchFocusVec.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camLookTarget.copy(focusPos);
+      this.camLookTarget.set(
+        this.scratchFocusVec.x + (-48 - this.scratchFocusVec.x) * 0.16,
+        this.scratchFocusVec.y,
+        this.scratchFocusVec.z + (-36 - this.scratchFocusVec.z) * 0.16
+      );
     } else if (s.userOrbitActive) {
-      const anchor = focusPos ?? new THREE.Vector3(sp.shipX, 0, sp.shipZ);
+      const anchor = hasFocus
+        ? this.scratchFocusVec
+        : this.scratchShipAnchor.set(sp.shipX, 0, sp.shipZ);
       const dist = Math.min(180, Math.max(4.5, s.orbitDistance));
       this.camPosTarget.set(
         anchor.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        Math.sin(s.orbitPitch) * dist,
+        anchor.y + Math.sin(s.orbitPitch) * dist,
         anchor.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
       this.camLookTarget.copy(anchor);

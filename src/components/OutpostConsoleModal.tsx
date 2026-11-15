@@ -69,13 +69,13 @@ export function OutpostConsoleModal({
   );
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/90 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
       <div
         data-testid="outpost-console-modal"
         className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-5"
       >
         {/* Header */}
-        <div className="mb-4 flex shrink-0 items-start justify-between gap-3 border-b border-cyan-500/25 pb-3">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-3 border-b border-sky-400/20 pb-3">
           <div>
             <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-emerald-300 uppercase">
               Sol {state.solNumber} · {state.planet === 'mars' ? 'Jezero Base Camp' : 'Shackleton Rim Base Camp'}
@@ -89,10 +89,10 @@ export function OutpostConsoleModal({
               type="button"
               data-testid="toggle-sol-report-btn"
               onClick={() => setShowSolReport((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-hud text-xs font-bold uppercase ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-hud text-xs font-bold uppercase ${
                 showSolReport
                   ? 'border-amber-400 bg-amber-500/20 text-amber-200'
-                  : 'border-cyan-400/50 bg-slate-900 text-cyan-200 hover:border-cyan-300'
+                  : 'border-sky-400/35 bg-slate-900/75 text-sky-200 hover:border-sky-300'
               }`}
             >
               <FileBarChart className="h-3.5 w-3.5" />
@@ -102,7 +102,7 @@ export function OutpostConsoleModal({
               type="button"
               aria-label="Close Outpost Console"
               onClick={onClose}
-              className="rounded-lg border border-cyan-500/30 bg-slate-900 p-2 text-slate-300 hover:border-cyan-400 hover:text-white"
+              className="rounded-xl border border-sky-400/25 bg-slate-900/75 p-2 text-slate-300 hover:border-sky-400/60 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -111,7 +111,7 @@ export function OutpostConsoleModal({
 
         {/* 3 Core Resource Strips (POWER, AIR/O₂, SHIELDING) */}
         <div className="mb-4 grid shrink-0 grid-cols-3 gap-2.5 text-xs tabular-nums">
-          <div className="rounded-xl border border-amber-400/30 bg-slate-950/95 p-2.5">
+          <div className="rounded-xl border border-amber-400/30 bg-slate-950/65 p-2.5">
             <div className="flex justify-between font-hud text-[11px] font-bold text-amber-300 uppercase">
               <span>Power Bus</span>
               <span className="font-mono-tech">{Math.round(resources.power)}%</span>
@@ -120,16 +120,16 @@ export function OutpostConsoleModal({
               <div className="h-full bg-amber-400" style={{ width: `${Math.round(resources.power)}%` }} />
             </div>
           </div>
-          <div className="rounded-xl border border-cyan-400/30 bg-slate-950/95 p-2.5">
-            <div className="flex justify-between font-hud text-[11px] font-bold text-cyan-300 uppercase">
+          <div className="rounded-xl border border-sky-400/30 bg-slate-950/65 p-2.5">
+            <div className="flex justify-between font-hud text-[11px] font-bold text-sky-300 uppercase">
               <span>Air / O₂</span>
               <span className="font-mono-tech">{Math.round(resources.oxygen)}%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full bg-cyan-400" style={{ width: `${Math.round(resources.oxygen)}%` }} />
+              <div className="h-full bg-sky-400" style={{ width: `${Math.round(resources.oxygen)}%` }} />
             </div>
           </div>
-          <div className="rounded-xl border border-emerald-400/30 bg-slate-950/95 p-2.5">
+          <div className="rounded-xl border border-emerald-400/30 bg-slate-950/65 p-2.5">
             <div className="flex justify-between font-hud text-[11px] font-bold text-emerald-300 uppercase">
               <span>Shielding</span>
               <span className="font-mono-tech">{Math.round(resources.shield)}%</span>
@@ -141,7 +141,7 @@ export function OutpostConsoleModal({
         </div>
 
         {/* Airlock Pressurization Cycle Bar */}
-        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/80 bg-slate-900/95 p-3">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-400/20 bg-slate-900/65 p-3">
           <div className="flex items-center gap-3">
             <DoorOpen className={`h-5 w-5 ${isInside ? 'text-emerald-300' : 'text-amber-300'}`} />
             <div>
@@ -218,7 +218,7 @@ export function OutpostConsoleModal({
                 ))}
               </ul>
 
-              <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3 text-xs text-cyan-100">
+              <div className="rounded-lg border border-sky-400/30 bg-sky-500/10 p-3 text-xs text-sky-100">
                 <strong className="font-hud uppercase">Flight Surgeon Recommendation: </strong>
                 {solReport.recommendation}
               </div>
@@ -236,16 +236,16 @@ export function OutpostConsoleModal({
                       type="button"
                       disabled={!isInside}
                       onClick={() => onSelectRoom(bay.id)}
-                      className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left font-hud text-xs font-bold transition ${
+                      className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-hud text-xs font-bold transition ${
                         !isInside
                           ? 'border-slate-800 bg-slate-900/50 text-slate-600'
                           : active
-                            ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                            : 'border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400/50'
+                            ? 'border-sky-400 bg-sky-500/20 text-white'
+                            : 'border-sky-400/15 bg-slate-900/65 text-slate-200 hover:border-sky-400/50'
                       }`}
                     >
                       <span className="inline-flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${active && isInside ? 'text-cyan-300' : 'text-slate-400'}`} />
+                        <Icon className={`h-4 w-4 ${active && isInside ? 'text-sky-300' : 'text-slate-400'}`} />
                         {bay.name}
                       </span>
                     </button>
@@ -254,7 +254,7 @@ export function OutpostConsoleModal({
               </div>
 
               {/* Active Interior Bay Schematic & Controls */}
-              <div className="flex flex-col justify-between gap-3 rounded-xl border border-cyan-500/25 bg-slate-950/95 p-4">
+              <div className="flex flex-col justify-between gap-3 rounded-xl border border-sky-400/20 bg-slate-950/65 p-4">
                 {!isInside ? (
                   <div className="my-auto py-8 text-center">
                     <p className="font-display text-sm font-bold text-amber-300 uppercase">
@@ -268,7 +268,7 @@ export function OutpostConsoleModal({
                   <>
                     <div>
                       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-display text-base font-bold text-cyan-200 uppercase">
+                        <h3 className="font-display text-base font-bold text-sky-200 uppercase">
                           {activeBay.name}
                         </h3>
                         <span className="rounded border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 font-mono-tech text-[10px] font-bold text-emerald-300">
@@ -281,8 +281,8 @@ export function OutpostConsoleModal({
                       <p className="mt-2 text-xs leading-relaxed text-slate-100">
                         {activeBay.statusLine}
                       </p>
-                      <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/90 p-3 text-xs text-slate-200">
-                        <span className="font-hud font-bold text-cyan-300 uppercase">Real Physics Rule: </span>
+                      <div className="mt-3 rounded-lg border border-sky-400/15 bg-slate-900/75 p-3 text-xs text-slate-200">
+                        <span className="font-hud font-bold text-sky-300 uppercase">Real Physics Rule: </span>
                         {activeBay.fact}
                       </div>
                     </div>

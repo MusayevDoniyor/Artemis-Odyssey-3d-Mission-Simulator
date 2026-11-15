@@ -117,12 +117,12 @@ export function TitleOverlay({
           type="button"
           onClick={onToggleMute}
           title="Toggle Sound [M]"
-          className="hud-panel pointer-events-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/70"
+          className="hud-panel pointer-events-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-sky-400/60"
         >
           {muted ? (
             <VolumeX className="h-4 w-4 text-slate-400" />
           ) : (
-            <Volume2 className="h-4 w-4 text-cyan-300" />
+            <Volume2 className="h-4 w-4 text-sky-300" />
           )}
           <span className="keycap">M</span>
         </button>
@@ -145,7 +145,7 @@ export function TitleOverlay({
           <div>
             <div className="flex items-center gap-2">
               <NASAInsignia size={22} className="shrink-0" />
-              <p className="font-hud text-[11px] font-bold tracking-[0.24em] text-cyan-300 uppercase">
+              <p className="font-hud text-[11px] font-bold tracking-[0.24em] text-sky-300 uppercase">
                 NASA Flight Operations Simulator
               </p>
             </div>
@@ -161,7 +161,7 @@ export function TitleOverlay({
 
         {/* 4-Stage Campaign Selector */}
         <div className="pointer-events-auto mb-4">
-          <div className="mb-1.5 flex items-center justify-between font-hud text-[11px] font-bold tracking-wider text-cyan-300 uppercase">
+          <div className="mb-1.5 flex items-center justify-between font-hud text-[11px] font-bold tracking-wider text-sky-300 uppercase">
             <span>Campaign Manifest</span>
             {carryover.completedMissions.length > 0 && (
               <span className="font-mono-tech text-emerald-300">
@@ -180,12 +180,12 @@ export function TitleOverlay({
                   type="button"
                   data-testid={`campaign-btn-${id}`}
                   onClick={() => onSelectCampaignMission(id)}
-                  className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
+                  className={`rounded-xl border px-3 py-2 text-left text-xs transition ${
                     active
-                      ? 'border-amber-400 bg-amber-500/20 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]'
+                      ? 'border-amber-400/80 bg-amber-500/20 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]'
                       : done
                         ? 'border-emerald-400/50 bg-emerald-500/12 text-emerald-200 hover:border-emerald-300'
-                        : 'hud-panel text-slate-200 hover:border-cyan-400/60'
+                        : 'hud-panel text-slate-200 hover:border-sky-400/55'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1 font-hud font-bold tracking-wide">
@@ -198,12 +198,12 @@ export function TitleOverlay({
               );
             })}
           </div>
-          <div className="mt-2 max-w-lg rounded-lg border border-cyan-500/20 bg-slate-950/95 px-3 py-2 text-[11px]">
+          <div className="mt-2 max-w-lg rounded-xl border border-sky-400/20 bg-slate-950/75 px-3 py-2 text-[11px]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-hud font-bold tracking-wide text-amber-300 uppercase">
                 {activeMission.code}
               </span>
-              <span className="font-mono-tech text-[10px] text-cyan-300">
+              <span className="font-mono-tech text-[10px] text-sky-300">
                 {MISSION_ROUTE_BADGE[activeMission.id]}
               </span>
             </div>
@@ -236,7 +236,7 @@ export function TitleOverlay({
           <button
             type="button"
             onClick={() => onJumpToPhase('inspector')}
-            className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-cyan-100 uppercase transition hover:border-cyan-400/75"
+            className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-sky-100 uppercase transition hover:border-sky-400/65"
           >
             Hardware Bay
           </button>
@@ -287,7 +287,7 @@ export function TitleOverlay({
             onReset={onResetCamera}
           />
 
-          <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg p-1.5">
+          <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl p-1.5">
             <span className="px-2 font-hud text-[11px] font-bold text-slate-400 uppercase">
               3D Model
             </span>
@@ -296,9 +296,9 @@ export function TitleOverlay({
                 key={opt.id}
                 type="button"
                 onClick={() => onSelectShowcase(opt.id)}
-                className={`rounded-md px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap transition ${
+                className={`rounded-lg px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap transition ${
                   showcase === opt.id
-                    ? 'bg-cyan-400 text-slate-950'
+                    ? 'bg-sky-400 text-slate-950'
                     : 'text-slate-200 hover:bg-slate-800'
                 }`}
               >

@@ -57,8 +57,8 @@ function ResourceGaugeStrip({ resources }: { resources: ResourceState }) {
     {
       label: 'O₂ Reserve',
       val: Math.round(resources.oxygen),
-      bar: 'bg-cyan-400',
-      text: 'text-cyan-300',
+      bar: 'bg-sky-400',
+      text: 'text-sky-300',
     },
     {
       label: 'Rad Shield',
@@ -69,7 +69,7 @@ function ResourceGaugeStrip({ resources }: { resources: ResourceState }) {
   ];
 
   return (
-    <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl border border-cyan-500/20 bg-slate-950/95 p-3 text-left text-xs">
+    <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl border border-sky-400/20 bg-slate-950/65 p-3 text-left text-xs">
       {items.map((item) => (
         <div key={item.label}>
           <div className="mb-1 flex items-center justify-between gap-1">
@@ -106,13 +106,13 @@ export function OutcomeModal({
 }: OutcomeModalProps) {
   if (mode === 'discovery' && discoveryObjective) {
     return (
-      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
+      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
         <div className="hud-panel tactical-frame animate-modal-enter w-full max-w-lg rounded-2xl p-6">
-          <div className="mb-3 flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-2.5">
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-sky-400/20 pb-2.5">
             <span className="font-hud text-[11px] font-bold tracking-[0.16em] text-emerald-300 uppercase">
               SPECIMEN LOGGED · LEDGER UPDATED
             </span>
-            <span className="font-mono-tech text-[11px] font-bold text-cyan-300">+800 PTS</span>
+            <span className="font-mono-tech text-[11px] font-bold text-sky-300">+800 PTS</span>
           </div>
 
           <h2 className="font-display text-2xl font-bold text-white">{discoveryObjective.title}</h2>
@@ -120,7 +120,7 @@ export function OutcomeModal({
             {discoveryObjective.rewardText}
           </p>
 
-          <div className="mt-3.5 rounded-xl border border-cyan-500/25 bg-slate-950/95 p-3.5 text-sm leading-relaxed text-slate-100">
+          <div className="mt-3.5 rounded-xl border border-sky-400/20 bg-slate-950/65 p-3.5 text-sm leading-relaxed text-slate-100">
             {discoveryObjective.nasaFact}
           </div>
 
@@ -128,7 +128,7 @@ export function OutcomeModal({
             <button
               type="button"
               onClick={onResume}
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-cyan-300"
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-sky-300"
             >
               <Play className="h-4 w-4 fill-slate-950" />
               Resume
@@ -157,11 +157,11 @@ export function OutcomeModal({
           : 'ERR // LUNAR-EDL-IMPACT';
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
       <div className={`${panelClass} animate-modal-enter w-full max-w-xl rounded-2xl p-6`}>
         {mode === 'pause' && (
           <div className="text-center">
-            <p className="font-hud text-[11px] font-bold tracking-[0.2em] text-cyan-300 uppercase">
+            <p className="font-hud text-[11px] font-bold tracking-[0.2em] text-sky-300 uppercase">
               Houston Telemetry Hold
             </p>
             <h2 className="mt-1 font-display text-2xl font-bold tracking-wide text-white uppercase">
@@ -271,7 +271,7 @@ export function OutcomeModal({
               <span className="block font-hud text-[9px] font-bold text-slate-300 uppercase">
                 ISRU H₂O
               </span>
-              <span className="font-mono-tech font-bold text-cyan-300">
+              <span className="font-mono-tech font-bold text-sky-300">
                 {carryover.isruWaterKg}kg
               </span>
             </div>
@@ -299,7 +299,7 @@ export function OutcomeModal({
             <button
               type="button"
               onClick={onResume}
-              className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-cyan-300"
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-sky-300"
             >
               <Play className="h-4 w-4 fill-slate-950" />
               Resume
@@ -328,7 +328,7 @@ export function OutcomeModal({
           <button
             type="button"
             onClick={onBackToTitle}
-            className="rounded-xl border border-cyan-500/30 bg-slate-900/90 px-4 py-2.5 font-hud text-xs font-bold tracking-wide whitespace-nowrap text-slate-200 uppercase transition hover:border-cyan-400 hover:text-white"
+            className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2.5 font-hud text-xs font-bold tracking-wide whitespace-nowrap text-slate-200 uppercase transition hover:border-sky-400/60 hover:text-white"
           >
             Command Deck
           </button>

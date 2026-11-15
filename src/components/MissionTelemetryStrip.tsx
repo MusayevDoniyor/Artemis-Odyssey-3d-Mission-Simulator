@@ -25,13 +25,13 @@ interface MissionTelemetryStripProps {
 
 const BADGE_STYLE: Record<HonestyBadgeKind, string> = {
   'REAL DATA': 'border-emerald-400/50 bg-emerald-500/15 text-emerald-300',
-  'REFERENCE VALUE': 'border-cyan-400/50 bg-cyan-500/15 text-cyan-300',
+  'REFERENCE VALUE': 'border-sky-400/50 bg-sky-500/15 text-sky-300',
   'SIMULATED VALUE': 'border-amber-400/50 bg-amber-500/15 text-amber-300',
 };
 
 const TONE_CLASS: Record<NonNullable<TelemetryMetricItem['tone']>, string> = {
   white: 'text-white',
-  cyan: 'text-cyan-300',
+  cyan: 'text-sky-300',
   amber: 'text-amber-300',
   emerald: 'text-emerald-300',
   rose: 'text-rose-300',
@@ -58,7 +58,7 @@ export function MissionTelemetryStrip({
       {/* Left: Live Phase + Next Milestone + Metrics */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1.5 border-r border-slate-700/80 pr-3">
-          <span className="font-display text-[11px] font-bold tracking-wider text-cyan-300 uppercase">
+          <span className="font-display text-[11px] font-bold tracking-wider text-sky-300 uppercase">
             {phaseLabel}
           </span>
           <span className="text-slate-500">·</span>
@@ -106,7 +106,7 @@ export function MissionTelemetryStrip({
           type="button"
           data-testid="glossary-chip-btn"
           onClick={() => setGlossaryOpen((v) => !v)}
-          className="inline-flex shrink-0 items-center gap-1 rounded border border-cyan-400/50 bg-cyan-500/15 px-2 py-0.5 font-hud text-[10px] font-bold text-cyan-200 uppercase hover:border-cyan-300 hover:bg-cyan-500/25"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-400/35 bg-sky-500/15 px-2 py-0.5 font-hud text-[10px] font-bold text-sky-200 uppercase hover:border-sky-300 hover:bg-sky-500/25"
         >
           <HelpCircle className="h-3 w-3" />
           {glossary.shortLabel}
@@ -126,7 +126,7 @@ export function MissionTelemetryStrip({
         <div
           role="dialog"
           aria-label={`Glossary: ${glossary.term}`}
-          className="hud-panel-amber tactical-frame absolute top-full right-3 z-30 mt-2 w-80 rounded-xl p-3 shadow-2xl"
+          className="hud-panel-amber tactical-frame absolute top-full right-3 z-30 mt-2 w-80 rounded-2xl p-3 shadow-2xl"
         >
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className="font-display text-xs font-bold text-amber-300 uppercase">

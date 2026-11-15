@@ -18,17 +18,17 @@ export function CalmFactToast({ fact, onDismiss }: CalmFactToastProps) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-sm font-bold text-amber-300">
           <span>Did you know?</span>
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs font-semibold text-stone-200">
+          <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs font-semibold text-sky-200">
             {fact.badge}
           </span>
         </div>
-        <p className="mt-0.5 text-base leading-snug text-stone-100">{fact.text}</p>
+        <p className="mt-0.5 text-base leading-snug text-slate-100">{fact.text}</p>
       </div>
       <button
         type="button"
         aria-label="Dismiss fact"
         onClick={onDismiss}
-        className="rounded-lg p-1 text-stone-400 hover:text-white"
+        className="rounded-lg p-1 text-slate-400 hover:text-white"
       >
         <X className="h-4 w-4" />
       </button>

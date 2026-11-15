@@ -30,9 +30,9 @@ export function AudioQualityPopover({
         data-testid="audio-quality-btn"
         aria-label="Audio & Graphics Settings"
         onClick={() => setOpen((v) => !v)}
-        className="hud-panel inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-200 uppercase hover:border-cyan-400"
+        className="hud-panel inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-200 uppercase hover:border-sky-400/60"
       >
-        <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-300" />
+        <SlidersHorizontal className="h-3.5 w-3.5 text-sky-300" />
         Settings
       </button>
 
@@ -40,10 +40,10 @@ export function AudioQualityPopover({
         <div
           role="dialog"
           aria-label="Audio & Quality Console"
-          className="hud-panel tactical-frame absolute top-full right-0 z-30 mt-2 w-72 rounded-xl p-4 shadow-2xl"
+          className="hud-panel tactical-frame absolute top-full right-0 z-30 mt-2 w-72 rounded-2xl p-4 shadow-2xl"
         >
-          <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="font-display text-xs font-bold text-cyan-300 uppercase">
+          <div className="mb-3 flex items-center justify-between border-b border-sky-400/15 pb-2">
+            <span className="font-display text-xs font-bold text-sky-300 uppercase">
               Audio &amp; Graphics Bus
             </span>
             <button
@@ -84,7 +84,7 @@ export function AudioQualityPopover({
                 max={100}
                 value={Math.round(audio.masterVolume * 100)}
                 onChange={(e) => onUpdateAudio({ masterVolume: Number(e.target.value) / 100 })}
-                className="w-full accent-cyan-400"
+                className="w-full accent-sky-400"
               />
             </label>
 
@@ -128,10 +128,10 @@ export function AudioQualityPopover({
                     key={q.id}
                     type="button"
                     onClick={() => onChangeQuality(q.id)}
-                    className={`rounded-md py-1.5 font-hud text-[11px] font-bold uppercase ${
+                    className={`rounded-lg py-1.5 font-hud text-[11px] font-bold uppercase ${
                       quality === q.id
-                        ? 'bg-cyan-400 text-slate-950'
-                        : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-400'
+                        ? 'bg-sky-400 text-slate-950'
+                        : 'border border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-sky-400/60'
                     }`}
                   >
                     {q.label}

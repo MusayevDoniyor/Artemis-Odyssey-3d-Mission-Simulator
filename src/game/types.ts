@@ -547,6 +547,7 @@ export type GameMenuTab =
   | 'map'
   | 'outpost'
   | 'ledger'
+  | 'achievements'
   | 'nasa'
   | 'glossary'
   | 'settings';

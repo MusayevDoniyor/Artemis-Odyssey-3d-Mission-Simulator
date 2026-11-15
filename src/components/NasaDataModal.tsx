@@ -76,14 +76,14 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
       <div
         data-testid="nasa-data-modal"
         className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-6"
       >
-        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-cyan-500/20 pb-3">
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-sky-400/20 pb-3">
           <div>
-            <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
+            <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-sky-300 uppercase">
               DONKI · OSDR · JPL Reference · Grounded Briefs
             </p>
             <h2 className="font-display text-2xl font-bold text-white uppercase">
@@ -94,7 +94,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
             type="button"
             aria-label="Close NASA Data modal"
             onClick={onClose}
-            className="rounded-lg border border-cyan-500/30 bg-slate-900 p-2 text-slate-300 hover:border-cyan-400 hover:text-white"
+            className="rounded-xl border border-sky-400/25 bg-slate-900/75 p-2 text-slate-300 hover:border-sky-400/60 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -122,7 +122,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                 href={donki.link}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 font-hud text-xs font-bold text-cyan-300 hover:underline"
+                className="inline-flex items-center gap-1 font-hud text-xs font-bold text-sky-300 hover:underline"
               >
                 Open DONKI <ExternalLink className="h-3 w-3" />
               </a>
@@ -136,13 +136,13 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
           </div>
 
           {/* 2. Data Honesty & Scenario Attribution */}
-          <div className="mb-4 rounded-xl border border-cyan-500/30 bg-slate-900/95 p-4">
-            <div className="mb-2 flex items-center gap-2 font-display text-xs font-bold tracking-wider text-cyan-300 uppercase">
-              <ShieldAlert className="h-4 w-4 text-cyan-300" />
+          <div className="mb-4 rounded-xl border border-sky-400/20 bg-slate-900/65 p-4">
+            <div className="mb-2 flex items-center gap-2 font-display text-xs font-bold tracking-wider text-sky-300 uppercase">
+              <ShieldAlert className="h-4 w-4 text-sky-300" />
               Data Honesty &amp; Training Scenario Attribution
             </div>
             <div className="grid gap-2.5 text-[11px] leading-relaxed text-slate-200 sm:grid-cols-2">
-              <div className="rounded-lg border border-emerald-500/30 bg-slate-950 p-3">
+              <div className="rounded-lg border border-emerald-500/30 bg-slate-950/65 p-3">
                 <span className="mb-1 inline-block rounded border border-emerald-400/50 bg-emerald-500/15 px-1.5 py-0.5 font-mono-tech text-[9px] font-bold text-emerald-300">
                   REAL DATA
                 </span>
@@ -151,7 +151,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                   JWST, Voyager, Perseverance EDL/MOXIE, JPL Horizons light-time/gravity, and live/archived DONKI + OSDR feeds.
                 </p>
               </div>
-              <div className="rounded-lg border border-amber-500/30 bg-slate-950 p-3">
+              <div className="rounded-lg border border-amber-500/30 bg-slate-950/65 p-3">
                 <span className="mb-1 inline-block rounded border border-amber-400/50 bg-amber-500/15 px-1.5 py-0.5 font-mono-tech text-[9px] font-bold text-amber-300">
                   SIMULATED VALUE
                 </span>
@@ -165,10 +165,10 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
 
           {/* 3. NASA JPL Light-Time & Gravity Reference Table */}
           {jplRef && (
-            <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/95 p-4">
+            <div className="mb-4 rounded-xl border border-sky-400/20 bg-slate-900/65 p-4">
               <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-white uppercase">
-                  <Table2 className="h-4 w-4 text-cyan-300" />
+                  <Table2 className="h-4 w-4 text-sky-300" />
                   JPL Light-Time &amp; Surface Gravity Reference
                 </span>
                 <span className="rounded border border-emerald-400/50 bg-emerald-500/15 px-1.5 py-0.5 font-mono-tech text-[10px] font-bold text-emerald-300">
@@ -191,7 +191,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                       <tr key={b.name} className="border-b border-slate-800/80 text-slate-200">
                         <td className="py-1.5 pr-3 font-bold text-white">{b.name}</td>
                         <td className="py-1.5 pr-3 text-slate-300">{b.au.toFixed(2)} AU</td>
-                        <td className="py-1.5 pr-3 text-cyan-300">{b.lightTime}</td>
+                        <td className="py-1.5 pr-3 text-sky-300">{b.lightTime}</td>
                         <td className="py-1.5 pr-3 text-amber-300">{b.gravityG} g</td>
                         <td className="py-1.5 text-emerald-300">
                           {(35 * b.gravityG).toFixed(1)} kg eq
@@ -205,7 +205,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
           )}
 
           {/* 4. NASA OSDR Live Radiation & Biology Studies */}
-          <div className="mb-4 rounded-xl border border-emerald-400/35 bg-slate-900/95 p-4">
+          <div className="mb-4 rounded-xl border border-emerald-400/30 bg-slate-900/65 p-4">
             <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
               <span className="font-display text-sm font-bold text-emerald-200 uppercase">
                 OSDR Radiation &amp; Biology Studies
@@ -221,7 +221,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                   href={study.uri}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg border border-cyan-500/20 bg-slate-950/95 p-3 text-left transition hover:border-emerald-400/60"
+                  className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-3 text-left transition hover:border-emerald-400/60"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="font-mono-tech text-xs font-bold text-emerald-300">
@@ -233,7 +233,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                   </div>
                   <div className="font-hud text-xs font-bold text-white">{study.title}</div>
                   <p className="mt-1 text-[11px] text-slate-300">{study.keyFinding}</p>
-                  <p className="mt-1.5 text-[11px] font-semibold text-cyan-300">
+                  <p className="mt-1.5 text-[11px] font-semibold text-sky-300">
                     Rule: {study.gameplayRule}
                   </p>
                 </a>
@@ -242,10 +242,10 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
           </div>
 
           {/* 5. Live Google Search Grounded NASA Mission Brief */}
-          <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/95 p-4">
+          <div className="mb-4 rounded-xl border border-sky-400/20 bg-slate-900/65 p-4">
             <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-white uppercase">
-                <Globe className="h-4 w-4 text-cyan-300" />
+                <Globe className="h-4 w-4 text-sky-300" />
                 NASA Mission Science Brief
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -261,10 +261,10 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                     key={t.id}
                     type="button"
                     onClick={() => setSearchTopic(t.id)}
-                    className={`rounded-md px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap ${
+                    className={`rounded-lg px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap ${
                       searchTopic === t.id
-                        ? 'bg-cyan-400 text-slate-950'
-                        : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                        ? 'bg-sky-400 text-slate-950'
+                        : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700'
                     }`}
                   >
                     {t.label}
@@ -274,7 +274,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
             </div>
 
             {loading ? (
-              <p className="font-mono-tech text-xs text-cyan-300">Querying NASA dataset brief...</p>
+              <p className="font-mono-tech text-xs text-sky-300">Querying NASA dataset brief...</p>
             ) : (
               <>
                 <p className="whitespace-pre-line text-xs leading-relaxed text-slate-100">
@@ -288,7 +288,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                         href={src.uri}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded bg-cyan-500/15 px-2.5 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/25"
+                        className="inline-flex items-center gap-1 rounded bg-sky-500/15 px-2.5 py-1 text-[11px] font-semibold text-sky-200 hover:bg-sky-500/25"
                       >
                         {src.title}
                         <ExternalLink className="h-3 w-3" />
@@ -301,7 +301,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
           </div>
 
           {/* 6. Google Maps Grounded NASA Launch & Analog Sites */}
-          <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/95 p-4">
+          <div className="mb-4 rounded-xl border border-sky-400/20 bg-slate-900/65 p-4">
             <div className="mb-2 flex items-center gap-2 font-display text-sm font-bold text-white uppercase">
               <MapPin className="h-4 w-4 text-emerald-400" />
               NASA Launch &amp; Analog Facilities
@@ -316,7 +316,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                   href={place.uri}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-start justify-between gap-2 rounded-lg border border-cyan-500/20 bg-slate-950/95 p-2.5 text-xs hover:border-emerald-400/60"
+                  className="flex items-start justify-between gap-2 rounded-lg border border-sky-400/20 bg-slate-950/65 p-2.5 text-xs hover:border-emerald-400/60"
                 >
                   <div>
                     <div className="font-hud font-bold text-emerald-200">{place.title}</div>
@@ -335,9 +335,9 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
             {OSDR_FACTS.map((f) => (
               <div
                 key={f.code}
-                className="rounded-lg border border-cyan-500/25 bg-slate-950/95 p-3"
+                className="rounded-lg border border-sky-400/20 bg-slate-950/65 p-3"
               >
-                <div className="mb-1 font-mono-tech text-xs font-bold text-cyan-300">{f.code}</div>
+                <div className="mb-1 font-mono-tech text-xs font-bold text-sky-300">{f.code}</div>
                 <p className="text-[11px] leading-relaxed text-slate-300">{f.summary}</p>
               </div>
             ))}

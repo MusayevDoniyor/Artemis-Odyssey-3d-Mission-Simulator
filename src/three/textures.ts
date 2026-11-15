@@ -21,6 +21,16 @@ export interface ProceduralTextureSet {
   sunAlbedo: THREE.CanvasTexture;
   moonSphereAlbedo: THREE.CanvasTexture;
   marsSphereAlbedo: THREE.CanvasTexture;
+  mercuryAlbedo: THREE.CanvasTexture;
+  venusAlbedo: THREE.CanvasTexture;
+  jupiterAlbedo: THREE.CanvasTexture;
+  saturnAlbedo: THREE.CanvasTexture;
+  saturnRingAlbedo: THREE.CanvasTexture;
+  uranusAlbedo: THREE.CanvasTexture;
+  neptuneAlbedo: THREE.CanvasTexture;
+  plutoAlbedo: THREE.CanvasTexture;
+  nebulaSky: THREE.CanvasTexture;
+  sunGlowSprite: THREE.CanvasTexture;
 }
 
 function finalizeColorTex(
@@ -615,6 +625,215 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   maSphCtx.fillRect(0, 0, 512, 16);
   maSphCtx.fillRect(0, 238, 512, 18);
 
+  // 17. Mercury Cratered Silicate Albedo
+  const mercCanvas = document.createElement('canvas');
+  mercCanvas.width = 256;
+  mercCanvas.height = 128;
+  const meCtx = mercCanvas.getContext('2d')!;
+  meCtx.fillStyle = '#9ca3af';
+  meCtx.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 95; i++) {
+    const cx = Math.random() * 256;
+    const cy = 10 + Math.random() * 108;
+    const r = 2 + Math.random() * 8;
+    const cg = meCtx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, 1, cx, cy, r);
+    cg.addColorStop(0, i % 3 === 0 ? 'rgba(55,65,81,0.62)' : 'rgba(71,85,105,0.45)');
+    cg.addColorStop(0.76, 'rgba(226,232,240,0.42)');
+    cg.addColorStop(1, 'rgba(156,163,175,0)');
+    meCtx.fillStyle = cg;
+    meCtx.beginPath();
+    meCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    meCtx.fill();
+  }
+
+  // 18. Venus Dense Sulfuric Cloud Banding
+  const venusCanvas = document.createElement('canvas');
+  venusCanvas.width = 256;
+  venusCanvas.height = 128;
+  const vCtx = venusCanvas.getContext('2d')!;
+  const vGrad = vCtx.createLinearGradient(0, 0, 0, 128);
+  vGrad.addColorStop(0, '#d97706');
+  vGrad.addColorStop(0.35, '#fbbf24');
+  vGrad.addColorStop(0.55, '#fde68a');
+  vGrad.addColorStop(0.75, '#f59e0b');
+  vGrad.addColorStop(1, '#b45309');
+  vCtx.fillStyle = vGrad;
+  vCtx.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 42; i++) {
+    const y = Math.random() * 128;
+    vCtx.fillStyle = i % 2 === 0 ? 'rgba(254,243,199,0.22)' : 'rgba(180,83,9,0.18)';
+    vCtx.beginPath();
+    vCtx.ellipse(Math.random() * 256, y, 42 + Math.random() * 64, 5 + Math.random() * 6, 0, 0, Math.PI * 2);
+    vCtx.fill();
+  }
+
+  // 19. Jupiter Cloud Belts + Great Red Spot
+  const jupCanvas = document.createElement('canvas');
+  jupCanvas.width = 512;
+  jupCanvas.height = 256;
+  const jCtx = jupCanvas.getContext('2d')!;
+  const jBands: Array<[number, number, string]> = [
+    [0, 24, '#78716c'],
+    [24, 24, '#e7e5e4'],
+    [48, 22, '#c27849'],
+    [70, 20, '#fef3c7'],
+    [90, 28, '#b45309'],
+    [118, 24, '#fde68a'],
+    [142, 30, '#9a3412'],
+    [172, 24, '#f5f5f4'],
+    [196, 26, '#c27849'],
+    [222, 34, '#78716c'],
+  ];
+  jBands.forEach(([y, h, col]) => {
+    jCtx.fillStyle = col;
+    jCtx.fillRect(0, y, 512, h);
+  });
+  for (let i = 0; i < 70; i++) {
+    const sx = Math.random() * 512;
+    const sy = 16 + Math.random() * 224;
+    jCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(124,45,18,0.16)';
+    jCtx.beginPath();
+    jCtx.ellipse(sx, sy, 24 + Math.random() * 44, 3 + Math.random() * 4, 0, 0, Math.PI * 2);
+    jCtx.fill();
+  }
+  const grs = jCtx.createRadialGradient(310, 158, 3, 310, 158, 24);
+  grs.addColorStop(0, '#dc2626');
+  grs.addColorStop(0.6, '#ea580c');
+  grs.addColorStop(1, 'rgba(154,52,18,0)');
+  jCtx.fillStyle = grs;
+  jCtx.beginPath();
+  jCtx.ellipse(310, 158, 26, 15, 0, 0, Math.PI * 2);
+  jCtx.fill();
+
+  // 20. Saturn Golden Banded Atmosphere + Cassini Ring Banded Texture
+  const satCanvas = document.createElement('canvas');
+  satCanvas.width = 512;
+  satCanvas.height = 256;
+  const saCtx = satCanvas.getContext('2d')!;
+  const saGrad = saCtx.createLinearGradient(0, 0, 0, 256);
+  saGrad.addColorStop(0, '#a8a29e');
+  saGrad.addColorStop(0.2, '#fde68a');
+  saGrad.addColorStop(0.45, '#fcd34d');
+  saGrad.addColorStop(0.65, '#f59e0b');
+  saGrad.addColorStop(0.85, '#fef3c7');
+  saGrad.addColorStop(1, '#92400e');
+  saCtx.fillStyle = saGrad;
+  saCtx.fillRect(0, 0, 512, 256);
+  for (let y = 18; y < 238; y += 14) {
+    saCtx.fillStyle = y % 28 === 0 ? 'rgba(255,255,255,0.18)' : 'rgba(146,64,14,0.14)';
+    saCtx.fillRect(0, y, 512, 6);
+  }
+
+  const satRingCanvas = document.createElement('canvas');
+  satRingCanvas.width = 256;
+  satRingCanvas.height = 256;
+  const srngCtx = satRingCanvas.getContext('2d')!;
+  srngCtx.clearRect(0, 0, 256, 256);
+  const ringGrad = srngCtx.createRadialGradient(128, 128, 56, 128, 128, 126);
+  ringGrad.addColorStop(0, 'rgba(254,243,199,0)');
+  ringGrad.addColorStop(0.08, 'rgba(214,211,209,0.45)');
+  ringGrad.addColorStop(0.32, 'rgba(253,230,138,0.88)');
+  ringGrad.addColorStop(0.56, 'rgba(245,208,138,0.82)');
+  ringGrad.addColorStop(0.62, 'rgba(15,23,42,0.08)'); // Cassini Division
+  ringGrad.addColorStop(0.68, 'rgba(254,243,199,0.78)');
+  ringGrad.addColorStop(0.92, 'rgba(253,230,138,0.35)');
+  ringGrad.addColorStop(1, 'rgba(254,243,199,0)');
+  srngCtx.fillStyle = ringGrad;
+  srngCtx.beginPath();
+  srngCtx.arc(128, 128, 126, 0, Math.PI * 2);
+  srngCtx.fill();
+
+  // 21. Uranus Pale Cyan Methane Atmosphere
+  const urCanvas = document.createElement('canvas');
+  urCanvas.width = 256;
+  urCanvas.height = 128;
+  const uCtx = urCanvas.getContext('2d')!;
+  const uGrad = uCtx.createLinearGradient(0, 0, 0, 128);
+  uGrad.addColorStop(0, '#a5f3fc');
+  uGrad.addColorStop(0.5, '#67e8f9');
+  uGrad.addColorStop(1, '#22d3ee');
+  uCtx.fillStyle = uGrad;
+  uCtx.fillRect(0, 0, 256, 128);
+
+  // 22. Neptune Deep Cobalt Storms + Dark Spot
+  const nepCanvas = document.createElement('canvas');
+  nepCanvas.width = 256;
+  nepCanvas.height = 128;
+  const neCtx = nepCanvas.getContext('2d')!;
+  const neGrad = neCtx.createLinearGradient(0, 0, 0, 128);
+  neGrad.addColorStop(0, '#1e3a8a');
+  neGrad.addColorStop(0.45, '#2563eb');
+  neGrad.addColorStop(0.7, '#1d4ed8');
+  neGrad.addColorStop(1, '#1e40af');
+  neCtx.fillStyle = neGrad;
+  neCtx.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 18; i++) {
+    neCtx.fillStyle = 'rgba(191,219,254,0.28)';
+    neCtx.fillRect(Math.random() * 200, 18 + Math.random() * 92, 34 + Math.random() * 44, 2.5);
+  }
+  neCtx.fillStyle = 'rgba(15,23,42,0.55)';
+  neCtx.beginPath();
+  neCtx.ellipse(148, 72, 16, 10, 0, 0, Math.PI * 2);
+  neCtx.fill();
+
+  // 23. Pluto Nitrogen Heart Basin (Tombaugh Regio)
+  const plutoCanvas = document.createElement('canvas');
+  plutoCanvas.width = 256;
+  plutoCanvas.height = 128;
+  const plCtx = plutoCanvas.getContext('2d')!;
+  const plGrad = plCtx.createLinearGradient(0, 0, 256, 128);
+  plGrad.addColorStop(0, '#a89078');
+  plGrad.addColorStop(0.5, '#d6c3ad');
+  plGrad.addColorStop(1, '#856b58');
+  plCtx.fillStyle = plGrad;
+  plCtx.fillRect(0, 0, 256, 128);
+  plCtx.fillStyle = 'rgba(248,250,252,0.72)';
+  plCtx.beginPath();
+  plCtx.ellipse(132, 66, 26, 18, -0.15, 0, Math.PI * 2);
+  plCtx.fill();
+
+  // 24. Deep-Space Milky Way Nebula Sky Dome
+  const nebCanvas = document.createElement('canvas');
+  nebCanvas.width = 1024;
+  nebCanvas.height = 512;
+  const nebCtx = nebCanvas.getContext('2d')!;
+  nebCtx.fillStyle = '#020510';
+  nebCtx.fillRect(0, 0, 1024, 512);
+  for (let i = 0; i < 28; i++) {
+    const t = i / 28;
+    const x = t * 1024;
+    const y = 248 + Math.sin(t * Math.PI * 2.1 + 0.4) * 68;
+    const r = 76 + (i % 4) * 32;
+    const ng = nebCtx.createRadialGradient(x, y, 4, x, y, r);
+    ng.addColorStop(0, i % 3 === 0 ? 'rgba(96, 165, 250, 0.14)' : 'rgba(56, 189, 248, 0.1)');
+    ng.addColorStop(0.45, i % 2 === 0 ? 'rgba(99, 102, 241, 0.08)' : 'rgba(245, 158, 11, 0.05)');
+    ng.addColorStop(1, 'rgba(2, 5, 16, 0)');
+    nebCtx.fillStyle = ng;
+    nebCtx.beginPath();
+    nebCtx.ellipse(x, y, r * 1.45, r * 0.72, -0.25, 0, Math.PI * 2);
+    nebCtx.fill();
+  }
+  for (let s = 0; s < 520; s++) {
+    const sx = Math.random() * 1024;
+    const sy = Math.random() * 512;
+    const alpha = 0.25 + Math.random() * 0.65;
+    nebCtx.fillStyle = s % 8 === 0 ? `rgba(186,230,253,${alpha})` : `rgba(248,250,252,${alpha})`;
+    nebCtx.fillRect(sx, sy, s % 15 === 0 ? 1.8 : 1.1, s % 15 === 0 ? 1.8 : 1.1);
+  }
+
+  // 25. Soft Radial Solar Coronal Flare Sprite
+  const glowCanvas = document.createElement('canvas');
+  glowCanvas.width = 256;
+  glowCanvas.height = 256;
+  const gCtx = glowCanvas.getContext('2d')!;
+  const sunRad = gCtx.createRadialGradient(128, 128, 18, 128, 128, 126);
+  sunRad.addColorStop(0, 'rgba(255, 251, 235, 0.92)');
+  sunRad.addColorStop(0.28, 'rgba(251, 191, 36, 0.56)');
+  sunRad.addColorStop(0.6, 'rgba(249, 115, 22, 0.18)');
+  sunRad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+  gCtx.fillStyle = sunRad;
+  gCtx.fillRect(0, 0, 256, 256);
+
   return {
     moonAlbedo: finalizeColorTex(moonCanvas, maxAnisotropy, 12, 12),
     moonBump: finalizeDataTex(moonCanvas, maxAnisotropy, 12, 12),
@@ -636,5 +855,15 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     sunAlbedo: finalizeColorTex(sunCanvas, maxAnisotropy),
     moonSphereAlbedo: finalizeColorTex(moonSphCanvas, maxAnisotropy),
     marsSphereAlbedo: finalizeColorTex(marsSphCanvas, maxAnisotropy),
+    mercuryAlbedo: finalizeColorTex(mercCanvas, maxAnisotropy),
+    venusAlbedo: finalizeColorTex(venusCanvas, maxAnisotropy),
+    jupiterAlbedo: finalizeColorTex(jupCanvas, maxAnisotropy),
+    saturnAlbedo: finalizeColorTex(satCanvas, maxAnisotropy),
+    saturnRingAlbedo: finalizeColorTex(satRingCanvas, maxAnisotropy),
+    uranusAlbedo: finalizeColorTex(urCanvas, maxAnisotropy),
+    neptuneAlbedo: finalizeColorTex(nepCanvas, maxAnisotropy),
+    plutoAlbedo: finalizeColorTex(plutoCanvas, maxAnisotropy),
+    nebulaSky: finalizeColorTex(nebCanvas, maxAnisotropy),
+    sunGlowSprite: finalizeColorTex(glowCanvas, maxAnisotropy),
   };
 }

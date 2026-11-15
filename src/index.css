@@ -61,129 +61,79 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Primary Aerospace Tactical Telemetry Surface */
+/* Primary Deep-Space Translucent Surface */
 .hud-panel {
   position: relative;
-  background: linear-gradient(165deg, rgba(10, 16, 30, 0.97) 0%, rgba(5, 9, 19, 0.985) 100%);
-  border: 1px solid rgba(34, 211, 238, 0.32);
+  background: linear-gradient(170deg, rgba(11, 18, 34, 0.94) 0%, rgba(6, 10, 20, 0.97) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.24);
   box-shadow:
-    inset 0 1px 0 rgba(165, 243, 252, 0.14),
-    0 14px 36px rgba(2, 6, 23, 0.8);
+    inset 0 1px 0 rgba(186, 230, 253, 0.1),
+    0 18px 44px rgba(2, 6, 23, 0.78);
 }
 
 .hud-panel-amber {
   position: relative;
-  background: linear-gradient(165deg, rgba(22, 17, 10, 0.97) 0%, rgba(10, 10, 18, 0.985) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.48);
+  background: linear-gradient(170deg, rgba(24, 18, 12, 0.95) 0%, rgba(10, 11, 20, 0.97) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.42);
   box-shadow:
-    inset 0 1px 0 rgba(253, 230, 138, 0.16),
-    0 14px 36px rgba(2, 6, 23, 0.82);
+    inset 0 1px 0 rgba(253, 230, 138, 0.14),
+    0 18px 44px rgba(2, 6, 23, 0.8);
 }
 
 .hud-panel-danger {
   position: relative;
-  background: linear-gradient(170deg, rgba(26, 10, 19, 0.98) 0%, rgba(8, 10, 21, 0.99) 100%);
-  border: 1px solid rgba(244, 63, 94, 0.52);
+  background: linear-gradient(170deg, rgba(28, 11, 20, 0.96) 0%, rgba(9, 10, 20, 0.98) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.48);
   box-shadow:
-    inset 0 1px 0 rgba(254, 205, 211, 0.14),
-    0 20px 52px rgba(2, 6, 23, 0.9);
+    inset 0 1px 0 rgba(254, 205, 211, 0.12),
+    0 20px 52px rgba(2, 6, 23, 0.88);
 }
 
 .hud-panel-success {
   position: relative;
-  background: linear-gradient(170deg, rgba(8, 22, 22, 0.98) 0%, rgba(7, 11, 22, 0.99) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.52);
+  background: linear-gradient(170deg, rgba(9, 24, 24, 0.96) 0%, rgba(7, 12, 22, 0.98) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.46);
   box-shadow:
-    inset 0 1px 0 rgba(167, 243, 208, 0.16),
-    0 20px 52px rgba(2, 6, 23, 0.9);
+    inset 0 1px 0 rgba(167, 243, 208, 0.14),
+    0 20px 52px rgba(2, 6, 23, 0.88);
 }
 
-/* Soft Warm-Dark Rounded Gameplay HUD Surfaces (1-accent Amber + 1-alert Rose) */
+/* Deep-Space Translucent Gameplay HUD Surfaces (Zero backdrop-filter for WebGL 60fps; soft cyan & warm amber accents) */
 .hud-soft {
-  background: rgba(20, 18, 17, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+  background: linear-gradient(175deg, rgba(10, 16, 30, 0.88) 0%, rgba(7, 11, 22, 0.92) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(186, 230, 253, 0.08),
+    0 12px 32px rgba(2, 6, 23, 0.56);
 }
 
 .hud-soft-alert {
-  background: rgba(28, 16, 18, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(244, 63, 94, 0.45);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(175deg, rgba(32, 13, 21, 0.92) 0%, rgba(18, 9, 16, 0.95) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(254, 205, 211, 0.1),
+    0 12px 34px rgba(2, 6, 23, 0.6);
 }
 
-/* Tactical chamfered modal corner brackets via clean CSS background gradients */
+/* Subtle top specular edge sheen (replaces legacy tactical L-bracket chrome cleanly) */
 .tactical-frame {
-  background-image:
-    linear-gradient(to right, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to bottom, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to left, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to bottom, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to right, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to top, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to left, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65)),
-    linear-gradient(to top, rgba(34, 211, 238, 0.65), rgba(34, 211, 238, 0.65));
-  background-size:
-    14px 2px,
-    2px 14px,
-    14px 2px,
-    2px 14px,
-    14px 2px,
-    2px 14px,
-    14px 2px,
-    2px 14px;
-  background-position:
-    left 10px top 10px,
-    left 10px top 10px,
-    right 10px top 10px,
-    right 10px top 10px,
-    left 10px bottom 10px,
-    left 10px bottom 10px,
-    right 10px bottom 10px,
-    right 10px bottom 10px;
-  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 1px 0 rgba(125, 211, 252, 0.16),
+    0 22px 54px rgba(2, 6, 23, 0.84);
 }
 
 .tactical-frame-danger {
-  background-image:
-    linear-gradient(to right, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to bottom, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to left, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to bottom, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to right, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to top, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to left, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75)),
-    linear-gradient(to top, rgba(244, 63, 94, 0.75), rgba(244, 63, 94, 0.75));
-  background-size:
-    16px 2px,
-    2px 16px,
-    16px 2px,
-    2px 16px,
-    16px 2px,
-    2px 16px,
-    16px 2px,
-    2px 16px;
-  background-position:
-    left 10px top 10px,
-    left 10px top 10px,
-    right 10px top 10px,
-    right 10px top 10px,
-    left 10px bottom 10px,
-    left 10px bottom 10px,
-    right 10px bottom 10px,
-    right 10px bottom 10px;
-  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 1px 0 rgba(251, 113, 133, 0.2),
+    0 22px 54px rgba(2, 6, 23, 0.88);
 }
 
 .title-scrim {
   background: linear-gradient(
     90deg,
-    rgba(5, 8, 17, 0.95) 0%,
-    rgba(5, 8, 17, 0.84) 44%,
-    rgba(5, 8, 17, 0.24) 74%,
+    rgba(5, 8, 17, 0.94) 0%,
+    rgba(5, 8, 17, 0.8) 44%,
+    rgba(5, 8, 17, 0.2) 74%,
     transparent 100%
   );
 }
@@ -194,14 +144,14 @@
   justify-content: center;
   min-width: 24px;
   height: 24px;
-  padding: 0 6px;
-  font-family: 'JetBrains Mono', monospace;
+  padding: 0 7px;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #cffafe;
-  background: #091224;
-  border: 1px solid rgba(34, 211, 238, 0.55);
-  border-bottom-width: 3px;
+  color: #e0f2fe;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-bottom-width: 2px;
   border-radius: 6px;
 }
 

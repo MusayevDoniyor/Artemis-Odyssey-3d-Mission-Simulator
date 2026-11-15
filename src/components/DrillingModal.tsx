@@ -44,15 +44,15 @@ export function DrillingModal({
         : 'text-emerald-300';
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/90 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/82 p-4">
       <div
         data-testid="drilling-console-modal"
         className="hud-panel tactical-frame animate-modal-enter w-full max-w-3xl rounded-2xl p-5"
       >
         {/* Header */}
-        <div className="mb-4 flex items-start justify-between gap-3 border-b border-cyan-500/25 pb-3">
+        <div className="mb-4 flex items-start justify-between gap-3 border-b border-sky-400/20 pb-3">
           <div>
-            <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
+            <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-sky-300 uppercase">
               TRIDENT 1m Percussive Core Sampler · {state.planet === 'mars' ? 'Jezero Crater' : 'Lunar South Pole'}
             </p>
             <h2 className="font-display text-xl font-bold text-white uppercase">
@@ -63,7 +63,7 @@ export function DrillingModal({
             type="button"
             aria-label="Close TRIDENT Drill Console"
             onClick={onClose}
-            className="rounded-lg border border-cyan-500/30 bg-slate-900 p-2 text-slate-300 hover:border-cyan-400 hover:text-white"
+            className="rounded-xl border border-sky-400/25 bg-slate-900/75 p-2 text-slate-300 hover:border-sky-400/60 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -73,10 +73,10 @@ export function DrillingModal({
           {/* Left: Drill Controls, Heat & Torque Monitors */}
           <div className="flex flex-col gap-3">
             {/* Speed Selector */}
-            <div className="rounded-xl border border-slate-700/80 bg-slate-950/95 p-3">
+            <div className="rounded-xl border border-sky-400/20 bg-slate-950/65 p-3">
               <div className="mb-2 flex items-center justify-between font-hud text-[11px] font-bold tracking-wider text-slate-300 uppercase">
                 <span>Auger Speed &amp; Percussion</span>
-                <span className="font-mono-tech text-cyan-300">
+                <span className="font-mono-tech text-sky-300">
                   {Math.round(state.depthCm)} / 100 cm
                 </span>
               </div>
@@ -91,7 +91,7 @@ export function DrillingModal({
                       className={`rounded-lg border px-2.5 py-2 text-left transition ${
                         active
                           ? 'border-amber-400 bg-amber-500/20 text-white'
-                          : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-400/60'
+                          : 'border-sky-400/15 bg-slate-900/75 text-slate-300 hover:border-sky-400/50'
                       }`}
                     >
                       <div className="font-hud text-xs font-bold uppercase">{m.label}</div>
@@ -165,7 +165,7 @@ export function DrillingModal({
                 <button
                   type="button"
                   onClick={onPurgeAndCool}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-cyan-400 px-3 py-2 font-hud text-xs font-bold text-slate-950 uppercase hover:bg-cyan-300"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-400 px-3 py-2 font-hud text-xs font-bold text-slate-950 uppercase hover:bg-sky-300"
                 >
                   <Snowflake className="h-3.5 w-3.5" />
                   Purge &amp; Cool
@@ -174,7 +174,7 @@ export function DrillingModal({
             )}
 
             {!state.jammed && !state.overheated && (
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-900/95 px-3 py-2 text-xs text-slate-200">
+              <div className="rounded-lg border border-sky-400/20 bg-slate-900/65 px-3 py-2 text-xs text-slate-200">
                 {state.statusNote}
               </div>
             )}
@@ -210,7 +210,7 @@ export function DrillingModal({
                   <button
                     type="button"
                     onClick={onPurgeAndCool}
-                    className="rounded-xl border border-cyan-400/50 bg-slate-900 px-3.5 py-3 font-hud text-xs font-bold text-cyan-200 uppercase hover:border-cyan-300"
+                    className="rounded-xl border border-sky-400/35 bg-slate-900/75 px-3.5 py-3 font-hud text-xs font-bold text-sky-200 uppercase hover:border-sky-300"
                   >
                     Purge / Cool
                   </button>
@@ -230,9 +230,9 @@ export function DrillingModal({
           </div>
 
           {/* Right: 2D Core Sample Stratigraphy Tube Viewer */}
-          <div className="flex flex-col rounded-xl border border-cyan-500/25 bg-slate-950/95 p-3.5">
+          <div className="flex flex-col rounded-xl border border-sky-400/20 bg-slate-950/65 p-3.5">
             <div className="mb-2.5 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 font-display text-xs font-bold text-cyan-300 uppercase">
+              <span className="inline-flex items-center gap-1.5 font-display text-xs font-bold text-sky-300 uppercase">
                 <Layers className="h-4 w-4" />
                 Core Stratigraphy Tube
               </span>

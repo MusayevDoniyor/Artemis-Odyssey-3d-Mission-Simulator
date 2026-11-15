@@ -93,14 +93,14 @@ export function LaunchHUD({
             </div>
           </div>
 
-          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-stone-100">
+          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
             <div className="flex items-center gap-2 text-base font-bold text-amber-400">
               <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
               <span>LC-39B Ascent</span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4">
-              <p className="text-base leading-snug text-stone-100">{objectiveLine}</p>
-              <span className="shrink-0 text-base font-bold text-stone-200 tabular-nums">
+              <p className="text-base leading-snug text-slate-100">{objectiveLine}</p>
+              <span className="shrink-0 text-base font-bold text-slate-200 tabular-nums">
                 {counterText}
               </span>
             </div>
@@ -109,7 +109,7 @@ export function LaunchHUD({
           {inspectedPart && (
             <div
               data-testid="launch-part-callout"
-              className="hud-soft pointer-events-auto max-w-xs rounded-2xl p-3.5 text-stone-100"
+              className="hud-soft pointer-events-auto max-w-xs rounded-2xl p-3.5 text-slate-100"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-base font-bold text-amber-300">{inspectedPart.name}</span>
@@ -118,45 +118,45 @@ export function LaunchHUD({
                     type="button"
                     aria-label="Close part note"
                     onClick={onClearSelectedPart}
-                    className="rounded-lg p-1 text-stone-400 hover:text-white"
+                    className="rounded-lg p-1 text-slate-400 hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-              <p className="mt-1 text-sm text-stone-300">{inspectedPart.fact}</p>
+              <p className="mt-1 text-sm text-slate-300">{inspectedPart.fact}</p>
             </div>
           )}
         </div>
 
         {/* GROUP 2: Top-Right 3 Meters + Orbit Distance (+ Conditional Fuel/Steep Chip) */}
         <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
-          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-white/10 rounded-2xl px-4 py-2.5 tabular-nums">
+          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-4 py-2.5 tabular-nums">
             <div className="flex items-center gap-2.5 pr-4">
               <Battery className="h-5 w-5 text-amber-400" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.power)}%
                 </span>
-                <span className="text-sm text-stone-400">Power</span>
+                <span className="text-sm text-slate-400">Power</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 px-4">
-              <Wind className="h-5 w-5 text-stone-200" />
+              <Wind className="h-5 w-5 text-sky-300" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.oxygen)}%
                 </span>
-                <span className="text-sm text-stone-400">Air</span>
+                <span className="text-sm text-slate-400">Air</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 px-4">
-              <Shield className="h-5 w-5 text-amber-400" />
+              <Shield className="h-5 w-5 text-emerald-300" />
               <div>
                 <span className="block text-lg leading-none font-bold text-white">
                   {Math.round(resources.shield)}%
                 </span>
-                <span className="text-sm text-stone-400">Shield</span>
+                <span className="text-sm text-slate-400">Shield</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5 pl-4">
@@ -165,7 +165,7 @@ export function LaunchHUD({
                 <span data-testid="launch-altitude" className="block text-lg leading-none font-bold text-white">
                   {distToOrbitKm} km
                 </span>
-                <span className="text-sm text-stone-400">To Orbit</span>
+                <span className="text-sm text-slate-400">To Orbit</span>
               </div>
             </div>
           </div>
@@ -195,16 +195,16 @@ export function LaunchHUD({
           data-testid="hud-group-radar"
           onClick={() => onOpenMenuTab('map')}
           title="Open Ascent Map & Menu [Tab]"
-          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-amber-400"
+          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-sky-400/60"
         >
           <svg viewBox="0 0 144 144" className="h-full w-full">
-            <circle cx="72" cy="72" r="60" fill="#13151a" stroke="rgba(255,255,255,0.16)" strokeWidth="1.5" />
-            <line x1="20" y1="72" x2="124" y2="72" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+            <circle cx="72" cy="72" r="60" fill="#0b1222" stroke="rgba(56,189,248,0.28)" strokeWidth="1.5" />
+            <line x1="20" y1="72" x2="124" y2="72" stroke="rgba(148,163,184,0.22)" strokeWidth="1" />
             <g transform={`translate(72, 72) rotate(${launch.pitchDeg})`}>
               <line x1="-26" y1="0" x2="26" y2="0" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
               <polygon points="0,-24 -5,-12 5,-12" fill="#fbbf24" />
             </g>
-            <text x="72" y="114" textAnchor="middle" fontSize="12" fontWeight="700" fill="#f5f5f4">
+            <text x="72" y="114" textAnchor="middle" fontSize="12" fontWeight="700" fill="#f8fafc">
               {Math.round(launch.pitchDeg)}° PITCH
             </text>
           </svg>
@@ -229,7 +229,7 @@ export function LaunchHUD({
                       className={`rounded-xl border px-3 py-1.5 text-left text-sm font-semibold transition ${
                         checked
                           ? 'border-amber-400/60 bg-amber-500/20 text-amber-100'
-                          : 'border-white/15 bg-white/5 text-stone-200 hover:border-amber-300'
+                          : 'border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-amber-300'
                       }`}
                     >
                       {item.label} · {checked ? 'GO' : 'CHK'}
@@ -244,9 +244,9 @@ export function LaunchHUD({
                   if (!allChecksGo) onVerifyAllPreLaunchChecks();
                   onBeginSimulation();
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
               >
-                <Play className="h-4 w-4 fill-stone-950" />
+                <Play className="h-4 w-4 fill-slate-950" />
                 {allChecksGo ? 'Begin Countdown' : 'Verify & Start'}
               </button>
             </div>
@@ -255,7 +255,7 @@ export function LaunchHUD({
           {launch.launchSequence === 'COUNTDOWN' && (
             <div className="hud-soft rounded-2xl px-8 py-3 text-center">
               <div className="text-4xl font-bold text-amber-400">T-{countdownDigit}</div>
-              <div className="text-sm text-stone-200">Arming RS-25 Core</div>
+              <div className="text-sm text-slate-200">Arming RS-25 Core</div>
             </div>
           )}
 
@@ -265,7 +265,7 @@ export function LaunchHUD({
               data-testid="start-launch-btn"
               data-hold-keys="forward"
               onClick={onStartLaunch}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-7 py-3 text-lg font-bold text-stone-950 shadow-lg hover:bg-amber-400"
+              className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-7 py-3 text-lg font-bold text-slate-950 shadow-lg hover:bg-amber-400"
             >
               <Rocket className="h-5 w-5" />
               Ignite &amp; Launch
@@ -283,7 +283,7 @@ export function LaunchHUD({
                 data-testid="fire-tli-btn"
                 disabled={leoTransfer.tliBurnActive || leoTransfer.readyForSpaceTransition}
                 onClick={onFireTliBurn}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-base font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-base font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-60"
               >
                 <Flame className="h-4 w-4" />
                 {leoTransfer.tliBurnActive ? 'Firing TLI...' : 'Fire TLI Burn'}
@@ -295,7 +295,7 @@ export function LaunchHUD({
             <button
               type="button"
               onClick={onSeparateStage}
-              className="pointer-events-auto rounded-2xl bg-amber-500 px-6 py-2.5 text-base font-bold text-stone-950 shadow-lg hover:bg-amber-400"
+              className="pointer-events-auto rounded-2xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 shadow-lg hover:bg-amber-400"
             >
               {launch.stagePrompt === 'SRB_SEP'
                 ? 'Press Space: Drop Boosters'
@@ -318,17 +318,17 @@ export function LaunchHUD({
         {/* GROUP 4: Bottom-Right Max 3 Contextual Hints */}
         <div
           data-testid="hud-group-hints"
-          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-2.5 text-base"
+          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-base"
         >
           <button
             type="button"
             onClick={onToggleAutoGuidance}
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               A/D
             </span>
-            <span className="font-medium text-stone-200">
+            <span className="font-medium text-slate-200">
               {launch.autoGuidance ? 'Auto Pitch' : 'Manual Pitch'}
             </span>
           </button>
@@ -337,10 +337,10 @@ export function LaunchHUD({
             onClick={launch.orbitReached ? onSkipToSpace : onSeparateStage}
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               Space
             </span>
-            <span className="font-medium text-stone-200">
+            <span className="font-medium text-slate-200">
               {launch.orbitReached ? 'Skip Space' : 'Stage'}
             </span>
           </button>
@@ -351,10 +351,10 @@ export function LaunchHUD({
             onDoubleClick={onResetLaunch}
             className="inline-flex items-center gap-2 hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
               Esc
             </span>
-            <span className="font-medium text-stone-200">Menu</span>
+            <span className="font-medium text-slate-200">Menu</span>
           </button>
         </div>
       </div>

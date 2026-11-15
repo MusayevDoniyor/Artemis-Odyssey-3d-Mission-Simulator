@@ -77,7 +77,7 @@ import {
   stepMarsEdlSequence,
   stepUnstowSequence,
 } from './game/sequences';
-import type { SolarScaleMode } from './game/solarSystemData';
+import { SOLAR_SYSTEM_BODIES, type SolarScaleMode } from './game/solarSystemData';
 import type {
   AudioSettings,
   CameraMode,
@@ -304,7 +304,14 @@ export default function App() {
 
   const [solarScaleMode, setSolarScaleMode] = useState<SolarScaleMode>('exploration');
   const [solarTimeSpeed, setSolarTimeSpeed] = useState<number>(0.8);
+  const [solarEpochYearsUi, setSolarEpochYearsUi] = useState<number>(0);
   const [focusedSolarBodyId, setFocusedSolarBodyId] = useState<string | null>(null);
+  const [exploredSolarBodyIds, setExploredSolarBodyIds] = useState<string[]>(['earth']);
+  const [selectedBodyPin, setSelectedBodyPin] = useState<{
+    xPct: number;
+    yPct: number;
+    visible: boolean;
+  } | null>(null);
 
   useEffect(() => {
     modalOpenRef.current =
@@ -570,6 +577,7 @@ export default function App() {
       if (targetPhase !== 'space') {
         s.focusedSolarBodyId = null;
         setFocusedSolarBodyId(null);
+        setSelectedBodyPin(null);
       }
 
       if (targetPhase === 'title') {
@@ -618,10 +626,21 @@ export default function App() {
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'space') {
         s.phase = 'space';
-        s.orbitYaw = 0.55;
-        s.orbitPitch = 0.48;
-        s.orbitDistance = 22;
         s.solarEpochYears = 0;
+        setSolarEpochYearsUi(0);
+        if (s.freeExploreMode) {
+          s.focusedSolarBodyId = 'earth';
+          setFocusedSolarBodyId('earth');
+          s.orbitYaw = 0.35;
+          s.orbitPitch = 0.34;
+          s.orbitDistance = 30;
+        } else {
+          s.focusedSolarBodyId = null;
+          setFocusedSolarBodyId(null);
+          s.orbitYaw = 0.55;
+          s.orbitPitch = 0.48;
+          s.orbitDistance = 22;
+        }
         s.resources = applyPayloadBonus(payloadRef.current);
         s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
       } else if (targetPhase === 'landing') {
@@ -674,6 +693,54 @@ export default function App() {
     scoreRef.current = 0;
     jumpToPhase('space', 'moon');
   }, [jumpToPhase]);
+
+  const handleFocusSolarBody = useCallback((bodyId: string | null) => {
+    const s = simRef.current;
+    s.focusedSolarBodyId = bodyId;
+    s.userOrbitActive = false;
+    setFocusedSolarBodyId(bodyId);
+    if (bodyId) {
+      const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
+      const baseSize = bodyId === 'sun' ? 11.4 : bodyId === 'earth' ? 4.8 : spec?.explorationBodySize ?? 2.5;
+      s.orbitYaw = bodyId === 'earth' ? 0.35 : 0.52;
+      s.orbitPitch = bodyId === 'earth' ? 0.34 : 0.32;
+      s.orbitDistance = bodyId === 'sun' ? 44 : bodyId === 'earth' ? 30 : Math.max(11, baseSize * 4.6);
+      setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
+    } else {
+      setSelectedBodyPin(null);
+      s.orbitYaw = 0.55;
+      s.orbitPitch = 0.48;
+      s.orbitDistance = 22;
+    }
+    soundSynth.init();
+    soundSynth.playClick();
+  }, []);
+
+  const handleExploreSolarBody = useCallback(
+    (bodyId: string) => {
+      setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
+      if (bodyId === 'mars') {
+        jumpToPhase('landing', 'mars');
+        return;
+      }
+      if (bodyId === 'earth') {
+        jumpToPhase('landing', 'moon');
+        return;
+      }
+      const s = simRef.current;
+      const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
+      const baseSize = bodyId === 'sun' ? 11.4 : spec?.explorationBodySize ?? 2.5;
+      s.focusedSolarBodyId = bodyId;
+      s.userOrbitActive = false;
+      setFocusedSolarBodyId(bodyId);
+      s.orbitYaw = 0.42;
+      s.orbitPitch = 0.22;
+      s.orbitDistance = bodyId === 'sun' ? 28 : Math.max(8.5, baseSize * 2.9);
+      soundSynth.init();
+      soundSynth.playClick();
+    },
+    [jumpToPhase]
+  );
 
   // Per-frame physics + game progression loop
   const onFrameTick = useCallback(
@@ -1178,6 +1245,12 @@ export default function App() {
         setResourcesUi({ ...s.resources });
         setObjectivesUi(s.objectives.map((o) => ({ ...o })));
         setMarsQueueUi({ ...marsQueueRef.current });
+        if (s.phase === 'space') {
+          setSolarEpochYearsUi(s.solarEpochYears ?? 0);
+          setSelectedBodyPin(
+            sceneMgrRef.current?.getSelectedSolarBodyScreenPos(s.focusedSolarBodyId ?? null) ?? null
+          );
+        }
         if (s.phase === 'rover') {
           setWorldPrompts(sceneMgrRef.current?.getSurfaceWorldPrompts(s) || []);
         }
@@ -1266,6 +1339,17 @@ export default function App() {
       if (code === 'KeyZ') inp.throttleDown = down;
       if (code === 'KeyX') inp.cutoff = down;
       if (code === 'KeyB') inp.killDrift = down;
+      if (
+        down &&
+        simRef.current.phase === 'space' &&
+        simRef.current.focusedSolarBodyId &&
+        ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)
+      ) {
+        simRef.current.focusedSolarBodyId = null;
+        simRef.current.userOrbitActive = false;
+        setFocusedSolarBodyId(null);
+        setSelectedBodyPin(null);
+      }
       if (moveChanged) syncRoverInputState();
     };
 
@@ -1614,6 +1698,13 @@ export default function App() {
       }
       return;
     }
+    if (travel < 6 && simRef.current.phase === 'space') {
+      const hitBodyId = sceneMgrRef.current?.pickSolarBody(e.clientX, e.clientY) || null;
+      if (hitBodyId) {
+        handleFocusSolarBody(hitBodyId);
+      }
+      return;
+    }
     if (travel < 6 && simRef.current.phase === 'launch') {
       const partId = sceneMgrRef.current?.pickLaunchPart(e.clientX, e.clientY) || null;
       simRef.current.highlightedPart = partId;
@@ -1665,7 +1756,7 @@ export default function App() {
     }
     const s = simRef.current;
     const minD = s.phase === 'launch' ? 9 : s.phase === 'space' ? 4.5 : s.phase === 'landing' ? 5.5 : 3.2;
-    const maxD = s.phase === 'launch' || s.phase === 'space' ? 88 : s.phase === 'landing' ? 80 : 65;
+    const maxD = s.phase === 'launch' ? 88 : s.phase === 'space' ? 160 : s.phase === 'landing' ? 80 : 65;
     s.userOrbitActive = true;
     s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.022, minD, maxD);
   };
@@ -2129,8 +2220,20 @@ export default function App() {
           resources={resourcesUi}
           campaignMission={carryoverUi.activeMission}
           donkiFlareActive={Boolean(/M|X/i.test(donki.classType || ''))}
+          nasaOnline={donki.isLive || osdr.isLive}
           freeExploreMode={freeExploreMode}
+          focusedSolarBodyId={focusedSolarBodyId}
+          exploredSolarBodyIds={exploredSolarBodyIds}
+          selectedBodyPin={selectedBodyPin}
+          solarScaleMode={solarScaleMode}
+          solarEpochYears={solarEpochYearsUi}
+          onFocusSolarBody={handleFocusSolarBody}
+          onExploreSolarBody={handleExploreSolarBody}
           onOpenMenuTab={openMenuWithTab}
+          onOpenBriefing={() => jumpToPhase('briefing')}
+          onOpenHardwareBay={() => jumpToPhase('inspector')}
+          onOpenNotebook={() => setFieldNotebookOpen(true)}
+          onOpenNasaModal={() => setNasaModalOpen(true)}
           onToggleAutoPilot={() => {
             simRef.current.space.autoPilot = !simRef.current.space.autoPilot;
             syncUiNow();
@@ -2320,6 +2423,7 @@ export default function App() {
         activeTab={menuTab}
         phase={phase}
         carryover={carryoverUi}
+        exploredSolarBodyIds={exploredSolarBodyIds}
         rover={roverUi}
         objectives={objectivesUi}
         marsQueue={marsQueueUi}
@@ -2394,11 +2498,7 @@ export default function App() {
           solarTimeSpeedRef.current = speed;
           setSolarTimeSpeed(speed);
         }}
-        onFocusSolarBody={(bodyId) => {
-          simRef.current.focusedSolarBodyId = bodyId;
-          setFocusedSolarBodyId(bodyId);
-          soundSynth.playClick();
-        }}
+        onFocusSolarBody={handleFocusSolarBody}
         onSelectLandingZone={(id) => {
           simRef.current.landing.targetZoneId = id;
           syncUiNow();

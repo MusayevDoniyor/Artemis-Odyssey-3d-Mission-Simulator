@@ -178,7 +178,7 @@ export function RoverHUD({
             </div>
           </div>
 
-          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-stone-100">
+          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
             <div className="flex items-center gap-2 text-base font-bold text-amber-400">
               <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
               <span>
@@ -186,8 +186,8 @@ export function RoverHUD({
               </span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4">
-              <p className="text-base leading-snug text-stone-100">{objectiveText}</p>
-              <span className="shrink-0 text-base font-bold text-stone-200 tabular-nums">
+              <p className="text-base leading-snug text-slate-100">{objectiveText}</p>
+              <span className="shrink-0 text-base font-bold text-slate-200 tabular-nums">
                 {completedCount} / {objectives.length}
               </span>
             </div>
@@ -206,7 +206,7 @@ export function RoverHUD({
 
         {/* GROUP 2: Top-Right Core 3 Meters + Distance (+ Contextual Chip only if triggered) */}
         <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
-          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-white/10 rounded-2xl px-4 py-2.5 tabular-nums">
+          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-4 py-2.5 tabular-nums">
             <div className="flex items-center gap-2.5 pr-4">
               <Battery
                 className={`h-5 w-5 ${resources.power <= 20 ? 'text-rose-400' : 'text-amber-400'}`}
@@ -219,13 +219,13 @@ export function RoverHUD({
                 >
                   {Math.round(resources.power)}%
                 </span>
-                <span className="text-sm text-stone-400">Power</span>
+                <span className="text-sm text-slate-400">Power</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2.5 px-4">
               <Wind
-                className={`h-5 w-5 ${resources.oxygen <= 20 ? 'text-rose-400' : 'text-stone-200'}`}
+                className={`h-5 w-5 ${resources.oxygen <= 20 ? 'text-rose-400' : 'text-sky-300'}`}
               />
               <div>
                 <span
@@ -235,13 +235,13 @@ export function RoverHUD({
                 >
                   {Math.round(resources.oxygen)}%
                 </span>
-                <span className="text-sm text-stone-400">Air</span>
+                <span className="text-sm text-slate-400">Air</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2.5 px-4">
               <Shield
-                className={`h-5 w-5 ${resources.shield <= 20 ? 'text-rose-400' : 'text-amber-400'}`}
+                className={`h-5 w-5 ${resources.shield <= 20 ? 'text-rose-400' : 'text-emerald-300'}`}
               />
               <div>
                 <span
@@ -251,7 +251,7 @@ export function RoverHUD({
                 >
                   {Math.round(resources.shield)}%
                 </span>
-                <span className="text-sm text-stone-400">Shield</span>
+                <span className="text-sm text-slate-400">Shield</span>
               </div>
             </div>
 
@@ -261,7 +261,7 @@ export function RoverHUD({
                 <span className="block text-lg leading-none font-bold text-white">
                   {distToNext} m
                 </span>
-                <span className="text-sm text-stone-400">Target</span>
+                <span className="text-sm text-slate-400">Target</span>
               </div>
             </div>
           </div>
@@ -301,30 +301,30 @@ export function RoverHUD({
           data-testid="hud-group-radar"
           onClick={() => onOpenMenuTab('map')}
           title="Open Full Topo Map [Tab]"
-          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-amber-400"
+          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-sky-400/60"
         >
           <svg viewBox="0 0 144 144" className="h-full w-full">
             <circle
               cx="72"
               cy="72"
               r="60"
-              fill={isMars ? '#311a10' : '#151922'}
-              stroke="rgba(255,255,255,0.16)"
+              fill={isMars ? '#1d1216' : '#0b1222'}
+              stroke="rgba(56,189,248,0.28)"
               strokeWidth="1.5"
             />
-            <circle cx="72" cy="72" r="34" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+            <circle cx="72" cy="72" r="34" fill="none" stroke="rgba(148,163,184,0.16)" strokeWidth="1" />
 
             {/* Cardinal Markers */}
-            <text x="72" y="11" textAnchor="middle" fontSize="11" fontWeight="700" fill="#f5f5f4">
+            <text x="72" y="11" textAnchor="middle" fontSize="11" fontWeight="700" fill="#f8fafc">
               N
             </text>
-            <text x="72" y="139" textAnchor="middle" fontSize="11" fontWeight="700" fill="#a8a29e">
+            <text x="72" y="139" textAnchor="middle" fontSize="11" fontWeight="700" fill="#94a3b8">
               S
             </text>
-            <text x="10" y="76" textAnchor="middle" fontSize="11" fontWeight="700" fill="#a8a29e">
+            <text x="10" y="76" textAnchor="middle" fontSize="11" fontWeight="700" fill="#94a3b8">
               W
             </text>
-            <text x="134" y="76" textAnchor="middle" fontSize="11" fontWeight="700" fill="#a8a29e">
+            <text x="134" y="76" textAnchor="middle" fontSize="11" fontWeight="700" fill="#94a3b8">
               E
             </text>
 
@@ -378,14 +378,14 @@ export function RoverHUD({
               data-testid="mars-batch-bar"
               className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-base"
             >
-              <span className="font-semibold text-stone-100">
+              <span className="font-semibold text-slate-100">
                 {marsQueue.queue.length} Waypoint{marsQueue.queue.length > 1 ? 's' : ''} (14m lag)
               </span>
               <button
                 type="button"
                 aria-label="Undo last waypoint"
                 onClick={onUndoMarsQueue}
-                className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-stone-200 hover:border-amber-400"
+                className="rounded-lg border border-sky-400/20 bg-slate-900/80 p-1.5 text-slate-200 hover:border-amber-400"
               >
                 <Undo2 className="h-4 w-4" />
               </button>
@@ -393,7 +393,7 @@ export function RoverHUD({
                 type="button"
                 aria-label="Clear waypoints"
                 onClick={onClearMarsQueue}
-                className="rounded-lg border border-white/15 bg-white/5 p-1.5 text-stone-200 hover:border-rose-400"
+                className="rounded-lg border border-sky-400/20 bg-slate-900/80 p-1.5 text-slate-200 hover:border-rose-400"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -401,7 +401,7 @@ export function RoverHUD({
                 type="button"
                 data-testid="send-mars-batch-btn"
                 onClick={onTransmitMarsQueue}
-                className="rounded-xl bg-amber-500 px-4 py-1.5 text-base font-bold text-stone-950 hover:bg-amber-400"
+                className="rounded-xl bg-amber-500 px-4 py-1.5 text-base font-bold text-slate-950 hover:bg-amber-400"
               >
                 Send Batch
               </button>
@@ -427,15 +427,15 @@ export function RoverHUD({
         {/* GROUP 4: Bottom-Right Max 3 Contextual Hints */}
         <div
           data-testid="hud-group-hints"
-          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-2.5 text-base"
+          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-base"
         >
           {hints.map((h) => {
             const inner = (
               <>
-                <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-white/25 bg-white/10 px-1.5 py-0.5 text-sm font-bold text-white">
+                <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
                   {h.keys}
                 </span>
-                <span className="font-medium text-stone-200">{h.label}</span>
+                <span className="font-medium text-slate-200">{h.label}</span>
               </>
             );
             if ('hold' in h && h.hold) {
