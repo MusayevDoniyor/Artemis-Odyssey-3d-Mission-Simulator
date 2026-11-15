@@ -37,7 +37,17 @@ import {
   switchOutpostPowerSource,
   toggleOutpostAirlock,
 } from './outpost';
-import { createInitialCampaignCarryover } from './physics';
+import {
+  clearMarsQueue,
+  createInitialMarsQueueState,
+  enqueueMarsWaypoint,
+  removeLastMarsCommand,
+  shouldShowDidYouKnowToast,
+  stepMarsQueue,
+  transmitMarsQueue,
+} from './marsQueue';
+import { getPlanetObjectives } from './constants';
+import { createInitialCampaignCarryover, createInitialRoverState } from './physics';
 
 test('hardware catalog includes all 7 vehicles with parts, explode axes, and connections', () => {
   assert.equal(HARDWARE_ORDER.length, 7);
@@ -208,4 +218,84 @@ test('Outpost airlock cycles cleanly, Kilopower switches bus, and Sol report sum
   assert.equal(report.solNumber, 2);
   assert.ok(report.highlights.length >= 1);
   assert.ok(report.recommendation.toLowerCase().includes('power'));
+});
+
+test('Mars waypoint batch queue clamps coords, transmits across lag, steers, and triggers arrival drill', () => {
+  let mq = createInitialMarsQueueState(14);
+  assert.equal(mq.phase, 'IDLE');
+  assert.equal(mq.queue.length, 0);
+
+  // Clamp out-of-bounds waypoint and enqueue an objective drill command
+  mq = enqueueMarsWaypoint(mq, 999, -999, 'Far Point');
+  assert.equal(mq.queue.length, 1);
+  assert.ok(mq.queue[0].x <= 260 && mq.queue[0].z >= -260);
+  assert.equal(mq.queue[0].type, 'DRIVE_TO');
+
+  mq = removeLastMarsCommand(mq);
+  assert.equal(mq.queue.length, 0);
+
+  const marsObjs = getPlanetObjectives('mars').map((o) => ({ ...o, progress: 0, completed: false }));
+  const targetObj = marsObjs[0];
+  mq = enqueueMarsWaypoint(mq, targetObj.x, targetObj.z, targetObj.siteName, targetObj.id);
+  assert.equal(mq.queue[0].type, 'DRILL');
+
+  mq = transmitMarsQueue(mq);
+  assert.equal(mq.phase, 'TRANSMITTING');
+  assert.ok(mq.txRemainingSec > 0);
+
+  // Step through simulated uplink lag -> transitions to EXECUTING
+  const startRover = createInitialRoverState(0, 0, 'mars');
+  for (let i = 0; i < 30; i++) {
+    const res = stepMarsQueue(mq, startRover, marsObjs, 0.1);
+    mq = res.queueState;
+  }
+  assert.equal(mq.phase, 'EXECUTING');
+
+  // While far away, issues steering/drive commands cleanly
+  const farRes = stepMarsQueue(mq, startRover, marsObjs, 0.05);
+  assert.ok(farRes.input.left || farRes.input.right || farRes.input.forward);
+  assert.equal(farRes.triggerDrillObjectiveId, null);
+
+  // Once within arrival distance of targetObj, triggers drill prompt & clears queue
+  const nearRover = createInitialRoverState(targetObj.x - 1.5, targetObj.z - 1.5, 'mars');
+  const arriveRes = stepMarsQueue(mq, nearRover, marsObjs, 0.05);
+  assert.equal(arriveRes.triggerDrillObjectiveId, targetObj.id);
+  assert.equal(arriveRes.queueState.phase, 'IDLE');
+
+  mq = enqueueMarsWaypoint(mq, 12, 12, 'Pad');
+  mq = clearMarsQueue(mq);
+  assert.equal(mq.queue.length, 0);
+});
+
+test('shouldShowDidYouKnowToast shows only during calm gameplay with zero alerts or menus open', () => {
+  assert.equal(
+    shouldShowDidYouKnowToast({
+      hasActiveAnomaly: false,
+      apollo1202Active: false,
+      hasCriticalWarning: false,
+      menuOpen: false,
+      modalOpen: false,
+    }),
+    true
+  );
+
+  for (const flag of [
+    'hasActiveAnomaly',
+    'apollo1202Active',
+    'hasCriticalWarning',
+    'menuOpen',
+    'modalOpen',
+  ] as const) {
+    assert.equal(
+      shouldShowDidYouKnowToast({
+        hasActiveAnomaly: false,
+        apollo1202Active: false,
+        hasCriticalWarning: false,
+        menuOpen: false,
+        modalOpen: false,
+        [flag]: true,
+      }),
+      false
+    );
+  }
 });

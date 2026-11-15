@@ -1,6 +1,7 @@
+import type { MouseEvent } from 'react';
 import { Compass, Map, Maximize2, Minimize2, Satellite, Sun } from 'lucide-react';
 import { PHYSICS, getLandingZones } from '../game/constants';
-import type { RoverObjective, RoverState, SurfacePlanet } from '../game/types';
+import type { MarsQueueState, RoverObjective, RoverState, SurfacePlanet } from '../game/types';
 
 interface SurfaceMapPanelProps {
   planet: SurfacePlanet;
@@ -9,6 +10,8 @@ interface SurfaceMapPanelProps {
   relayOnline: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
+  marsQueue?: MarsQueueState;
+  onMapClick?: (worldX: number, worldZ: number) => void;
 }
 
 const MAP_BOUND = PHYSICS.SURFACE_BOUND_M + 10;
@@ -19,6 +22,21 @@ function toSvg(x: number, z: number): { sx: number; sy: number } {
   return { sx, sy };
 }
 
+function fromSvgClient(
+  rect: DOMRect,
+  clientX: number,
+  clientY: number
+): { x: number; z: number } {
+  const nx = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
+  const ny = Math.max(0, Math.min(1, (clientY - rect.top) / Math.max(1, rect.height)));
+  const rawX = nx * (MAP_BOUND * 2) - MAP_BOUND;
+  const rawZ = ny * (MAP_BOUND * 2) - MAP_BOUND;
+  return {
+    x: Math.max(-PHYSICS.SURFACE_BOUND_M, Math.min(PHYSICS.SURFACE_BOUND_M, rawX)),
+    z: Math.max(-PHYSICS.SURFACE_BOUND_M, Math.min(PHYSICS.SURFACE_BOUND_M, rawZ)),
+  };
+}
+
 export function SurfaceMapPanel({
   planet,
   rover,
@@ -26,6 +44,8 @@ export function SurfaceMapPanel({
   relayOnline,
   expanded,
   onToggleExpand,
+  marsQueue,
+  onMapClick,
 }: SurfaceMapPanelProps) {
   const zones = getLandingZones(planet);
   const rovPt = toSvg(rover.x, rover.z);
@@ -34,18 +54,25 @@ export function SurfaceMapPanel({
   const padPt = toSvg(0, 0);
 
   const isMars = planet === 'mars';
-  const sizePx = expanded ? 288 : 176;
+  const sizePx = expanded ? 304 : 180;
   const scale100mPx = (100 / (MAP_BOUND * 2)) * 240;
+
+  const handleSvgClick = (e: MouseEvent<SVGSVGElement>) => {
+    if (!onMapClick) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { x, z } = fromSvgClient(rect, e.clientX, e.clientY);
+    onMapClick(x, z);
+  };
 
   return (
     <div
       data-testid="surface-map-panel"
-      className="hud-panel pointer-events-auto rounded-xl p-2.5 transition-all"
+      className="hud-soft pointer-events-auto rounded-2xl p-3 transition-all"
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <Map className={`h-3.5 w-3.5 ${isMars ? 'text-amber-400' : 'text-cyan-300'}`} />
-          <span className="font-display text-[11px] font-bold tracking-wider text-white uppercase">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Map className="h-4 w-4 text-amber-400" />
+          <span className="text-sm font-bold tracking-wide text-white uppercase">
             {isMars ? 'Jezero Topo Map' : 'South Pole Map'}
           </span>
         </div>
@@ -54,34 +81,30 @@ export function SurfaceMapPanel({
           type="button"
           data-testid="toggle-surface-map-btn"
           onClick={onToggleExpand}
-          title="Expand / Collapse Map [Tab]"
-          className="inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-slate-900 px-1.5 py-0.5 font-hud text-[10px] font-bold text-slate-200 hover:border-cyan-400"
+          title="Expand / Collapse Map"
+          className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-stone-200 hover:border-amber-400"
         >
-          {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-          <span className="keycap">Tab</span>
+          {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
         </button>
       </div>
 
       {/* Satellite Resolution Indicator */}
-      <div className="mb-2 flex items-center justify-between gap-2 text-[10px]">
-        <span
-          className={`inline-flex items-center gap-1 font-semibold ${
-            relayOnline ? 'text-emerald-300' : 'text-amber-300'
-          }`}
-        >
-          <Satellite className="h-3 w-3" />
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 font-semibold text-amber-300">
+          <Satellite className="h-3.5 w-3.5" />
           {relayOnline ? 'HERMES High-Res Contours' : 'Coarse Survey Grid'}
         </span>
-        <span className="font-mono-tech text-slate-300">±{PHYSICS.SURFACE_BOUND_M}m</span>
+        <span className="font-mono-tech text-stone-300">±{PHYSICS.SURFACE_BOUND_M}m</span>
       </div>
 
       {/* SVG Topographic Arena */}
-      <div className="relative overflow-hidden rounded-lg border border-slate-700/90 bg-slate-950">
+      <div className="relative overflow-hidden rounded-xl border border-white/15 bg-stone-950">
         <svg
           width={sizePx}
           height={sizePx}
           viewBox="0 0 240 240"
-          className="block"
+          onClick={handleSvgClick}
+          className={`block ${onMapClick ? 'cursor-crosshair' : ''}`}
           aria-label={`${planet} tactical terrain map`}
         >
           {/* Background Terrain Tint */}
@@ -90,7 +113,7 @@ export function SurfaceMapPanel({
             y="0"
             width="240"
             height="240"
-            fill={isMars ? '#1e100a' : '#080f1d'}
+            fill={isMars ? '#20110a' : '#0b1018'}
           />
 
           {/* Outer Arena Boundary Ring */}
@@ -336,13 +359,60 @@ export function SurfaceMapPanel({
             );
           })}
 
+          {/* Mars Queued Command Waypoints */}
+          {marsQueue && marsQueue.queue.length > 0 && (
+            <g>
+              <polyline
+                points={[
+                  `${rovPt.sx.toFixed(1)},${rovPt.sy.toFixed(1)}`,
+                  ...marsQueue.queue.map((cmd) => {
+                    const p = toSvg(cmd.x, cmd.z);
+                    return `${p.sx.toFixed(1)},${p.sy.toFixed(1)}`;
+                  }),
+                ].join(' ')}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="1.6"
+                strokeDasharray="4 3"
+                opacity="0.88"
+              />
+              {marsQueue.queue.map((cmd, idx) => {
+                const p = toSvg(cmd.x, cmd.z);
+                const isDone = idx < marsQueue.activeIndex && marsQueue.phase === 'EXECUTING';
+                const isCurrent = idx === marsQueue.activeIndex && marsQueue.phase === 'EXECUTING';
+                return (
+                  <g key={cmd.id}>
+                    <circle
+                      cx={p.sx}
+                      cy={p.sy}
+                      r={isCurrent ? 6.5 : 5}
+                      fill={isDone ? '#57534e' : '#f59e0b'}
+                      stroke="#141211"
+                      strokeWidth="1.2"
+                    />
+                    <text
+                      x={p.sx}
+                      y={p.sy + 2.5}
+                      textAnchor="middle"
+                      fontSize="7"
+                      fontWeight="bold"
+                      fill="#141211"
+                    >
+                      {idx + 1}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
           {/* Live Rover Heading Arrow + Sensor FOV Wedge */}
           <g transform={`translate(${rovPt.sx}, ${rovPt.sy}) rotate(${-headingDeg})`}>
-            <path d="M 0 0 L -9 20 A 22 22 0 0 0 9 20 Z" fill="#38bdf8" fillOpacity="0.18" />
+            <path d="M 0 0 L -9 20 A 22 22 0 0 0 9 20 Z" fill="#f59e0b" fillOpacity="0.18" />
             <polygon
               points="0,8 -4.5,-5 0,-2.5 4.5,-5"
               fill="#f8fafc"
-              stroke="#0ea5e9"
+              stroke="#f59e0b"
               strokeWidth="1.2"
             />
           </g>

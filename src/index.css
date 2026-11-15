@@ -98,6 +98,23 @@
     0 20px 52px rgba(2, 6, 23, 0.9);
 }
 
+/* Soft Warm-Dark Rounded Gameplay HUD Surfaces (1-accent Amber + 1-alert Rose) */
+.hud-soft {
+  background: rgba(20, 18, 17, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
+}
+
+.hud-soft-alert {
+  background: rgba(28, 16, 18, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
 /* Tactical chamfered modal corner brackets via clean CSS background gradients */
 .tactical-frame {
   background-image:

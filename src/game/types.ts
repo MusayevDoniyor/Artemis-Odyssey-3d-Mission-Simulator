@@ -508,4 +508,48 @@ export interface LandedPose {
   zoneId: number;
 }
 
+export interface MarsCommand {
+  id: string;
+  type: 'DRIVE_TO' | 'DRILL';
+  x: number;
+  z: number;
+  label: string;
+  objectiveId?: string;
+}
+
+export interface MarsQueueState {
+  phase: 'IDLE' | 'TRANSMITTING' | 'EXECUTING';
+  queue: MarsCommand[];
+  activeIndex: number;
+  txRemainingSec: number;
+  txTotalSec: number;
+  realDelayMin: number;
+  statusMessage: string;
+}
+
+export interface SurfaceWorldPrompt {
+  id: string;
+  kind: 'objective' | 'basecamp';
+  title: string;
+  subtitle: string;
+  xPct: number;
+  yPct: number;
+  visible: boolean;
+  distM: number;
+  inRange: boolean;
+  completed: boolean;
+  progress: number;
+  worldX: number;
+  worldZ: number;
+}
+
+export type GameMenuTab =
+  | 'map'
+  | 'outpost'
+  | 'ledger'
+  | 'nasa'
+  | 'glossary'
+  | 'settings';
+
+
 

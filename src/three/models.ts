@@ -41,6 +41,7 @@ function createStrutBetween(
 
 export interface LunarEnvironmentHandles {
   group: THREE.Group;
+  terrainMesh: THREE.Mesh;
   colliders: RoverCollider[];
   moonColliders: RoverCollider[];
   marsColliders: RoverCollider[];
@@ -54,8 +55,8 @@ export interface LunarEnvironmentHandles {
     id: string;
     planet: SurfacePlanet;
     group: THREE.Group;
-    crystal: THREE.Mesh;
-    beam: THREE.Mesh;
+    ring: THREE.Mesh;
+    halo: THREE.Mesh;
   }>;
   landingZoneMeshes: Array<{
     id: number;
@@ -483,43 +484,72 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   wheelTrackMesh.instanceMatrix.needsUpdate = true;
   group.add(wheelTrackMesh);
 
-  // 4b. Mars Jezero Crater Sedimentary Delta Mesas & Basalt Buttes (visible only on Mars)
+  // 4b. Mars Jezero Crater Distant Layered Ridges & Horizon Rim Outcrops (visible only on Mars)
   const marsDecorGroup = new THREE.Group();
   marsDecorGroup.visible = false;
-  const mesaMat = new THREE.MeshStandardMaterial({
+  const ridgeMat = new THREE.MeshStandardMaterial({
     map: tex.marsAlbedo,
-    color: 0xd97745,
-    roughness: 0.92,
-    metalness: 0.04,
+    bumpMap: tex.marsBump,
+    bumpScale: 0.65,
+    color: 0xc2653b,
+    roughness: 0.94,
+    metalness: 0.03,
   });
-  [
-    { x: 142, z: -148, rTop: 15, rBot: 23, h: 15 },
-    { x: -156, z: -116, rTop: 14, rBot: 22, h: 14 },
-    { x: 152, z: 126, rTop: 13, rBot: 21, h: 12 },
-    { x: -142, z: 158, rTop: 16, rBot: 24, h: 16 },
-  ].forEach((m) => {
-    const mesa = new THREE.Mesh(new THREE.CylinderGeometry(m.rTop, m.rBot, m.h, 7), mesaMat);
-    mesa.position.set(m.x, getSurfaceTerrainHeight('mars', m.x, m.z) + m.h * 0.4, m.z);
-    mesa.castShadow = true;
-    mesa.receiveShadow = true;
-    marsDecorGroup.add(mesa);
-  });
+
+  const makeDisplacedOutcropGeo = (rx: number, ry: number, rz: number, seed: number) => {
+    const geo = new THREE.IcosahedronGeometry(1, 3);
+    const pos = geo.attributes.position;
+    for (let vi = 0; vi < pos.count; vi++) {
+      const vx = pos.getX(vi);
+      const vy = pos.getY(vi);
+      const vz = pos.getZ(vi);
+      const strata = Math.sin(vy * 9.0 + seed) * 0.08;
+      const crag =
+        Math.sin(vx * 4.3 + seed * 1.7) * Math.cos(vz * 3.9 - seed * 0.9) * 0.22 + strata;
+      const flatTop = vy > 0.35 ? 0.58 + (vy - 0.35) * 0.22 : 1.0;
+      pos.setXYZ(vi, vx * rx * (1 + crag), vy * ry * flatTop * (1 + crag * 0.5), vz * rz * (1 + crag));
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    return geo;
+  };
+
+  // Organic rocky crater-rim ridges around far perimeter (no oversized blocky polygon frustums)
+  for (let rIdx = 0; rIdx < 16; rIdx++) {
+    const ang = (rIdx / 16) * Math.PI * 2 + 0.14;
+    const dist = 285 + (rIdx % 3) * 28;
+    const rx = Math.cos(ang) * dist;
+    const rz = Math.sin(ang) * dist;
+    const widthX = 36 + (rIdx % 4) * 14;
+    const heightY = 14 + (rIdx % 3) * 8;
+    const depthZ = 24 + ((rIdx + 1) % 3) * 10;
+    const outcrop = new THREE.Mesh(
+      makeDisplacedOutcropGeo(widthX, heightY, depthZ, rIdx + 1),
+      ridgeMat
+    );
+    outcrop.position.set(rx, getSurfaceTerrainHeight('mars', rx, rz) + heightY * 0.24, rz);
+    outcrop.rotation.y = ang + Math.PI * 0.5;
+    outcrop.castShadow = true;
+    outcrop.receiveShadow = true;
+    marsDecorGroup.add(outcrop);
+  }
+
   // Distant Phobos orbital speck in Mars sky
   const phobos = new THREE.Mesh(
-    new THREE.DodecahedronGeometry(3.2, 1),
-    new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.9 })
+    new THREE.DodecahedronGeometry(3.0, 1),
+    new THREE.MeshStandardMaterial({ color: 0xa8a29e, roughness: 0.92 })
   );
   phobos.position.set(160, 118, -320);
   marsDecorGroup.add(phobos);
   group.add(marsDecorGroup);
 
-  // 5. Instanced Boulders (expanded across ±260m corridors, clean around all Moon & Mars waypoints)
+  // 5. Instanced Organic Craggy Boulders & Gravel Pebbles (expanded across ±260m corridors)
   const allStations = [...MOON_OBJECTIVES, ...MARS_OBJECTIVES];
   const allLandingZones = [...MOON_LANDING_ZONES, ...MARS_LANDING_ZONES];
   const boulderSpecs: Array<{ x: number; yMoon: number; yMars: number; z: number; s: number; rot: number }> = [];
-  for (let i = 0; i < 136; i++) {
+  for (let i = 0; i < 142; i++) {
     const angle = i * 2.39996;
-    const dist = 22 + i * 1.68;
+    const dist = 20 + i * 1.65;
     const rx = Math.cos(angle) * dist;
     const rz = Math.sin(angle) * dist;
     const nearObj = allStations.some((o) => Math.hypot(rx - o.x, rz - o.z) < 9.5);
@@ -529,38 +559,77 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
 
     const yMoon = getSurfaceTerrainHeight('moon', rx, rz);
     const yMars = getSurfaceTerrainHeight('mars', rx, rz);
-    const s = 0.52 + (i % 6) * 0.24;
+    const s = 0.45 + (i % 7) * 0.26;
     boulderSpecs.push({ x: rx, yMoon, yMars, z: rz, s, rot: i * 0.7 });
-    const c: RoverCollider = { x: rx, z: rz, r: s * 1.05, type: 'rock', label: 'Surface Boulder' };
+    const c: RoverCollider = { x: rx, z: rz, r: s * 1.02, type: 'rock', label: 'Surface Boulder' };
     moonColliders.push(c);
     marsColliders.push({ ...c, label: 'Basalt Boulder' });
   }
 
-  const rockGeo = new THREE.DodecahedronGeometry(1.0, 1);
+  // Craggy deterministic vertex displacement on rock geometry
+  const rockGeo = new THREE.IcosahedronGeometry(1.0, 2);
+  const rockPos = rockGeo.attributes.position;
+  for (let vi = 0; vi < rockPos.count; vi++) {
+    const vx = rockPos.getX(vi);
+    const vy = rockPos.getY(vi);
+    const vz = rockPos.getZ(vi);
+    const ridgeNoise =
+      Math.sin(vx * 3.7 + vz * 2.1) * 0.18 +
+      Math.cos(vy * 4.5 - vx * 2.9) * 0.14 +
+      Math.sin((vx + vy + vz) * 6.2) * 0.08;
+    const scale = 1.0 + ridgeNoise;
+    const flat = vy < -0.2 ? 0.65 : 1.0;
+    rockPos.setXYZ(vi, vx * scale, vy * scale * flat, vz * scale);
+  }
+  rockPos.needsUpdate = true;
+  rockGeo.computeVertexNormals();
+
   const rockMat = new THREE.MeshStandardMaterial({
     map: tex.moonAlbedo,
+    bumpMap: tex.moonBump,
+    bumpScale: 0.35,
     color: 0xffffff,
-    roughness: 0.92,
-    metalness: 0.05,
-    flatShading: true,
+    roughness: 0.93,
+    metalness: 0.04,
   });
   const boulderInstanced = new THREE.InstancedMesh(rockGeo, rockMat, boulderSpecs.length);
   boulderInstanced.castShadow = true;
   boulderInstanced.receiveShadow = true;
+
+  // Fine surface gravel/cobble scatter (non-colliding atmosphere detail)
+  const pebbleSpecs: Array<{ x: number; yMoon: number; yMars: number; z: number; s: number; rot: number }> = [];
+  for (let pi = 0; pi < 260; pi++) {
+    const ang = pi * 2.39996 + 0.55;
+    const dist = 7 + pi * 0.92;
+    const px = Math.cos(ang) * dist;
+    const pz = Math.sin(ang) * dist;
+    if (Math.hypot(px, pz) < 6) continue;
+    pebbleSpecs.push({
+      x: px,
+      yMoon: getSurfaceTerrainHeight('moon', px, pz),
+      yMars: getSurfaceTerrainHeight('mars', px, pz),
+      z: pz,
+      s: 0.12 + (pi % 5) * 0.06,
+      rot: pi * 1.17,
+    });
+  }
+  const pebbleInstanced = new THREE.InstancedMesh(rockGeo, rockMat, pebbleSpecs.length);
+  pebbleInstanced.receiveShadow = true;
+
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
 
   const updateBouldersForPlanet = (planet: SurfacePlanet) => {
     boulderSpecs.forEach((b, idx) => {
       const y = planet === 'mars' ? b.yMars : b.yMoon;
-      dummy.position.set(b.x, y + b.s * 0.28, b.z);
-      dummy.rotation.set(b.rot, b.rot * 1.3, 0);
-      dummy.scale.set(b.s * 1.2, b.s * 0.75, b.s * 1.05);
+      dummy.position.set(b.x, y + b.s * 0.22, b.z);
+      dummy.rotation.set(b.rot * 0.4, b.rot * 1.3, b.rot * 0.25);
+      dummy.scale.set(b.s * 1.28, b.s * 0.72, b.s * 1.08);
       dummy.updateMatrix();
       boulderInstanced.setMatrixAt(idx, dummy.matrix);
-      const tone = 0.78 + (idx % 5) * 0.06;
+      const tone = 0.72 + (idx % 5) * 0.06;
       if (planet === 'mars') {
-        tint.setRGB(tone * 1.05, tone * 0.58, tone * 0.42);
+        tint.setRGB(tone * 1.02, tone * 0.52, tone * 0.36);
       } else {
         tint.setRGB(tone, tone, tone + 0.03);
       }
@@ -568,15 +637,54 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     });
     boulderInstanced.instanceMatrix.needsUpdate = true;
     if (boulderInstanced.instanceColor) boulderInstanced.instanceColor.needsUpdate = true;
+
+    pebbleSpecs.forEach((p, idx) => {
+      const y = planet === 'mars' ? p.yMars : p.yMoon;
+      dummy.position.set(p.x, y + p.s * 0.16, p.z);
+      dummy.rotation.set(p.rot * 0.5, p.rot * 1.7, p.rot * 0.3);
+      dummy.scale.set(p.s * 1.35, p.s * 0.6, p.s * 1.1);
+      dummy.updateMatrix();
+      pebbleInstanced.setMatrixAt(idx, dummy.matrix);
+      const tone = 0.68 + (idx % 4) * 0.07;
+      if (planet === 'mars') {
+        tint.setRGB(tone * 0.98, tone * 0.48, tone * 0.34);
+      } else {
+        tint.setRGB(tone, tone, tone + 0.02);
+      }
+      pebbleInstanced.setColorAt(idx, tint);
+    });
+    pebbleInstanced.instanceMatrix.needsUpdate = true;
+    if (pebbleInstanced.instanceColor) pebbleInstanced.instanceColor.needsUpdate = true;
+
     rockMat.map = planet === 'mars' ? tex.marsAlbedo : tex.moonAlbedo;
+    rockMat.bumpMap = planet === 'mars' ? tex.marsBump : tex.moonBump;
     rockMat.needsUpdate = true;
   };
   updateBouldersForPlanet('moon');
   boulderInstanced.computeBoundingSphere();
+  pebbleInstanced.computeBoundingSphere();
   group.add(boulderInstanced);
+  group.add(pebbleInstanced);
 
-  // 6. Science Stations at Moon & Mars Objective Coordinates
+  // 6. Grounded NASA Hardware Science Stations + Amber Ground Target Rings (Zero Floating Crystals/Beams)
   const objectiveMeshes: LunarEnvironmentHandles['objectiveMeshes'] = [];
+  const stationMetalMat = new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0,
+    metalness: 0.72,
+    roughness: 0.28,
+  });
+  const stationDarkMat = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    metalness: 0.55,
+    roughness: 0.45,
+  });
+  const stationGoldMat = new THREE.MeshStandardMaterial({
+    map: tex.foilAlbedo,
+    color: 0xfbbf24,
+    metalness: 0.84,
+    roughness: 0.26,
+  });
+
   allStations.forEach((obj) => {
     const g = new THREE.Group();
     const ty = getSurfaceTerrainHeight(obj.planet, obj.x, obj.z);
@@ -586,95 +694,112 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     if (obj.planet === 'mars') marsColliders.push(stationCol);
     else moonColliders.push(stationCol);
 
+    // Grounded outcrop rock / ice deposit beside instrument
+    const specimenRock = new THREE.Mesh(rockGeo, rockMat.clone());
+    (specimenRock.material as THREE.MeshStandardMaterial).color.setHex(
+      obj.id.includes('ice') || obj.id.includes('hydrogen')
+        ? 0xbae6fd
+        : obj.planet === 'mars'
+          ? 0xc2653b
+          : 0x94a3b8
+    );
+    specimenRock.scale.set(1.15, 0.75, 0.95);
+    specimenRock.position.set(0, 0.32, 0);
+    specimenRock.castShadow = true;
+    specimenRock.receiveShadow = true;
+    g.add(specimenRock);
+
     if (obj.id.includes('ice') || obj.id.includes('hydrogen')) {
-      for (let k = 0; k < 5; k++) {
-        const shard = new THREE.Mesh(
-          new THREE.ConeGeometry(0.45, 1.5, 6),
-          new THREE.MeshStandardMaterial({
-            color: obj.color,
-            emissive: 0x0284c7,
-            emissiveIntensity: 0.45,
-            roughness: 0.2,
-            metalness: 0.65,
-          })
+      // TRIDENT Cryo-Drill Tripod beside regolith specimen
+      for (let leg = 0; leg < 3; leg++) {
+        const a = (leg / 3) * Math.PI * 2;
+        const strut = createStrutBetween(
+          new THREE.Vector3(Math.cos(a) * 1.15, 0, Math.sin(a) * 1.15),
+          new THREE.Vector3(Math.cos(a) * 0.22, 1.85, Math.sin(a) * 0.22),
+          0.04,
+          0.055,
+          stationDarkMat
         );
-        const a = (k / 5) * Math.PI * 2;
-        shard.position.set(Math.cos(a) * 1.0, 0.7, Math.sin(a) * 1.0);
-        g.add(shard);
+        g.add(strut);
       }
+      const drillHead = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.55, 0.58), stationGoldMat);
+      drillHead.position.y = 1.75;
+      drillHead.castShadow = true;
+      g.add(drillHead);
+      const auger = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 1.55, 10), stationMetalMat);
+      auger.position.y = 0.85;
+      g.add(auger);
     } else if (obj.id.includes('solar') || obj.id.includes('maaz')) {
-      const box = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.0, 1.2, 0.8, 8),
-        new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.8, roughness: 0.3 })
-      );
-      box.position.y = 0.4;
-      g.add(box);
+      // Articulated Solar & Weather Mast on anchored tripod
+      const baseSkid = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, 0.28, 8), stationDarkMat);
+      baseSkid.position.y = 0.14;
+      baseSkid.castShadow = true;
+      g.add(baseSkid);
+      const mastPole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.35, 10), stationMetalMat);
+      mastPole.position.set(1.1, 1.18, -0.4);
+      mastPole.castShadow = true;
+      g.add(mastPole);
       const wing = new THREE.Mesh(
-        new THREE.BoxGeometry(3.4, 1.5, 0.1),
-        new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.5, roughness: 0.2 })
+        new THREE.BoxGeometry(2.1, 0.06, 0.95),
+        new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.45, roughness: 0.24 })
       );
-      wing.position.y = 2.2;
+      wing.position.set(1.1, 2.15, -0.4);
+      wing.rotation.x = 0.48;
+      wing.castShadow = true;
       g.add(wing);
     } else if (obj.id.includes('moxie') || obj.id.includes('delta')) {
-      const unit = new THREE.Mesh(
-        new THREE.BoxGeometry(2.1, 1.3, 1.6),
-        new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xf8fafc, metalness: 0.75, roughness: 0.28 })
-      );
-      unit.position.y = 0.75;
+      // MOXIE Electrolysis Skid + Dual O2 Cylinders
+      const unit = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.95, 1.15), stationGoldMat);
+      unit.position.set(1.35, 0.52, -0.35);
+      unit.castShadow = true;
       g.add(unit);
-      const tank = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.42, 0.42, 1.8, 12),
-        new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.6, roughness: 0.3 })
-      );
-      tank.position.set(1.2, 0.9, 0);
-      g.add(tank);
-    } else {
-      for (let b = 0; b < 3; b++) {
-        const mono = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.95, 0),
-          new THREE.MeshStandardMaterial({ color: obj.planet === 'mars' ? 0xfdba74 : 0x86efac, roughness: 0.75, metalness: 0.15 })
-        );
-        mono.position.set((b - 1) * 1.1, 0.8, (b % 2) * 0.5);
-        g.add(mono);
+      for (const offsetZ of [-0.28, 0.28]) {
+        const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 1.15, 12), stationMetalMat);
+        tank.position.set(2.3, 0.6, offsetZ - 0.35);
+        tank.castShadow = true;
+        g.add(tank);
       }
+    } else {
+      // Spectrometer Beacon & Sample Cairn
+      const sensorBox = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.44, 0.54), stationGoldMat);
+      sensorBox.position.set(1.25, 1.15, 0.25);
+      sensorBox.castShadow = true;
+      g.add(sensorBox);
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 1.15, 8), stationDarkMat);
+      stand.position.set(1.25, 0.58, 0.25);
+      g.add(stand);
     }
 
-    const crystal = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.9, 0),
-      new THREE.MeshStandardMaterial({
-        color: obj.color,
-        emissive: obj.color,
-        emissiveIntensity: 0.75,
-        roughness: 0.2,
-        metalness: 0.8,
-      })
-    );
-    crystal.position.y = 4.4;
-    g.add(crystal);
-
-    const beam = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 1.4, 34, 16, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: obj.color,
-        transparent: true,
-        opacity: 0.16,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      })
-    );
-    beam.position.y = 17;
-    g.add(beam);
-
+    // Crisp glowing amber target ground ring matching reference art direction
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(5.2, 5.7, 32),
-      new THREE.MeshBasicMaterial({ color: obj.color, side: THREE.DoubleSide })
+      new THREE.RingGeometry(4.4, 4.88, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xf59e0b,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide,
+      })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.24;
     g.add(ring);
 
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(3.85, 5.45, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.21;
+    g.add(halo);
+
     group.add(g);
-    objectiveMeshes.push({ id: obj.id, planet: obj.planet, group: g, crystal, beam });
+    objectiveMeshes.push({ id: obj.id, planet: obj.planet, group: g, ring, halo });
   });
 
   // 7. Moon & Mars Landing Zones
@@ -748,6 +873,7 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
 
   const envHandles: LunarEnvironmentHandles = {
     group,
+    terrainMesh: terrain,
     colliders: moonColliders,
     moonColliders,
     marsColliders,

@@ -25,6 +25,7 @@ import type {
   RoverState,
   SpaceFlightState,
   SurfacePlanet,
+  SurfaceWorldPrompt,
   VehicleShowcaseId,
 } from '../game/types';
 import {
@@ -151,6 +152,7 @@ export class SpaceSceneManager {
   private raycaster = new THREE.Raycaster();
   private pointerNdc = new THREE.Vector2();
   private launchFog = new THREE.FogExp2(0x162238, 0.0022);
+  private marsFog = new THREE.FogExp2(0x9a4d2c, 0.0046);
 
   private simRef: { current: SceneSimulationBridge };
   private onFrameTick: (dt: number) => void;
@@ -332,6 +334,84 @@ export class SpaceSceneManager {
 
   getSurfaceColliders(planet: SurfacePlanet): RoverCollider[] {
     return planet === 'mars' ? this.lunarEnv.marsColliders : this.lunarEnv.moonColliders;
+  }
+
+  pickSurfacePoint(clientX: number, clientY: number): { x: number; z: number } | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    this.pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNdc, this.camera);
+    const hits = this.raycaster.intersectObject(this.lunarEnv.terrainMesh, false);
+    if (hits.length === 0) return null;
+    const pt = hits[0].point;
+    return {
+      x: Math.max(-PHYSICS.SURFACE_BOUND_M, Math.min(PHYSICS.SURFACE_BOUND_M, pt.x)),
+      z: Math.max(-PHYSICS.SURFACE_BOUND_M, Math.min(PHYSICS.SURFACE_BOUND_M, pt.z)),
+    };
+  }
+
+  getSurfaceWorldPrompts(s: SceneSimulationBridge): SurfaceWorldPrompt[] {
+    if (s.phase !== 'rover') return [];
+    const r = s.rover;
+    const out: SurfaceWorldPrompt[] = [];
+
+    s.objectives.forEach((obj) => {
+      if (obj.completed) return;
+      const distM = Math.round(Math.hypot(obj.x - r.x, obj.z - r.z));
+      const inRange = distM < 6.8;
+      const ty = getSurfaceTerrainHeight(obj.planet, obj.x, obj.z);
+      this.scratchVec.set(obj.x, ty + (inRange ? 2.4 : 2.9), obj.z);
+      this.scratchVec.project(this.camera);
+      const visible =
+        this.scratchVec.z >= -1 &&
+        this.scratchVec.z <= 1 &&
+        Math.abs(this.scratchVec.x) <= 0.96 &&
+        Math.abs(this.scratchVec.y) <= 0.94;
+      out.push({
+        id: obj.id,
+        kind: 'objective',
+        title: obj.siteName,
+        subtitle: obj.instrument,
+        xPct: Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10,
+        yPct: Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10,
+        visible,
+        distM,
+        inRange,
+        completed: obj.completed,
+        progress: obj.progress,
+        worldX: obj.x,
+        worldZ: obj.z,
+      });
+    });
+
+    const baseDist = Math.round(Math.hypot(-15 - r.x, -13 - r.z));
+    const baseInRange = baseDist <= 22;
+    const baseTy = getSurfaceTerrainHeight(r.planet, -15, -13);
+    this.scratchVec.set(-15, baseTy + 4.4, -13);
+    this.scratchVec.project(this.camera);
+    const baseVisible =
+      this.scratchVec.z >= -1 &&
+      this.scratchVec.z <= 1 &&
+      Math.abs(this.scratchVec.x) <= 0.96 &&
+      Math.abs(this.scratchVec.y) <= 0.94;
+    out.push({
+      id: 'basecamp-airlock',
+      kind: 'basecamp',
+      title: r.planet === 'mars' ? 'Jezero Base' : 'Base Camp',
+      subtitle: 'Airlock & Shelter',
+      xPct: Math.round((this.scratchVec.x * 0.5 + 0.5) * 1000) / 10,
+      yPct: Math.round((-this.scratchVec.y * 0.5 + 0.5) * 1000) / 10,
+      visible: baseVisible,
+      distM: baseDist,
+      inRange: baseInRange,
+      completed: false,
+      progress: 0,
+      worldX: -15,
+      worldZ: -13,
+    });
+
+    return out;
   }
 
   pickLaunchPart(clientX: number, clientY: number): string | null {
@@ -599,12 +679,14 @@ export class SpaceSceneManager {
     this.particleColors[i * 3 + 2] = b;
   }
 
-  private updateParticles(dt: number) {
+  private updateParticles(dt: number, gravityMs2: number, windDriftX: number) {
     let anyAlive = false;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       if (this.particleLife[i] > 0) {
         anyAlive = true;
         this.particleLife[i] -= dt;
+        this.particleVel[i * 3 + 1] -= gravityMs2 * dt;
+        this.particleVel[i * 3] += windDriftX * dt;
         this.particlePos[i * 3] += this.particleVel[i * 3] * dt;
         this.particlePos[i * 3 + 1] += this.particleVel[i * 3 + 1] * dt;
         this.particlePos[i * 3 + 2] += this.particleVel[i * 3 + 2] * dt;
@@ -765,7 +847,14 @@ export class SpaceSceneManager {
       Boolean(s.kilopowerActive) ||
       ((phase === 'title' || phase === 'inspector') && s.showcase === 'outpost');
     this.starField.visible = !showLaunch || s.launch.altitudeKm > 18;
-    this.scene.fog = showLaunch && s.launch.altitudeKm < 16 ? this.launchFog : null;
+    const isSurfaceMars =
+      showLunar && s.phase !== 'title' && s.phase !== 'inspector' && s.planet === 'mars';
+    this.scene.fog =
+      showLaunch && s.launch.altitudeKm < 16
+        ? this.launchFog
+        : isSurfaceMars
+          ? this.marsFog
+          : null;
     if (showLaunch) {
       this.launchFog.density = Math.max(0, 0.0022 * (1 - s.launch.altitudeKm / 16));
     }
@@ -819,7 +908,14 @@ export class SpaceSceneManager {
     }
 
     this.syncCrashFxVisuals(s, dt, elapsedSec);
-    this.updateParticles(dt);
+    const particleGrav =
+      showLunar && (phase === 'rover' || phase === 'landing')
+        ? s.planet === 'mars'
+          ? 0.45
+          : 1.625
+        : 0;
+    const windX = isSurfaceMars ? 0.35 : 0;
+    this.updateParticles(dt, particleGrav, windX);
   }
 
   private syncSpacecraftShowcaseScene(
@@ -1340,22 +1436,28 @@ export class SpaceSceneManager {
       s.phase === 'title' || s.phase === 'inspector' ? 'moon' : s.planet;
     this.lunarEnv.applyPlanet(activePlanet);
 
-    // Mars Jezero dusty salmon-amber sky vs Lunar deep black sky
+    // Mars Jezero dusty golden-amber sky & low sun vs Lunar deep black sky
     if (activePlanet === 'mars') {
-      (this.scene.background as THREE.Color).setHex(0x3a1c14);
-      this.ambientLight.color.setHex(0xfdba74);
-      this.ambientLight.groundColor.setHex(0x451a12);
+      (this.scene.background as THREE.Color).setHex(0x9b4d2c);
+      this.ambientLight.color.setHex(0xffcca0);
+      this.ambientLight.groundColor.setHex(0x4e2112);
+      this.ambientLight.intensity = 0.85;
       this.sunLight.color.setHex(0xffedd5);
+      this.sunLight.position.set(112, 34, -84);
+      this.sunLight.intensity = 3.1;
       this.starField.visible = false;
     } else {
       (this.scene.background as THREE.Color).setHex(0x020617);
       this.ambientLight.color.setHex(0x93c5fd);
       this.ambientLight.groundColor.setHex(0x1e293b);
+      this.ambientLight.intensity = 0.55;
       this.sunLight.color.setHex(0xfffbeb);
+      this.sunLight.position.set(90, 72, 60);
+      this.sunLight.intensity = 2.75;
       this.starField.visible = true;
     }
 
-    // Animate objective crystals for active planet
+    // Pulse grounded amber target rings for active uncompleted science sites
     const showObjectiveMarkers = s.phase !== 'title' && s.phase !== 'inspector';
     this.lunarEnv.objectiveMeshes.forEach((om, idx) => {
       if (om.planet !== activePlanet) {
@@ -1368,10 +1470,14 @@ export class SpaceSceneManager {
         return;
       }
       om.group.visible = true;
-      om.crystal.rotation.y += dt * 1.4;
-      om.crystal.position.y = 4.4 + Math.sin(elapsedSec * 2.5 + idx) * 0.25;
-      om.beam.visible = showObjectiveMarkers && !obj.completed;
-      om.crystal.visible = showObjectiveMarkers && !obj.completed;
+      const showRing = showObjectiveMarkers && !obj.completed;
+      om.ring.visible = showRing;
+      om.halo.visible = showRing;
+      if (showRing) {
+        const pulse = 1 + Math.sin(elapsedSec * 2.8 + idx) * 0.04;
+        om.ring.scale.setScalar(pulse);
+        om.halo.scale.setScalar(1 + Math.sin(elapsedSec * 2.8 + idx) * 0.08);
+      }
     });
 
     // Showcase / Inspector Camera Modes
@@ -1797,49 +1903,54 @@ export class SpaceSceneManager {
       rm.drillArm.rotation.x += (0 - rm.drillArm.rotation.x) * Math.min(1, 8 * dt);
     }
 
-    // Regolith wheel dust when moving fast
-    if (!s.paused && Math.abs(r.speed) > 1.8 && Math.random() < 0.3) {
+    // Regolith wheel dust plume when moving (planet-specific tint & gravity arc)
+    if (!s.paused && Math.abs(r.speed) > 0.45 && Math.random() < 0.42) {
+      const isMars = r.planet === 'mars';
       this.emitParticle(
-        r.x - Math.sin(r.headingRad) * 1.2 + (Math.random() - 0.5) * 1.2,
-        r.y + 0.15,
-        r.z - Math.cos(r.headingRad) * 1.2 + (Math.random() - 0.5) * 1.2,
-        (Math.random() - 0.5) * 0.8,
-        0.7 + Math.random() * 0.6,
-        (Math.random() - 0.5) * 0.8,
-        0.5,
-        0.65,
-        0.68,
-        0.75
+        r.x - Math.sin(r.headingRad) * 1.15 + (Math.random() - 0.5) * 1.1,
+        r.y + 0.18,
+        r.z - Math.cos(r.headingRad) * 1.15 + (Math.random() - 0.5) * 1.1,
+        (Math.random() - 0.5) * 0.9,
+        0.55 + Math.random() * 0.55,
+        (Math.random() - 0.5) * 0.9,
+        isMars ? 0.85 : 0.46,
+        isMars ? 0.78 : 0.65,
+        isMars ? 0.42 : 0.68,
+        isMars ? 0.28 : 0.74
       );
     }
 
-    // Rover Camera Modes (supports instant 360° orbit + wheel zoom in Chase & Orbit)
+    // Rover Camera Modes (close chase camera frames rover at ~15-20% viewport height; mouse orbit supported)
     const fwdX = Math.sin(r.headingRad);
     const fwdZ = Math.cos(r.headingRad);
     if (s.cameraMode === 'cockpit') {
       this.camera.position.set(r.x + fwdX * 0.65, r.y + 2.75 + clearanceLift, r.z + fwdZ * 0.65);
       this.camera.lookAt(r.x + fwdX * 16, r.y + 1.4, r.z + fwdZ * 16);
     } else if (s.cameraMode === 'overhead') {
-      const zoomH = Math.min(68, Math.max(12, s.orbitDistance * 1.4));
+      const zoomH = Math.min(68, Math.max(12, s.orbitDistance * 2.2));
       this.camera.position.set(r.x, r.y + zoomH, r.z + 4);
       this.camera.lookAt(r.x, r.y, r.z);
     } else if (s.cameraMode === 'orbit' || s.userOrbitActive) {
-      const dist = Math.min(62, Math.max(3.2, s.orbitDistance));
+      const dist = Math.min(48, Math.max(3.2, s.orbitDistance));
       const camX = r.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
       const camZ = r.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
       const floorY = getSurfaceTerrainHeight(r.planet, camX, camZ) + 0.65;
       this.camera.position.set(
         camX,
-        Math.max(floorY, r.y + 1.5 + Math.sin(s.orbitPitch) * dist),
+        Math.max(floorY, r.y + 1.35 + Math.sin(s.orbitPitch) * dist),
         camZ
       );
-      this.camera.lookAt(r.x, r.y + 1.1, r.z);
+      this.camera.lookAt(r.x, r.y + 1.0, r.z);
     } else {
-      const dist = Math.min(34, Math.max(4.5, s.orbitDistance));
-      this.camPosTarget.set(r.x - fwdX * dist, r.y + 4.4 + dist * 0.14 + clearanceLift, r.z - fwdZ * dist);
-      this.camLookTarget.set(r.x + fwdX * 3.5, r.y + 1.4, r.z + fwdZ * 3.5);
-      this.camera.position.lerp(this.camPosTarget, Math.min(1, 6.5 * dt));
-      this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 7.5 * dt));
+      const dist = Math.min(24, Math.max(3.8, s.orbitDistance));
+      this.camPosTarget.set(
+        r.x - fwdX * dist,
+        r.y + 1.85 + dist * 0.11 + clearanceLift,
+        r.z - fwdZ * dist
+      );
+      this.camLookTarget.set(r.x + fwdX * 6.0, r.y + 1.05, r.z + fwdZ * 6.0);
+      this.camera.position.lerp(this.camPosTarget, Math.min(1, 7.5 * dt));
+      this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 8.5 * dt));
       this.camera.lookAt(this.camLookCurrent);
     }
   }

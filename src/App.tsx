@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BriefingOverlay } from './components/BriefingOverlay';
+import { CalmFactToast } from './components/CalmFactToast';
+import { CenteredEventCard } from './components/CenteredEventCard';
 import { DrillingModal } from './components/DrillingModal';
 import { FieldNotebookModal } from './components/FieldNotebookModal';
+import { GameMenuModal } from './components/GameMenuModal';
 import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
 import { MobileAcademyView } from './components/MobileAcademyView';
@@ -12,6 +15,7 @@ import { RoverHUD } from './components/RoverHUD';
 import { SpaceFlightHUD } from './components/SpaceFlightHUD';
 import { TitleOverlay } from './components/TitleOverlay';
 import { VehicleInspectorOverlay } from './components/VehicleInspectorOverlay';
+import { WorldTargetPins } from './components/WorldTargetPins';
 import { soundSynth } from './game/audio';
 import {
   CAMPAIGN_ANOMALIES,
@@ -28,7 +32,17 @@ import {
   setDrillSetting,
   stepDrillingConsole,
 } from './game/drilling';
+import { CONTEXTUAL_FACTS, type ContextualFact, type FactContextKey } from './game/factsAndGlossary';
 import { HARDWARE_CATALOG } from './game/hardwareCatalog';
+import {
+  clearMarsQueue,
+  createInitialMarsQueueState,
+  enqueueMarsWaypoint,
+  removeLastMarsCommand,
+  shouldShowDidYouKnowToast,
+  stepMarsQueue,
+  transmitMarsQueue,
+} from './game/marsQueue';
 import {
   createInitialOutpostConsoleState,
   stepAirlockCycle,
@@ -72,6 +86,7 @@ import type {
   DonkiStatus,
   DrillSetting,
   DrillingConsoleState,
+  GameMenuTab,
   GamePhase,
   InputState,
   InspectorLabelPoint,
@@ -81,6 +96,7 @@ import type {
   LaunchState,
   LeoTransferState,
   MarsEdlState,
+  MarsQueueState,
   MissionAnomaly,
   OsdrStatus,
   OutpostConsoleState,
@@ -97,9 +113,16 @@ import type {
   SpaceFlightState,
   SpaceTargetId,
   SurfacePlanet,
+  SurfaceWorldPrompt,
   TelemetrySpeedScale,
   VehicleShowcaseId,
 } from './game/types';
+import {
+  getLandingWarnings,
+  getLaunchWarnings,
+  getRoverWarnings,
+  getSpaceWarnings,
+} from './game/warnings';
 import { SpaceSceneManager, type SceneSimulationBridge } from './three/SpaceSceneManager';
 
 const DEFAULT_DONKI: DonkiStatus = {
@@ -225,11 +248,18 @@ export default function App() {
   const apollo1202ClearedRef = useRef<boolean>(false);
   const drillingConsoleRef = useRef<DrillingConsoleState | null>(null);
   const outpostConsoleRef = useRef<OutpostConsoleState>(createInitialOutpostConsoleState('moon'));
+  const marsQueueRef = useRef<MarsQueueState>(createInitialMarsQueueState(14));
   const mastPanDegRef = useRef<number>(0);
   const solarTimeSpeedRef = useRef<number>(0.8);
+  const calmElapsedRef = useRef<number>(0);
+  const toastVisibleSecRef = useRef<number>(0);
+  const toastFactIndexRef = useRef<number>(0);
+  const activeToastRef = useRef<ContextualFact | null>(null);
 
   const [phase, setPhase] = useState<GamePhase>(simRef.current.phase);
   const [paused, setPaused] = useState<boolean>(false);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [menuTab, setMenuTab] = useState<GameMenuTab>('map');
   const [muted, setMuted] = useState<boolean>(false);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => soundSynth.getSettings());
   const [qualityPreset, setQualityPreset] = useState<QualityPreset>('high');
@@ -244,11 +274,11 @@ export default function App() {
   const [osdr, setOsdr] = useState<OsdrStatus>(DEFAULT_OSDR);
   const [nasaModalOpen, setNasaModalOpen] = useState<boolean>(false);
   const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
-  const [mapExpanded, setMapExpanded] = useState<boolean>(false);
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window === 'undefined' ? true : window.innerWidth >= 1024
   );
   const modalOpenRef = useRef<boolean>(false);
+  const menuOpenRef = useRef<boolean>(false);
   const prevGatesPassedRef = useRef<number>(0);
 
   const [preLaunchChecks, setPreLaunchChecks] = useState<PreLaunchChecks>(() =>
@@ -262,9 +292,11 @@ export default function App() {
   );
   const [unstowUi, setUnstowUi] = useState<PostLandingUnstowState | null>(null);
   const [apollo1202Active, setApollo1202Active] = useState<boolean>(false);
+  const [marsQueueUi, setMarsQueueUi] = useState<MarsQueueState>(marsQueueRef.current);
+  const [worldPrompts, setWorldPrompts] = useState<SurfaceWorldPrompt[]>([]);
+  const [activeToastFact, setActiveToastFact] = useState<ContextualFact | null>(null);
 
   const [speedScale, setSpeedScale] = useState<TelemetrySpeedScale>('KID_25X');
-  const [mastPanDeg, setMastPanDeg] = useState<number>(0);
   const [drillingConsoleUi, setDrillingConsoleUi] = useState<DrillingConsoleState | null>(null);
   const [outpostConsoleUi, setOutpostConsoleUi] = useState<OutpostConsoleState>(() =>
     createInitialOutpostConsoleState('moon')
@@ -281,6 +313,10 @@ export default function App() {
       Boolean(drillingConsoleUi?.open) ||
       outpostConsoleUi.open;
   }, [nasaModalOpen, fieldNotebookOpen, drillingConsoleUi, outpostConsoleUi]);
+
+  useEffect(() => {
+    menuOpenRef.current = menuOpen;
+  }, [menuOpen]);
 
   useEffect(() => {
     const onResize = () => {
@@ -349,8 +385,27 @@ export default function App() {
     setDiscoveryObjUi(discoveryObjRef.current ? { ...discoveryObjRef.current } : null);
     setDrillingConsoleUi(drillingConsoleRef.current ? { ...drillingConsoleRef.current } : null);
     setOutpostConsoleUi({ ...outpostConsoleRef.current });
+    setMarsQueueUi({ ...marsQueueRef.current });
     setScoreUi(scoreRef.current);
     setFailReason(failReasonRef.current);
+  }, []);
+
+  const openMenuWithTab = useCallback((tab: GameMenuTab) => {
+    simRef.current.paused = true;
+    menuOpenRef.current = true;
+    setMenuTab(tab);
+    setMenuOpen(true);
+    setPaused(true);
+    soundSynth.init();
+    soundSynth.playClick();
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    simRef.current.paused = false;
+    menuOpenRef.current = false;
+    setMenuOpen(false);
+    setPaused(false);
+    soundSynth.playClick();
   }, []);
 
   const unlockFieldNote = useCallback((noteId?: string) => {
@@ -502,6 +557,16 @@ export default function App() {
       apollo1202ClearedRef.current = false;
       setApollo1202Active(false);
 
+      marsQueueRef.current = createInitialMarsQueueState(14);
+      setMarsQueueUi(marsQueueRef.current);
+      setWorldPrompts([]);
+      menuOpenRef.current = false;
+      setMenuOpen(false);
+      activeToastRef.current = null;
+      setActiveToastFact(null);
+      calmElapsedRef.current = 0;
+      toastVisibleSecRef.current = 0;
+
       if (targetPhase !== 'space') {
         s.focusedSolarBodyId = null;
         setFocusedSolarBodyId(null);
@@ -578,14 +643,13 @@ export default function App() {
         s.phase = 'rover';
         s.cameraMode = 'chase';
         s.orbitYaw = 0.6;
-        s.orbitPitch = 0.26;
-        s.orbitDistance = 11;
+        s.orbitPitch = 0.24;
+        s.orbitDistance = 5.4;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.rover = createInitialRoverState(6, 6, targetPlanet);
         s.landedPose = { planet: targetPlanet, x: 0, y: 0, z: 0, zoneId: 0 };
         s.unstow = null;
         mastPanDegRef.current = 0;
-        setMastPanDeg(0);
         s.mastPanRad = 0;
         sceneMgrRef.current?.resetWheelTracks();
         s.objectives = clonePlanetObjectives(targetPlanet);
@@ -639,7 +703,7 @@ export default function App() {
         }
       }
 
-      if (s.paused || modalOpenRef.current || discoveryObjRef.current) {
+      if (s.paused || modalOpenRef.current || menuOpenRef.current || discoveryObjRef.current) {
         soundSynth.setThrustVolume(0);
         const nowModal = performance.now();
         if (nowModal - lastUiSyncRef.current > 90) {
@@ -817,11 +881,12 @@ export default function App() {
             s.cameraMode = 'chase';
             s.userOrbitActive = false;
             s.orbitYaw = 0.6;
-            s.orbitPitch = 0.26;
-            s.orbitDistance = 11;
+            s.orbitPitch = 0.24;
+            s.orbitDistance = 5.4;
             s.rover = createInitialRoverState(startX, startZ, pose.planet);
+            marsQueueRef.current = createInitialMarsQueueState(14);
+            setMarsQueueUi(marsQueueRef.current);
             mastPanDegRef.current = 0;
-            setMastPanDeg(0);
             s.mastPanRad = 0;
             sceneMgrRef.current?.resetWheelTracks();
             s.objectives = clonePlanetObjectives(pose.planet);
@@ -924,7 +989,21 @@ export default function App() {
         soundSynth.setThrustVolume(0);
         s.mastPanRad = (mastPanDegRef.current * Math.PI) / 180;
         const colliders = sceneMgrRef.current?.getSurfaceColliders(s.rover.planet) || [];
-        s.rover = stepRoverPhysics(s.rover, s.input, colliders, dt);
+        let effectiveInput = s.input;
+        if (s.rover.planet === 'mars') {
+          const mq = stepMarsQueue(marsQueueRef.current, s.rover, s.objectives, dt);
+          marsQueueRef.current = mq.queueState;
+          effectiveInput = mq.input;
+          if (mq.triggerDrillObjectiveId) {
+            const obj = s.objectives.find((o) => o.id === mq.triggerDrillObjectiveId && !o.completed);
+            if (obj) {
+              drillingConsoleRef.current = createInitialDrillingState(obj.id, obj.title, obj.planet);
+              soundSynth.playClick();
+              syncUiNow();
+            }
+          }
+        }
+        s.rover = stepRoverPhysics(s.rover, effectiveInput, colliders, dt);
         phaseTimerRef.current += dt;
 
         if (
@@ -1019,6 +1098,72 @@ export default function App() {
         soundSynth.setThrustVolume(0);
       }
 
+      // Calm-Moment "Did you know?" Toast (~8s every ~26s during quiet moments only)
+      if (s.phase === 'launch' || s.phase === 'space' || s.phase === 'landing' || s.phase === 'rover') {
+        const hasCritical =
+          s.phase === 'launch'
+            ? getLaunchWarnings(s.launch, s.resources).some((w) => w.severity === 'critical')
+            : s.phase === 'space'
+              ? getSpaceWarnings(s.space, s.resources, s.donkiFlareActive).some(
+                  (w) => w.severity === 'critical'
+                )
+              : s.phase === 'landing'
+                ? getLandingWarnings(s.landing, s.resources).some((w) => w.severity === 'critical')
+                : getRoverWarnings(s.rover, s.resources, s.donkiFlareActive).some(
+                    (w) => w.severity === 'critical'
+                  );
+
+        const isCalm = shouldShowDidYouKnowToast({
+          hasActiveAnomaly: Boolean(
+            activeAnomalyRef.current && !activeAnomalyRef.current.resolvedChoiceId
+          ),
+          apollo1202Active: apollo1202TriggeredRef.current && !apollo1202ClearedRef.current,
+          hasCriticalWarning: hasCritical,
+          menuOpen: menuOpenRef.current,
+          modalOpen: modalOpenRef.current,
+        });
+
+        if (!isCalm) {
+          if (activeToastRef.current) {
+            activeToastRef.current = null;
+            toastVisibleSecRef.current = 0;
+            setActiveToastFact(null);
+          }
+        } else if (activeToastRef.current) {
+          toastVisibleSecRef.current += dt;
+          if (toastVisibleSecRef.current >= 8) {
+            activeToastRef.current = null;
+            toastVisibleSecRef.current = 0;
+            setActiveToastFact(null);
+          }
+        } else {
+          calmElapsedRef.current += dt;
+          if (calmElapsedRef.current >= 26) {
+            calmElapsedRef.current = 0;
+            const ctxKey: FactContextKey =
+              s.phase === 'launch'
+                ? s.launch.orbitReached
+                  ? 'leo'
+                  : 'launch'
+                : s.phase === 'space'
+                  ? 'space'
+                  : s.phase === 'landing'
+                    ? s.unstow?.active
+                      ? 'unstow'
+                      : s.landing.planet === 'mars'
+                        ? 'mars-edl'
+                        : 'moon-landing'
+                    : 'rover';
+            const list = CONTEXTUAL_FACTS[ctxKey] || CONTEXTUAL_FACTS.rover;
+            const picked = list[toastFactIndexRef.current % list.length];
+            toastFactIndexRef.current += 1;
+            activeToastRef.current = picked;
+            toastVisibleSecRef.current = 0;
+            setActiveToastFact(picked);
+          }
+        }
+      }
+
       // Throttled <= 10Hz UI state sync
       const now = performance.now();
       if (now - lastUiSyncRef.current > 100) {
@@ -1032,6 +1177,10 @@ export default function App() {
         setRoverUi({ ...s.rover });
         setResourcesUi({ ...s.resources });
         setObjectivesUi(s.objectives.map((o) => ({ ...o })));
+        setMarsQueueUi({ ...marsQueueRef.current });
+        if (s.phase === 'rover') {
+          setWorldPrompts(sceneMgrRef.current?.getSurfaceWorldPrompts(s) || []);
+        }
         if (s.phase === 'inspector' && s.inspector?.showLabels) {
           setInspectorLabels(sceneMgrRef.current?.getInspectorScreenLabels(s.showcase) || []);
         }
@@ -1132,15 +1281,30 @@ export default function App() {
       soundSynth.init();
 
       const s = simRef.current;
-      if (e.code === 'KeyM') {
+      const isGameplay =
+        s.phase === 'launch' || s.phase === 'space' || s.phase === 'landing' || s.phase === 'rover';
+
+      if (e.code === 'KeyM' && !e.repeat) {
+        if (isGameplay) {
+          if (menuOpenRef.current) {
+            closeMenu();
+          } else {
+            openMenuWithTab('map');
+          }
+          return;
+        }
         const m = soundSynth.toggleMute();
         setMuted(m);
         setAudioSettings(soundSynth.getSettings());
         return;
       }
 
-      if (e.code === 'Tab' && !e.repeat && s.phase === 'rover') {
-        setMapExpanded((prev) => !prev);
+      if (e.code === 'Tab' && !e.repeat && isGameplay) {
+        if (menuOpenRef.current) {
+          closeMenu();
+        } else {
+          openMenuWithTab('map');
+        }
         return;
       }
 
@@ -1155,18 +1319,23 @@ export default function App() {
           syncUiNow();
           return;
         }
+        if (nasaModalOpen) {
+          setNasaModalOpen(false);
+          return;
+        }
+        if (fieldNotebookOpen) {
+          setFieldNotebookOpen(false);
+          return;
+        }
       }
 
-      if (e.code === 'Escape' || e.code === 'KeyP') {
-        if (
-          s.phase !== 'title' &&
-          s.phase !== 'briefing' &&
-          s.phase !== 'inspector' &&
-          s.phase !== 'victory' &&
-          s.phase !== 'gameover'
-        ) {
-          s.paused = !s.paused;
-          syncUiNow();
+      if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) {
+        if (isGameplay) {
+          if (menuOpenRef.current) {
+            closeMenu();
+          } else {
+            openMenuWithTab('map');
+          }
         }
         return;
       }
@@ -1203,6 +1372,17 @@ export default function App() {
       }
 
       if (e.code === 'KeyC' && !e.repeat && (s.phase === 'landing' || s.phase === 'rover')) {
+        if (
+          s.phase === 'rover' &&
+          s.rover.planet === 'mars' &&
+          (marsQueueRef.current.queue.length > 0 || marsQueueRef.current.phase !== 'IDLE') &&
+          !menuOpenRef.current
+        ) {
+          marsQueueRef.current = clearMarsQueue(marsQueueRef.current);
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+          return;
+        }
         const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
         const nextMode = order[(order.indexOf(s.cameraMode) + 1) % order.length];
         s.cameraMode = nextMode;
@@ -1248,6 +1428,34 @@ export default function App() {
       }
 
       if (!e.repeat && s.phase === 'rover') {
+        if (
+          e.code === 'Space' &&
+          s.rover.planet === 'mars' &&
+          marsQueueRef.current.phase === 'IDLE' &&
+          marsQueueRef.current.queue.length > 0 &&
+          !menuOpenRef.current
+        ) {
+          marsQueueRef.current = transmitMarsQueue(marsQueueRef.current);
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+          return;
+        }
+        if (e.code === 'KeyE' && !menuOpenRef.current && !modalOpenRef.current) {
+          const nearObj = s.objectives.find(
+            (o) => !o.completed && Math.hypot(o.x - s.rover.x, o.z - s.rover.z) < 6.8
+          );
+          const atBase = Math.hypot(s.rover.x + 15, s.rover.z + 13) <= 22;
+          if (!nearObj && atBase) {
+            outpostConsoleRef.current = {
+              ...outpostConsoleRef.current,
+              planet: s.rover.planet,
+              open: true,
+            };
+            soundSynth.playClick();
+            syncUiNow();
+            return;
+          }
+        }
         if (e.code === 'Digit1') s.rover.driveMode = 'DRIVE';
         if (e.code === 'Digit2') s.rover.driveMode = 'CRAB';
         if (e.code === 'Digit3') s.rover.driveMode = 'SPIN';
@@ -1256,12 +1464,10 @@ export default function App() {
         if (e.code === 'KeyL') s.rover.headlightsOn = !s.rover.headlightsOn;
         if (e.code === 'KeyQ' || e.code === 'BracketLeft') {
           mastPanDegRef.current = clamp(mastPanDegRef.current - 15, -75, 75);
-          setMastPanDeg(mastPanDegRef.current);
           s.mastPanRad = (mastPanDegRef.current * Math.PI) / 180;
         }
         if (e.code === 'BracketRight') {
           mastPanDegRef.current = clamp(mastPanDegRef.current + 15, -75, 75);
-          setMastPanDeg(mastPanDegRef.current);
           s.mastPanRad = (mastPanDegRef.current * Math.PI) / 180;
         }
         syncUiNow();
@@ -1312,7 +1518,7 @@ export default function App() {
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [jumpToPhase, syncUiNow]);
+  }, [closeMenu, fieldNotebookOpen, jumpToPhase, nasaModalOpen, openMenuWithTab, syncUiNow]);
 
   // Universal 360° drag-to-orbit + scroll-wheel zoom across every 3D stage & model
   const dragStateRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number }>({
@@ -1369,13 +1575,45 @@ export default function App() {
   };
 
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
-    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi || drillingConsoleUi?.open || outpostConsoleUi.open) {
+    if (
+      menuOpen ||
+      nasaModalOpen ||
+      fieldNotebookOpen ||
+      discoveryObjUi ||
+      drillingConsoleUi?.open ||
+      outpostConsoleUi.open
+    ) {
       return;
     }
     const travel = Math.hypot(
       e.clientX - dragStateRef.current.startX,
       e.clientY - dragStateRef.current.startY
     );
+    if (
+      travel < 6 &&
+      simRef.current.phase === 'rover' &&
+      simRef.current.rover.planet === 'mars' &&
+      marsQueueRef.current.phase === 'IDLE'
+    ) {
+      const hit = sceneMgrRef.current?.pickSurfacePoint(e.clientX, e.clientY);
+      if (hit) {
+        const snapObj = simRef.current.objectives.find(
+          (o) => !o.completed && Math.hypot(o.x - hit.x, o.z - hit.z) < 9.5
+        );
+        marsQueueRef.current = snapObj
+          ? enqueueMarsWaypoint(marsQueueRef.current, snapObj.x, snapObj.z, snapObj.siteName, snapObj.id)
+          : enqueueMarsWaypoint(
+              marsQueueRef.current,
+              hit.x,
+              hit.z,
+              `Point (${Math.round(hit.x)}, ${Math.round(hit.z)})`
+            );
+        setMarsQueueUi(marsQueueRef.current);
+        soundSynth.init();
+        soundSynth.playClick();
+      }
+      return;
+    }
     if (travel < 6 && simRef.current.phase === 'launch') {
       const partId = sceneMgrRef.current?.pickLaunchPart(e.clientX, e.clientY) || null;
       simRef.current.highlightedPart = partId;
@@ -1500,8 +1738,8 @@ export default function App() {
     } else if (s.phase === 'rover') {
       s.userOrbitActive = false;
       s.orbitYaw = 0.6;
-      s.orbitPitch = 0.26;
-      s.orbitDistance = 11;
+      s.orbitPitch = 0.24;
+      s.orbitDistance = 5.4;
     } else if (s.phase === 'inspector') {
       s.userOrbitActive = true;
       s.orbitYaw = 0.65;
@@ -1743,6 +1981,52 @@ export default function App() {
         />
       )}
 
+      {phase === 'rover' &&
+        !menuOpen &&
+        !nasaModalOpen &&
+        !fieldNotebookOpen &&
+        !drillingConsoleUi?.open &&
+        !outpostConsoleUi.open &&
+        !discoveryObjUi && (
+          <WorldTargetPins
+            prompts={worldPrompts}
+            planet={roverUi.planet}
+            marsQueue={marsQueueUi}
+            onInteractObjective={(objId) => {
+              const obj = objectivesUi.find((o) => o.id === objId);
+              if (!obj || obj.completed) return;
+              drillingConsoleRef.current = createInitialDrillingState(
+                obj.id,
+                obj.title,
+                obj.planet
+              );
+              soundSynth.playClick();
+              syncUiNow();
+            }}
+            onOpenOutpost={() => {
+              outpostConsoleRef.current = {
+                ...outpostConsoleRef.current,
+                planet: simRef.current.rover.planet,
+                open: true,
+              };
+              soundSynth.playClick();
+              syncUiNow();
+            }}
+            onQueueMarsTarget={(prompt) => {
+              if (marsQueueRef.current.phase !== 'IDLE') return;
+              marsQueueRef.current = enqueueMarsWaypoint(
+                marsQueueRef.current,
+                prompt.worldX,
+                prompt.worldZ,
+                prompt.title,
+                prompt.kind === 'objective' ? prompt.id : undefined
+              );
+              setMarsQueueUi(marsQueueRef.current);
+              soundSynth.playClick();
+            }}
+          />
+        )}
+
       {phase === 'launch' && (
         <LaunchHUD
           launch={launchUi}
@@ -1754,33 +2038,7 @@ export default function App() {
             simRef.current.highlightedPart = null;
             syncUiNow();
           }}
-          muted={muted}
-          onToggleMute={toggleMute}
-          onPause={() => {
-            simRef.current.paused = true;
-            syncUiNow();
-          }}
-          onResetLaunch={() => {
-            soundSynth.init();
-            soundSynth.playClick();
-            soundSynth.setThrustVolume(0);
-            soundSynth.resetAtmosphere();
-            simRef.current.input = { ...EMPTY_INPUT };
-            simRef.current.crashFx = {
-              active: false,
-              kind: 'landing',
-              elapsed: 0,
-              x: 0,
-              y: 0,
-              z: 0,
-              planet: simRef.current.planet,
-            };
-            simRef.current.launch = createInitialLaunchState(simRef.current.launch.autoGuidance);
-            simRef.current.leoTransfer = createInitialLeoTransferState();
-            setPreLaunchChecks(createInitialPreLaunchChecks());
-            launchPrevCountdownDigitRef.current = 4;
-            syncUiNow();
-          }}
+          onOpenMenuTab={openMenuWithTab}
           onTogglePreLaunchCheck={(key) => {
             soundSynth.init();
             soundSynth.playClick();
@@ -1841,11 +2099,27 @@ export default function App() {
             syncUiNow();
           }}
           onSkipToSpace={() => jumpToPhase('space')}
-          onJumpToPhase={(p) => jumpToPhase(p)}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
-          onSetCameraPreset={handleSetCameraPreset}
-          onZoomCamera={handleZoomCamera}
-          onResetCamera={handleResetCamera}
+          onResetLaunch={() => {
+            soundSynth.init();
+            soundSynth.playClick();
+            soundSynth.setThrustVolume(0);
+            soundSynth.resetAtmosphere();
+            simRef.current.input = { ...EMPTY_INPUT };
+            simRef.current.crashFx = {
+              active: false,
+              kind: 'landing',
+              elapsed: 0,
+              x: 0,
+              y: 0,
+              z: 0,
+              planet: simRef.current.planet,
+            };
+            simRef.current.launch = createInitialLaunchState(simRef.current.launch.autoGuidance);
+            simRef.current.leoTransfer = createInitialLeoTransferState();
+            setPreLaunchChecks(createInitialPreLaunchChecks());
+            launchPrevCountdownDigitRef.current = 4;
+            syncUiNow();
+          }}
         />
       )}
 
@@ -1854,37 +2128,9 @@ export default function App() {
           space={spaceUi}
           resources={resourcesUi}
           campaignMission={carryoverUi.activeMission}
-          carryover={carryoverUi}
-          activeAnomaly={activeAnomalyUi}
           donkiFlareActive={Boolean(/M|X/i.test(donki.classType || ''))}
           freeExploreMode={freeExploreMode}
-          solarScaleMode={solarScaleMode}
-          solarTimeSpeed={solarTimeSpeed}
-          focusedSolarBodyId={focusedSolarBodyId}
-          onChangeSolarScaleMode={(mode) => {
-            simRef.current.solarScaleMode = mode;
-            setSolarScaleMode(mode);
-            soundSynth.playClick();
-          }}
-          onChangeSolarTimeSpeed={(speed) => {
-            solarTimeSpeedRef.current = speed;
-            setSolarTimeSpeed(speed);
-          }}
-          onFocusSolarBody={(bodyId) => {
-            simRef.current.focusedSolarBodyId = bodyId;
-            setFocusedSolarBodyId(bodyId);
-            soundSynth.playClick();
-          }}
-          muted={muted}
-          onToggleMute={toggleMute}
-          onPause={() => {
-            simRef.current.paused = true;
-            syncUiNow();
-          }}
-          onSelectTarget={(id: SpaceTargetId) => {
-            simRef.current.space.targetId = id;
-            syncUiNow();
-          }}
+          onOpenMenuTab={openMenuWithTab}
           onToggleAutoPilot={() => {
             simRef.current.space.autoPilot = !simRef.current.space.autoPilot;
             syncUiNow();
@@ -1911,11 +2157,6 @@ export default function App() {
           }}
           onEnterLunarOrbit={() => jumpToPhase('landing', 'moon')}
           onEnterMarsOrbit={() => jumpToPhase('landing', 'mars')}
-          onResolveAnomaly={handleResolveAnomaly}
-          onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onSetCameraPreset={handleSetCameraPreset}
-          onZoomCamera={handleZoomCamera}
-          onResetCamera={handleResetCamera}
         />
       )}
 
@@ -1924,16 +2165,9 @@ export default function App() {
           landing={landingUi}
           marsEdl={marsEdlUi}
           unstow={unstowUi}
-          apollo1202Active={apollo1202Active}
           resources={resourcesUi}
           isruFuelBonusPct={carryoverUi.isruFuelBonusPct}
-          cameraMode={cameraMode}
-          muted={muted}
-          onAckApollo1202={() => {
-            apollo1202ClearedRef.current = true;
-            setApollo1202Active(false);
-            soundSynth.playClick();
-          }}
+          onOpenMenuTab={openMenuWithTab}
           onFastForwardEdl={() => {
             if (simRef.current.marsEdl) {
               simRef.current.marsEdl = fastForwardMarsEdl(simRef.current.marsEdl);
@@ -1954,9 +2188,15 @@ export default function App() {
               const startX = clamp(pose.x, -240, 240);
               const startZ = clamp(pose.z + 6.2, -240, 240);
               simRef.current.planet = pose.planet;
+              simRef.current.cameraMode = 'chase';
+              simRef.current.userOrbitActive = false;
+              simRef.current.orbitYaw = 0.6;
+              simRef.current.orbitPitch = 0.24;
+              simRef.current.orbitDistance = 5.4;
               simRef.current.rover = createInitialRoverState(startX, startZ, pose.planet);
+              marsQueueRef.current = createInitialMarsQueueState(14);
+              setMarsQueueUi(marsQueueRef.current);
               mastPanDegRef.current = 0;
-              setMastPanDeg(0);
               simRef.current.mastPanRad = 0;
               sceneMgrRef.current?.resetWheelTracks();
               simRef.current.objectives = clonePlanetObjectives(pose.planet);
@@ -1966,22 +2206,6 @@ export default function App() {
               soundSynth.playSuccess();
               syncUiNow();
             }
-          }}
-          onToggleMute={toggleMute}
-          onPause={() => {
-            simRef.current.paused = true;
-            syncUiNow();
-          }}
-          onCycleCamera={() => {
-            const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            const nextMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
-            simRef.current.cameraMode = nextMode;
-            simRef.current.userOrbitActive = nextMode === 'orbit';
-            syncUiNow();
-          }}
-          onSelectZone={(id) => {
-            simRef.current.landing.targetZoneId = id;
-            syncUiNow();
           }}
           onSetGuidance={(mode: LandingGuidanceMode) => {
             simRef.current.landing.guidanceMode = mode;
@@ -2007,13 +2231,6 @@ export default function App() {
             simRef.current.landing.throttle = hoverNorm;
             syncUiNow();
           }}
-          onToggleAutoCutoff={() => {
-            simRef.current.landing.autoCutoff = !simRef.current.landing.autoCutoff;
-            syncUiNow();
-          }}
-          onSetCameraPreset={handleSetCameraPreset}
-          onZoomCamera={handleZoomCamera}
-          onResetCamera={handleResetCamera}
         />
       )}
 
@@ -2023,31 +2240,14 @@ export default function App() {
           roverInput={roverInputUi}
           resources={resourcesUi}
           objectives={objectivesUi}
-          carryover={carryoverUi}
-          activeAnomaly={activeAnomalyUi}
+          marsQueue={marsQueueUi}
           nearestObjective={nearestObjective}
           donkiFlareActive={Boolean(/M|X/i.test(donki.classType || ''))}
-          cameraMode={cameraMode}
-          mapExpanded={mapExpanded}
-          muted={muted}
           speedScale={speedScale}
-          mastPanDeg={mastPanDeg}
           freeExploreMode={freeExploreMode}
           onToggleSpeedScale={() => {
             soundSynth.playClick();
             setSpeedScale((prev) => (prev === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X'));
-          }}
-          onPanMast={(deltaDeg) => {
-            mastPanDegRef.current = clamp(mastPanDegRef.current + deltaDeg, -75, 75);
-            setMastPanDeg(mastPanDegRef.current);
-            simRef.current.mastPanRad = (mastPanDegRef.current * Math.PI) / 180;
-            soundSynth.playClick();
-          }}
-          onResetMast={() => {
-            mastPanDegRef.current = 0;
-            setMastPanDeg(0);
-            simRef.current.mastPanRad = 0;
-            soundSynth.playClick();
           }}
           onOpenDrillConsole={(obj) => {
             drillingConsoleRef.current = createInitialDrillingState(
@@ -2067,39 +2267,147 @@ export default function App() {
             soundSynth.playClick();
             syncUiNow();
           }}
-          onToggleMute={toggleMute}
-          onToggleMap={() => setMapExpanded((prev) => !prev)}
-          onPause={() => {
-            simRef.current.paused = true;
-            syncUiNow();
-          }}
-          onCycleCamera={() => {
-            const order: CameraMode[] = ['chase', 'cockpit', 'overhead', 'orbit'];
-            const nextMode = order[(order.indexOf(simRef.current.cameraMode) + 1) % order.length];
-            simRef.current.cameraMode = nextMode;
-            simRef.current.userOrbitActive = nextMode === 'orbit';
-            syncUiNow();
-          }}
+          onOpenMenuTab={openMenuWithTab}
           onSetDriveMode={(mode: RoverDriveMode) => {
             simRef.current.rover.driveMode = mode;
             syncUiNow();
           }}
-          onToggleClearance={() => {
-            simRef.current.rover.highClearance = !simRef.current.rover.highClearance;
-            syncUiNow();
+          onTransmitMarsQueue={() => {
+            marsQueueRef.current = transmitMarsQueue(marsQueueRef.current);
+            setMarsQueueUi(marsQueueRef.current);
+            soundSynth.playClick();
           }}
-          onToggleHeadlights={() => {
-            simRef.current.rover.headlightsOn = !simRef.current.rover.headlightsOn;
-            syncUiNow();
+          onUndoMarsQueue={() => {
+            marsQueueRef.current = removeLastMarsCommand(marsQueueRef.current);
+            setMarsQueueUi(marsQueueRef.current);
+            soundSynth.playClick();
           }}
-          onResolveAnomaly={handleResolveAnomaly}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
-          onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onSetCameraPreset={handleSetCameraPreset}
-          onZoomCamera={handleZoomCamera}
-          onResetCamera={handleResetCamera}
+          onClearMarsQueue={() => {
+            marsQueueRef.current = clearMarsQueue(marsQueueRef.current);
+            setMarsQueueUi(marsQueueRef.current);
+            soundSynth.playClick();
+          }}
         />
       )}
+
+      {(phase === 'launch' || phase === 'space' || phase === 'landing' || phase === 'rover') &&
+        !menuOpen && (
+          <CenteredEventCard
+            anomaly={activeAnomalyUi}
+            apollo1202Active={phase === 'landing' && apollo1202Active}
+            onResolveAnomaly={handleResolveAnomaly}
+            onAckApollo1202={() => {
+              apollo1202ClearedRef.current = true;
+              setApollo1202Active(false);
+              soundSynth.playClick();
+            }}
+          />
+        )}
+
+      {!menuOpen && !discoveryObjUi && (
+        <CalmFactToast
+          fact={activeToastFact}
+          onDismiss={() => {
+            activeToastRef.current = null;
+            toastVisibleSecRef.current = 0;
+            setActiveToastFact(null);
+          }}
+        />
+      )}
+
+      <GameMenuModal
+        open={menuOpen}
+        activeTab={menuTab}
+        phase={phase}
+        carryover={carryoverUi}
+        rover={roverUi}
+        objectives={objectivesUi}
+        marsQueue={marsQueueUi}
+        space={spaceUi}
+        landing={landingUi}
+        audioSettings={audioSettings}
+        qualityPreset={qualityPreset}
+        speedScale={speedScale}
+        solarScaleMode={solarScaleMode}
+        solarTimeSpeed={solarTimeSpeed}
+        focusedSolarBodyId={focusedSolarBodyId}
+        onSelectTab={setMenuTab}
+        onClose={closeMenu}
+        onRestartStage={() => {
+          closeMenu();
+          jumpToPhase(phase, simRef.current.planet);
+        }}
+        onBackToTitle={() => {
+          closeMenu();
+          jumpToPhase('title');
+        }}
+        onOpenOutpostConsole={() => {
+          outpostConsoleRef.current = {
+            ...outpostConsoleRef.current,
+            planet: simRef.current.rover.planet,
+            open: true,
+          };
+          soundSynth.playClick();
+          syncUiNow();
+        }}
+        onOpenFieldLedger={() => setFieldNotebookOpen(true)}
+        onOpenNasaModal={() => setNasaModalOpen(true)}
+        onJumpToInspector={() => jumpToPhase('inspector')}
+        onToggleSpeedScale={() => {
+          soundSynth.playClick();
+          setSpeedScale((prev) => (prev === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X'));
+        }}
+        onUpdateAudio={handleUpdateAudio}
+        onChangeQuality={handleChangeQuality}
+        onResetCamera={handleResetCamera}
+        onQueueMarsPoint={(wx, wz, label, objectiveId) => {
+          marsQueueRef.current = enqueueMarsWaypoint(
+            marsQueueRef.current,
+            wx,
+            wz,
+            label,
+            objectiveId
+          );
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+        }}
+        onClearMarsQueue={() => {
+          marsQueueRef.current = clearMarsQueue(marsQueueRef.current);
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+        }}
+        onTransmitMarsQueue={() => {
+          marsQueueRef.current = transmitMarsQueue(marsQueueRef.current);
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+        }}
+        onSelectSpaceTarget={(id: SpaceTargetId) => {
+          simRef.current.space.targetId = id;
+          syncUiNow();
+        }}
+        onChangeSolarScaleMode={(mode) => {
+          simRef.current.solarScaleMode = mode;
+          setSolarScaleMode(mode);
+          soundSynth.playClick();
+        }}
+        onChangeSolarTimeSpeed={(speed) => {
+          solarTimeSpeedRef.current = speed;
+          setSolarTimeSpeed(speed);
+        }}
+        onFocusSolarBody={(bodyId) => {
+          simRef.current.focusedSolarBodyId = bodyId;
+          setFocusedSolarBodyId(bodyId);
+          soundSynth.playClick();
+        }}
+        onSelectLandingZone={(id) => {
+          simRef.current.landing.targetZoneId = id;
+          syncUiNow();
+        }}
+        onToggleAutoCutoff={() => {
+          simRef.current.landing.autoCutoff = !simRef.current.landing.autoCutoff;
+          syncUiNow();
+        }}
+      />
 
       {drillingConsoleUi?.open && (
         <DrillingModal
@@ -2207,9 +2515,9 @@ export default function App() {
         />
       )}
 
-      {(paused || phase === 'gameover' || phase === 'victory') && !discoveryObjUi && (
+      {(phase === 'gameover' || phase === 'victory') && !discoveryObjUi && (
         <OutcomeModal
-          mode={phase === 'victory' ? 'victory' : phase === 'gameover' ? 'gameover' : 'pause'}
+          mode={phase === 'victory' ? 'victory' : 'gameover'}
           reason={failReason}
           score={scoreUi}
           resources={resourcesUi}
@@ -2225,14 +2533,6 @@ export default function App() {
                 }
               : undefined
           }
-          onResume={
-            paused
-              ? () => {
-                  simRef.current.paused = false;
-                  syncUiNow();
-                }
-              : undefined
-          }
           onNextMission={
             nextMissionId
               ? () => {
@@ -2241,13 +2541,7 @@ export default function App() {
                 }
               : undefined
           }
-          onRetry={() => {
-            if (phase === 'victory' || phase === 'gameover') {
-              jumpToPhase('briefing');
-            } else {
-              jumpToPhase(phase);
-            }
-          }}
+          onRetry={() => jumpToPhase('briefing')}
           onBackToTitle={() => jumpToPhase('title')}
         />
       )}
