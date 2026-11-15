@@ -298,7 +298,6 @@ export default function App() {
   const [selectedPayload, setSelectedPayload] = useState<PayloadId>('oxygen-tanks');
   const [donki, setDonki] = useState<DonkiStatus>(DEFAULT_DONKI);
   const [osdr, setOsdr] = useState<OsdrStatus>(DEFAULT_OSDR);
-  const [nasaModalOpen, setNasaModalOpen] = useState<boolean>(false);
   const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window === 'undefined' ? true : window.innerWidth >= 1024
@@ -352,11 +351,10 @@ export default function App() {
 
   useEffect(() => {
     modalOpenRef.current =
-      nasaModalOpen ||
       fieldNotebookOpen ||
       Boolean(drillingConsoleUi?.open) ||
       Boolean(learnModalUi?.open);
-  }, [nasaModalOpen, fieldNotebookOpen, drillingConsoleUi, learnModalUi]);
+  }, [fieldNotebookOpen, drillingConsoleUi, learnModalUi]);
 
   useEffect(() => {
     menuOpenRef.current = menuOpen;
@@ -525,11 +523,11 @@ export default function App() {
     let bodyState = 'playing';
     if (phase === 'title') bodyState = 'title';
     else if (phase === 'gameover' || phase === 'victory') bodyState = 'gameover';
-    else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi || learnModalUi?.open) {
+    else if (paused || fieldNotebookOpen || discoveryObjUi || learnModalUi?.open) {
       bodyState = 'paused';
     }
     document.body.dataset.state = bodyState;
-  }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
+  }, [isDesktop, phase, paused, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
 
   // Fetch live NASA DONKI + OSDR + JPL Horizons state vectors
   useEffect(() => {
@@ -1723,10 +1721,6 @@ export default function App() {
           syncUiNow();
           return;
         }
-        if (nasaModalOpen) {
-          setNasaModalOpen(false);
-          return;
-        }
         if (fieldNotebookOpen) {
           setFieldNotebookOpen(false);
           return;
@@ -1751,7 +1745,6 @@ export default function App() {
       if (
         s.phase === 'title' &&
         !menuOpenRef.current &&
-        !nasaModalOpen &&
         !fieldNotebookOpen &&
         (e.code === 'Enter' || e.code === 'Space')
       ) {
@@ -1946,7 +1939,6 @@ export default function App() {
     fieldNotebookOpen,
     handleOpenLearnForObjective,
     jumpToPhase,
-    nasaModalOpen,
     openMenuWithTab,
     syncUiNow,
   ]);
@@ -2101,7 +2093,6 @@ export default function App() {
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
     if (
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
@@ -2125,7 +2116,6 @@ export default function App() {
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
     if (
       menuOpen ||
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
@@ -2218,7 +2208,7 @@ export default function App() {
 
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
     if (simRef.current.phase !== 'inspector') return;
-    if (menuOpen || nasaModalOpen || fieldNotebookOpen) return;
+    if (menuOpen || fieldNotebookOpen) return;
     const hit = sceneMgrRef.current?.pickInspectorHit(
       e.clientX,
       e.clientY,
@@ -2236,7 +2226,6 @@ export default function App() {
 
   const handleCanvasWheel = (e: React.WheelEvent) => {
     if (
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
@@ -2562,7 +2551,7 @@ export default function App() {
             jumpToPhase('briefing');
           }}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenNasaModal={() => {}}
           onOpenMenuTab={openMenuWithTab}
           muted={muted}
           onToggleMute={toggleMute}
@@ -2643,14 +2632,13 @@ export default function App() {
           osdr={osdr}
           onBack={() => jumpToPhase('title')}
           onLaunch={startActiveMission}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenNasaModal={() => {}}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
       {phase === 'rover' &&
         !menuOpen &&
-        !nasaModalOpen &&
         !fieldNotebookOpen &&
         !drillingConsoleUi?.open &&
         !learnModalUi?.open &&
@@ -2828,7 +2816,7 @@ export default function App() {
           onOpenBriefing={() => jumpToPhase('briefing')}
           onOpenHardwareBay={() => jumpToPhase('inspector')}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenNasaModal={() => {}}
           onToggleAutoPilot={() => {
             simRef.current.space.autoPilot = !simRef.current.space.autoPilot;
             syncUiNow();
@@ -3047,7 +3035,7 @@ export default function App() {
         }}
         onOpenOutpostConsole={() => {}}
         onOpenFieldLedger={() => setFieldNotebookOpen(true)}
-        onOpenNasaModal={() => setNasaModalOpen(true)}
+        onOpenNasaModal={() => {}}
         onJumpToInspector={() => jumpToPhase('inspector')}
         onToggleSpeedScale={() => {
           soundSynth.playClick();
