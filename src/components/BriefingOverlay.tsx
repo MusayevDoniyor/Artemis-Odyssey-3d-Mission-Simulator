@@ -20,6 +20,7 @@ import artemisHeroImg from '../assets/images/artemis_hero_banner_1794685527117.j
 import architectureImg from '../assets/images/mission_architecture_diagram_v2_1794685546954.jpg';
 import viperLanderImg from '../assets/images/viper_lander_showcase_1794685527556.jpg';
 import { NASAInsignia } from './NASAInsignia';
+import { Button, Panel, StatusPill } from './ui';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
 import {
   MISSION_BRIEFING_META,
@@ -286,18 +287,19 @@ export function BriefingOverlay({
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/85 p-3 sm:p-4">
-      <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-5xl rounded-2xl p-4 sm:p-5 lg:p-6">
+      <Panel variant="surface" className="tactical-frame animate-modal-enter my-auto w-full max-w-5xl p-4 sm:p-5 lg:p-6">
         {/* TOP BAR */}
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-400/20 pb-3.5">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={onBack}
-              className="hud-btn-glass inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="shrink-0 font-hud text-xs font-bold uppercase"
             >
               <ArrowLeft className="h-4 w-4 text-sky-300" />
               Command Deck
-            </button>
+            </Button>
 
             <NASAInsignia size={40} className="shrink-0" />
 
@@ -315,21 +317,17 @@ export function BriefingOverlay({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={onOpenNotebook}
-              className="hud-btn-glass inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="shrink-0 font-hud text-xs font-bold uppercase"
             >
               <BookOpen className="h-4 w-4 text-cyan-300" />
               Ledger ({carryover.unlockedFieldNotes.length})
-            </button>
+            </Button>
 
-            <div
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-bold whitespace-nowrap text-amber-200 uppercase"
-            >
-              <Database className="h-4 w-4 shrink-0" />
-              {nasaBadgeText}
-            </div>
+            <StatusPill donki={donki} osdr={osdr} />
           </div>
         </header>
 
@@ -659,25 +657,40 @@ export function BriefingOverlay({
           </div>
 
           <div className="flex items-center gap-2.5">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={onBack}
-              className="hud-btn-glass rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="font-hud text-xs font-bold uppercase"
             >
               Back
-            </button>
-            <button
-              type="button"
-              data-testid="briefing-launch-btn"
-              onClick={onLaunch}
-              className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition lg:text-sm"
-            >
-              <Rocket className="h-4 w-4 shrink-0" />
-              {meta.ctaLabel}
-            </button>
+            </Button>
+            {activeMissionId === 'artemis-2' ? (
+              <Button
+                variant="primary"
+                size="lg"
+                data-testid="briefing-launch-btn"
+                onClick={onLaunch}
+                className="font-display text-xs font-bold tracking-wider uppercase lg:text-sm"
+              >
+                <Rocket className="h-4 w-4 shrink-0" />
+                {meta.ctaLabel}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="lg"
+                data-testid="briefing-launch-btn"
+                disabled
+                title="This mission is in development (as of Nov 2026). Select Artemis II to fly."
+                className="text-xs text-amber-300/90"
+              >
+                In Development (as of Nov 2026)
+              </Button>
+            )}
           </div>
         </footer>
-      </div>
+      </Panel>
     </div>
   );
 }
