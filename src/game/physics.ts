@@ -391,9 +391,12 @@ export function stepSpaceFlightPhysics(
   donkiFlareActive: boolean,
   rawDt: number,
   solarEpochYears = 0,
-  solarScaleMode: SolarScaleMode = 'exploration'
+  solarScaleMode: SolarScaleMode = 'exploration',
+  options?: { satDeployBoost?: number; fuelFactor?: number }
 ): { space: SpaceFlightState; resources: ResourceState } {
   const dt = Math.min(rawDt, 0.05);
+  const fuelFactor = options?.fuelFactor ?? 1.0;
+  const satDeployBoost = options?.satDeployBoost ?? 1.0;
   const s: SpaceFlightState = {
     ...state,
     visitedTargets: [...state.visitedTargets],
@@ -456,7 +459,7 @@ export function stepSpaceFlightPhysics(
   if (thrusting && s.fuelPct > 0) {
     s.vx += fwdX * accel * dt;
     s.vz += fwdZ * accel * dt;
-    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 1.8 : 0.65) * dt);
+    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 1.8 : 0.65) * fuelFactor * dt);
     if (s.boostActive) {
       res.power = Math.max(0, res.power - 2.0 * dt);
     }
@@ -512,9 +515,17 @@ export function stepSpaceFlightPhysics(
       s.orbitalSat.satX = clamp(s.shipX + fwdX * 3.2, -230, 230);
       s.orbitalSat.satZ = clamp(s.shipZ + fwdZ * 3.2, -230, 230);
     }
-    s.orbitalSat.solarDeployedPct = clamp(s.orbitalSat.solarDeployedPct + 48 * dt, 0, 100);
+    s.orbitalSat.solarDeployedPct = clamp(
+      s.orbitalSat.solarDeployedPct + 48 * satDeployBoost * dt,
+      0,
+      100
+    );
     if (s.orbitalSat.solarDeployedPct >= 50) {
-      s.orbitalSat.dishAlignedPct = clamp(s.orbitalSat.dishAlignedPct + 44 * dt, 0, 100);
+      s.orbitalSat.dishAlignedPct = clamp(
+        s.orbitalSat.dishAlignedPct + 44 * satDeployBoost * dt,
+        0,
+        100
+      );
       s.orbitalSat.rotationErrorDeg = clamp(
         42 * (1 - s.orbitalSat.dishAlignedPct / 100),
         0,

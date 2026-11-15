@@ -50,6 +50,11 @@ import {
   transmitMarsQueue,
 } from './game/marsQueue';
 import {
+  getMissionEquipmentOption,
+  getMissionStartingBaseResources,
+  getMissionStartingResources,
+} from './game/missionBriefing';
+import {
   createInitialOutpostConsoleState,
   stepAirlockCycle,
   switchOutpostPowerSource,
@@ -524,14 +529,11 @@ export default function App() {
   }, []);
 
   const applyPayloadBonus = useCallback((id: PayloadId): ResourceState => {
-    const p = PAYLOADS[id];
-    const solarBonus = Math.min(18, Math.round(carryoverRef.current.solarGridKw * 0.25));
-    const bermBonus = Math.min(16, carryoverRef.current.regolithShieldLevel * 8);
-    return {
-      power: clamp(75 + (p.bonus.power || 0) + solarBonus, 0, 100),
-      oxygen: clamp(75 + (p.bonus.oxygen || 0), 0, 100),
-      shield: clamp(70 + (p.bonus.shield || 0) + bermBonus, 0, 100),
-    };
+    return getMissionStartingResources(
+      carryoverRef.current,
+      carryoverRef.current.activeMission,
+      id
+    );
   }, []);
 
   const selectCampaignMission = useCallback(
@@ -554,7 +556,7 @@ export default function App() {
       soundSynth.playClick();
       soundSynth.resetAtmosphere();
       const s = simRef.current;
-      const payload = PAYLOADS[payloadRef.current];
+      const eq = getMissionEquipmentOption(carryoverRef.current.activeMission, payloadRef.current);
       const activeSpec = CAMPAIGN_MISSIONS[carryoverRef.current.activeMission];
       const targetPlanet = planetOverride || activeSpec.planet || s.planet;
 
@@ -622,7 +624,7 @@ export default function App() {
         s.orbitYaw = 0.62;
         s.orbitPitch = 0.26;
         s.orbitDistance = 28;
-        s.resources = { power: 75, oxygen: 75, shield: 70 };
+        s.resources = getMissionStartingBaseResources(carryoverRef.current);
         soundSynth.setThrustVolume(0);
       } else if (targetPhase === 'launch') {
         s.phase = 'launch';
@@ -664,7 +666,7 @@ export default function App() {
         s.orbitDistance = 28;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.landing = createInitialLandingState(
-          payload.massMultiplier,
+          eq.massMultiplier,
           targetPlanet,
           carryoverRef.current.isruFuelBonusPct
         );
@@ -810,7 +812,10 @@ export default function App() {
       // Active engineering consoles (Drill & Outpost Airlock) still animate when modal is open
       if (!s.paused) {
         if (drillingConsoleRef.current?.open) {
-          const drillBoost = PAYLOADS[payloadRef.current].drillBoost;
+          const drillBoost = getMissionEquipmentOption(
+            carryoverRef.current.activeMission,
+            payloadRef.current
+          ).drillBoost;
           const prevDrill = drillingConsoleRef.current;
           const nextDrill = stepDrillingConsole(prevDrill, dt, drillBoost);
           drillingConsoleRef.current = nextDrill;
@@ -921,6 +926,7 @@ export default function App() {
       } else if (s.phase === 'space') {
         const prevTargets = s.space.visitedTargets.length;
         const prevSatLocked = s.space.orbitalSat.linkLocked;
+        const spaceEq = getMissionEquipmentOption(s.campaignMission, payloadRef.current);
         const result = stepSpaceFlightPhysics(
           s.space,
           s.resources,
@@ -928,7 +934,11 @@ export default function App() {
           s.donkiFlareActive,
           dt,
           s.solarEpochYears ?? 0,
-          s.solarScaleMode ?? 'exploration'
+          s.solarScaleMode ?? 'exploration',
+          {
+            satDeployBoost: spaceEq.satDeployBoost,
+            fuelFactor: spaceEq.spaceFuelFactor,
+          }
         );
         s.space = result.space;
         s.resources = result.resources;
@@ -1068,8 +1078,11 @@ export default function App() {
             syncUiNow();
           }
 
-          const payload = PAYLOADS[payloadRef.current];
-          s.landing = stepLandingPhysics(s.landing, s.input, dt, payload.fragile);
+          const landingEq = getMissionEquipmentOption(
+            carryoverRef.current.activeMission,
+            payloadRef.current
+          );
+          s.landing = stepLandingPhysics(s.landing, s.input, dt, landingEq.fragile);
           soundSynth.setThrustVolume(!s.landing.landed && s.landing.fuelPct > 0 ? s.landing.throttle : 0);
 
           if (s.landing.landed) {
@@ -1092,7 +1105,7 @@ export default function App() {
               return;
             }
 
-            if (s.landing.result === 'hard' && payload.fragile) {
+            if (s.landing.result === 'hard' && landingEq.fragile) {
               s.resources.power = clamp(s.resources.power - 25, 10, 100);
             }
             const zones = getLandingZones(s.landing.planet);
@@ -1189,7 +1202,10 @@ export default function App() {
         );
         if (nearest && s.input.action) {
           s.activeDrillingId = nearest.id;
-          const drillBoost = PAYLOADS[payloadRef.current].drillBoost;
+          const drillBoost = getMissionEquipmentOption(
+            carryoverRef.current.activeMission,
+            payloadRef.current
+          ).drillBoost;
           nearest.progress = clamp(
             nearest.progress + (dt * drillBoost * scienceMultRef.current) / nearest.durationSec,
             0,
@@ -2200,7 +2216,12 @@ export default function App() {
             payloadRef.current = id;
             setSelectedPayload(id);
           }}
-          resources={{ power: 75, oxygen: 75, shield: 70 }}
+          resources={getMissionStartingBaseResources(carryoverUi)}
+          launch={launchUi}
+          leoTransfer={leoTransferUi}
+          space={spaceUi}
+          landing={landingUi}
+          objectives={objectivesUi}
           donki={donki}
           osdr={osdr}
           onBack={() => jumpToPhase('title')}

@@ -1,26 +1,48 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   Battery,
   BookOpen,
   Check,
+  CheckCircle2,
+  Circle,
   Database,
   Drill,
+  Fuel,
+  Radio,
   Rocket,
   Shield,
   ShieldCheck,
   Sun,
   Wind,
 } from 'lucide-react';
+import artemisHeroImg from '../assets/images/artemis_hero_banner_1794685527117.jpg';
 import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
-import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER, PAYLOADS } from '../game/constants';
+import architectureImg from '../assets/images/mission_architecture_diagram_v2_1794685546954.jpg';
+import viperLanderImg from '../assets/images/viper_lander_showcase_1794685527556.jpg';
+import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
+import {
+  MISSION_BRIEFING_META,
+  evaluateBriefingMissionStatus,
+  getMissionEquipmentList,
+  getMissionEquipmentOption,
+  getMissionStartingResources,
+  type EquipmentVisualKind,
+  type MissionEquipmentOption,
+  type MissionRouteNode,
+} from '../game/missionBriefing';
 import type {
   CampaignCarryoverState,
   CampaignMissionId,
   DonkiStatus,
+  LandingState,
+  LaunchState,
+  LeoTransferState,
   OsdrStatus,
   PayloadId,
-  PayloadOption,
   ResourceState,
+  RoverObjective,
+  SpaceFlightState,
 } from '../game/types';
 
 interface BriefingOverlayProps {
@@ -29,6 +51,11 @@ interface BriefingOverlayProps {
   onSelectCampaignMission: (id: CampaignMissionId) => void;
   onSelectPayload: (id: PayloadId) => void;
   resources: ResourceState;
+  launch?: LaunchState;
+  leoTransfer?: LeoTransferState;
+  space?: SpaceFlightState;
+  landing?: LandingState;
+  objectives?: RoverObjective[];
   donki: DonkiStatus;
   osdr: OsdrStatus;
   onBack: () => void;
@@ -37,109 +64,140 @@ interface BriefingOverlayProps {
   onOpenNotebook: () => void;
 }
 
-const MISSION_NODES: Record<CampaignMissionId, { steps: string[]; accent: string }> = {
+const MISSION_PREVIEW_IMAGE: Record<CampaignMissionId, { src: string; alt: string; posClass: string }> = {
   'artemis-2': {
-    steps: ['Pad 39B', '165 km LEO', 'HERMES Sat', 'Laser Link'],
-    accent: '#22d3ee',
+    src: artemisHeroImg,
+    alt: 'SLS Launch and Orion Cislunar Transit Artwork',
+    posClass: 'object-center',
   },
   'artemis-3': {
-    steps: ['Moon Orbit', '0.165g Land', 'Shackleton Ice', 'Berm & Solar'],
-    accent: '#38bdf8',
+    src: viperLanderImg,
+    alt: 'Lunar South Pole Lander and VIPER Prospecting Rover',
+    posClass: 'object-center',
   },
   'artemis-4': {
-    steps: ['Lunar Orbit', 'NRHO Dock', 'ISRU Fuel', 'Storm Shield'],
-    accent: '#facc15',
+    src: architectureImg,
+    alt: 'Lunar Gateway NRHO Propellant Transfer Architecture',
+    posClass: 'object-[50%_42%]',
   },
   'mars-pathfinder': {
-    steps: ['0.38g Entry', 'Jezero Pad', 'Delta Cores', 'MOXIE O₂'],
-    accent: '#fb923c',
+    src: '/assets/aistudio/image_93ad272a.png',
+    alt: 'Mars Orbital Surface Mosaic of Cratered Terrain',
+    posClass: 'object-[50%_45%]',
   },
 };
 
-function MissionProfileDiagram({
+function MissionRoutePreview({
   missionId,
-  planet,
+  nodes,
+  accent,
 }: {
   missionId: CampaignMissionId;
-  planet: 'moon' | 'mars';
+  nodes: MissionRouteNode[];
+  accent: string;
 }) {
-  const { steps, accent } = MISSION_NODES[missionId];
-  const nodeXs = [36, 134, 234, 326];
-  const nodeYs = [38, 16, 18, 36];
+  const nodeXs = [46, 146, 248, 348];
+  const nodeYs = [38, 22, 22, 36];
+  const gradId = `briefing-traj-${missionId}`;
 
   return (
     <svg
-      viewBox="0 0 360 66"
-      className="h-16 w-full"
-      aria-label="Mission flight profile diagram"
+      viewBox="0 0 394 64"
+      className="h-14 w-full drop-shadow-[0_2px_8px_rgba(2,6,23,0.9)]"
+      aria-label="Mission route checkpoints"
     >
       <defs>
-        <linearGradient id="trajGrad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.65" />
           <stop offset="100%" stopColor={accent} stopOpacity="0.95" />
         </linearGradient>
       </defs>
 
       <path
-        d={`M ${nodeXs[0]} ${nodeYs[0]} Q 88 10, ${nodeXs[1]} ${nodeYs[1]} T ${nodeXs[2]} ${nodeYs[2]} T ${nodeXs[3]} ${nodeYs[3]}`}
+        d={`M ${nodeXs[0]} ${nodeYs[0]} Q 96 14, ${nodeXs[1]} ${nodeYs[1]} T ${nodeXs[2]} ${nodeYs[2]} T ${nodeXs[3]} ${nodeYs[3]}`}
         fill="none"
-        stroke="url(#trajGrad)"
+        stroke={`url(#${gradId})`}
         strokeWidth="2.2"
         strokeDasharray="4 3"
       />
 
-      <circle cx={nodeXs[0]} cy={nodeYs[0]} r="9" fill="#0ea5e9" fillOpacity="0.18" />
-      <circle
-        cx={nodeXs[3]}
-        cy={nodeYs[3]}
-        r="10"
-        fill={planet === 'mars' ? '#f97316' : '#cbd5e1'}
-        fillOpacity="0.2"
-      />
-
-      {steps.map((label, idx) => (
-        <g key={label}>
-          <circle
-            cx={nodeXs[idx]}
-            cy={nodeYs[idx]}
-            r={idx === 0 || idx === 3 ? 4.5 : 3.5}
-            fill={idx === 3 ? accent : '#0f172a'}
-            stroke={accent}
-            strokeWidth="1.6"
-          />
-          <text
-            x={nodeXs[idx]}
-            y={idx === 1 || idx === 2 ? 36 : 58}
-            textAnchor="middle"
-            fill={idx === 3 ? '#f8fafc' : '#cbd5e1'}
-            fontSize="10"
-            fontWeight="700"
-            fontFamily="Chakra Petch, sans-serif"
-          >
-            {label}
-          </text>
-        </g>
-      ))}
+      {nodes.map((node, idx) => {
+        const isDone = node.status === 'done';
+        const isActive = node.status === 'active';
+        const fill = isDone ? '#34d399' : isActive ? accent : '#0f172a';
+        const stroke = isDone ? '#6ee7b7' : isActive ? '#f8fafc' : '#64748b';
+        return (
+          <g key={node.id}>
+            {isActive && (
+              <circle
+                cx={nodeXs[idx]}
+                cy={nodeYs[idx]}
+                r="8.5"
+                fill={accent}
+                fillOpacity="0.22"
+              />
+            )}
+            <circle
+              cx={nodeXs[idx]}
+              cy={nodeYs[idx]}
+              r={isDone || isActive ? 4.5 : 3.5}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth="1.6"
+            />
+            <text
+              x={nodeXs[idx]}
+              y={56}
+              textAnchor="middle"
+              fill={isDone ? '#a7f3d0' : isActive ? '#f8fafc' : '#cbd5e1'}
+              fontSize="10"
+              fontWeight="700"
+              fontFamily="Chakra Petch, sans-serif"
+            >
+              {node.label}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
-function PayloadBlueprintIcon({ id, active }: { id: PayloadId; active: boolean }) {
+function EquipmentIcon({
+  kind,
+  missionId,
+  active,
+}: {
+  kind: EquipmentVisualKind;
+  missionId: CampaignMissionId;
+  active: boolean;
+}) {
   const Icon =
-    id === 'heavy-shield'
+    kind === 'shield'
       ? ShieldCheck
-      : id === 'oxygen-tanks'
+      : kind === 'oxygen'
         ? Wind
-        : id === 'solar-panels'
+        : kind === 'solar'
           ? Sun
-          : Drill;
+          : missionId === 'artemis-2'
+            ? Radio
+            : missionId === 'artemis-4'
+              ? Fuel
+              : Drill;
+
+  const toneClass =
+    kind === 'shield'
+      ? 'text-emerald-300 border-emerald-400/35 bg-emerald-500/12'
+      : kind === 'oxygen'
+        ? 'text-sky-300 border-sky-400/35 bg-sky-500/12'
+        : kind === 'solar'
+          ? 'text-amber-300 border-amber-400/35 bg-amber-500/12'
+          : 'text-cyan-300 border-cyan-400/35 bg-cyan-500/12';
 
   return (
     <div
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
-        active
-          ? 'border-cyan-400/80 bg-cyan-500/18 text-cyan-300'
-          : 'border-sky-400/25 bg-slate-950/75 text-sky-300'
+        active ? 'border-cyan-400/85 bg-cyan-500/20 text-cyan-200' : toneClass
       }`}
     >
       <Icon className="h-5 w-5" />
@@ -156,7 +214,7 @@ function MassPips({ massMultiplier }: { massMultiplier: number }) {
         {[1, 2, 3, 4].map((idx) => (
           <span
             key={idx}
-            className={`h-1.5 w-3.5 rounded-sm ${
+            className={`h-1.5 w-3 rounded-sm ${
               idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-cyan-400') : 'bg-slate-800'
             }`}
           />
@@ -167,24 +225,20 @@ function MassPips({ massMultiplier }: { massMultiplier: number }) {
   );
 }
 
-function getPayloadBonuses(p: PayloadOption): { label: string; tone: string }[] {
-  const badges: { label: string; tone: string }[] = [];
-  if (p.bonus.shield) {
-    badges.push({ label: `+${p.bonus.shield}% Shield`, tone: 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200' });
+function getSimpleEquipmentHighlight(eq: MissionEquipmentOption): {
+  text: string;
+  tone: string;
+} {
+  if (eq.perkBadge) {
+    return { text: eq.perkBadge, tone: 'text-emerald-300' };
   }
-  if (p.bonus.oxygen) {
-    badges.push({ label: `+${p.bonus.oxygen}% Air`, tone: 'border-sky-400/35 bg-sky-500/12 text-sky-200' });
+  if (eq.fragile) {
+    return { text: 'Fragile — land < 2.5 m/s', tone: 'text-rose-300' };
   }
-  if (p.bonus.power) {
-    badges.push({ label: `+${p.bonus.power}% Power`, tone: 'border-amber-400/35 bg-amber-500/12 text-amber-200' });
+  if (eq.massMultiplier >= 1.35) {
+    return { text: 'Heavy hull — brake earlier', tone: 'text-amber-300' };
   }
-  if (p.drillBoost > 1) {
-    badges.push({ label: '+25% Drill Speed', tone: 'border-cyan-400/35 bg-cyan-500/12 text-cyan-200' });
-  }
-  if (p.fragile) {
-    badges.push({ label: 'Fragile Hull', tone: 'border-rose-400/40 bg-rose-500/12 text-rose-200' });
-  }
-  return badges;
+  return { text: eq.tradeoffHint.split('—')[1]?.trim() || 'Balanced loadout', tone: 'text-slate-300' };
 }
 
 export function BriefingOverlay({
@@ -193,6 +247,11 @@ export function BriefingOverlay({
   onSelectCampaignMission,
   onSelectPayload,
   resources,
+  launch,
+  leoTransfer,
+  space,
+  landing,
+  objectives,
   donki,
   osdr,
   onBack,
@@ -200,38 +259,43 @@ export function BriefingOverlay({
   onOpenNasaModal,
   onOpenNotebook,
 }: BriefingOverlayProps) {
-  const payloadList = Object.values(PAYLOADS);
-  const chosen = PAYLOADS[selectedPayload];
-  const mission = CAMPAIGN_MISSIONS[carryover.activeMission];
+  const activeMissionId = carryover.activeMission;
+  const meta = MISSION_BRIEFING_META[activeMissionId];
+  const mission = CAMPAIGN_MISSIONS[activeMissionId];
+  const equipmentList = getMissionEquipmentList(activeMissionId);
+  const chosen = getMissionEquipmentOption(activeMissionId, selectedPayload);
+  const previewResources = getMissionStartingResources(carryover, activeMissionId, selectedPayload);
+  const previewImg = MISSION_PREVIEW_IMAGE[activeMissionId];
 
-  const previewResources: ResourceState = {
-    power: Math.min(100, resources.power + (chosen.bonus.power || 0)),
-    oxygen: Math.min(100, resources.oxygen + (chosen.bonus.oxygen || 0)),
-    shield: Math.min(100, resources.shield + (chosen.bonus.shield || 0)),
-  };
+  const status = evaluateBriefingMissionStatus(activeMissionId, {
+    carryover,
+    launch,
+    leoTransfer,
+    space,
+    landing,
+    objectives,
+    donki,
+  });
 
-  const launchCtaLabel =
-    mission.startPhase === 'launch'
-      ? 'Proceed to Pad 39B Launch'
-      : mission.startPhase === 'space'
-        ? 'Undock to Orbital Transit'
-        : `Begin ${mission.planet === 'mars' ? 'Mars Jezero' : 'South Pole'} Descent`;
-
+  const flareActive = Boolean(/M|X/i.test(donki.classType || ''));
   const nasaBadgeText =
     osdr.studies.length > 0
       ? `DONKI ${donki.classType} · ${osdr.studies.length} OSDR`
       : `Space Weather · ${donki.classType}`;
 
+  const solarCarryBonus = Math.min(18, Math.round(carryover.solarGridKw * 0.25));
+  const bermCarryBonus = Math.min(16, carryover.regolithShieldLevel * 8);
+
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/84 p-4">
-      <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-5xl rounded-2xl p-5 lg:p-6">
-        {/* SECTION 1: Mission Identity & Destination */}
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-400/20 pb-4">
+    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/85 p-3 sm:p-4">
+      <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-5xl rounded-2xl p-4 sm:p-5 lg:p-6">
+        {/* TOP BAR */}
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-400/20 pb-3.5">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="hud-btn-glass inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="hud-btn-glass inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
             >
               <ArrowLeft className="h-4 w-4 text-sky-300" />
               Command Deck
@@ -239,7 +303,7 @@ export function BriefingOverlay({
 
             <div
               data-testid="briefing-mission-patch"
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_16px_rgba(34,211,238,0.22)]"
+              className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_16px_rgba(34,211,238,0.22)]"
             >
               <img
                 src={missionPatchImg}
@@ -250,11 +314,14 @@ export function BriefingOverlay({
             </div>
 
             <div>
-              <p className="font-hud text-xs font-bold tracking-[0.16em] text-cyan-300 uppercase">
-                {mission.code} · {mission.planet === 'mars' ? 'Mars · 0.38g Gravity' : 'Moon · 0.165g Gravity'}
+              <p
+                data-testid="briefing-mission-subtitle"
+                className="font-hud text-xs font-bold tracking-[0.14em] text-cyan-300 uppercase"
+              >
+                {meta.code} · {meta.destination} · {meta.gravityLabel}
               </p>
-              <h2 className="font-display text-xl font-bold text-white uppercase lg:text-2xl">
-                {mission.title}
+              <h2 className="font-display text-lg font-bold text-white uppercase sm:text-xl lg:text-2xl">
+                {meta.title}
               </h2>
             </div>
           </div>
@@ -263,7 +330,7 @@ export function BriefingOverlay({
             <button
               type="button"
               onClick={onOpenNotebook}
-              className="hud-btn-glass inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="hud-btn-glass inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
             >
               <BookOpen className="h-4 w-4 text-cyan-300" />
               Ledger ({carryover.unlockedFieldNotes.length})
@@ -272,7 +339,7 @@ export function BriefingOverlay({
             <button
               type="button"
               onClick={onOpenNasaModal}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3.5 py-2 text-xs font-bold whitespace-nowrap text-amber-200 uppercase transition hover:bg-amber-500/25"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-bold whitespace-nowrap text-amber-200 uppercase transition hover:bg-amber-500/25"
             >
               <Database className="h-4 w-4 shrink-0" />
               {nasaBadgeText}
@@ -280,43 +347,109 @@ export function BriefingOverlay({
           </div>
         </header>
 
-        {/* SECTION 2: Mission Tabs + Flight Profile & Objective Summary */}
-        <div className="mt-4 grid gap-3.5 lg:grid-cols-[1.35fr_1fr]">
+        {/* ROW 1: MISSION TABS + DYNAMIC ENVIRONMENT BANNER & OBJECTIVES + CARRYOVER */}
+        <div className="mt-3.5 grid gap-3.5 lg:grid-cols-[1.4fr_1fr]">
           <section className="rounded-2xl border border-sky-400/20 bg-slate-900/65 p-3.5">
-            <div className="mb-2.5 flex flex-wrap gap-1.5">
+            {/* Mission Switcher Tabs */}
+            <div className="mb-2.5 flex flex-wrap gap-1.5" role="tablist" aria-label="Campaign Missions">
               {CAMPAIGN_ORDER.map((id) => {
                 const m = CAMPAIGN_MISSIONS[id];
-                const active = carryover.activeMission === id;
+                const active = activeMissionId === id;
                 const done = carryover.completedMissions.includes(id);
                 return (
                   <button
                     key={id}
                     type="button"
+                    role="tab"
+                    aria-selected={active}
                     onClick={() => onSelectCampaignMission(id)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-bold whitespace-nowrap transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold whitespace-nowrap transition ${
                       active
                         ? 'bg-cyan-400 text-slate-950 shadow-[0_0_14px_rgba(34,211,238,0.3)]'
                         : done
-                          ? 'border border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
+                          ? 'border border-emerald-400/45 bg-emerald-500/15 text-emerald-200 hover:border-emerald-300'
                           : 'border border-white/10 bg-slate-800/80 text-slate-200 hover:border-cyan-400/45 hover:text-white'
                     }`}
                   >
-                    {m.shortLabel}
+                    {done && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    <span>{m.shortLabel}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="rounded-xl border border-sky-400/15 bg-slate-950/75 px-3 py-1.5">
-              <MissionProfileDiagram missionId={mission.id} planet={mission.planet} />
+            {/* Dynamic Environment Preview + Route Overlay */}
+            <div className="relative h-36 overflow-hidden rounded-xl border border-sky-400/25 bg-slate-950">
+              <img
+                src={previewImg.src}
+                alt={previewImg.alt}
+                referrerPolicy="no-referrer"
+                className={`h-full w-full object-cover opacity-55 ${previewImg.posClass}`}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/35" />
+
+              <div className="relative z-10 flex h-full flex-col justify-between p-2.5">
+                <MissionRoutePreview
+                  missionId={activeMissionId}
+                  nodes={status.routeNodes}
+                  accent={meta.accentHex}
+                />
+                <div>
+                  <p className="text-xs leading-snug font-medium text-slate-100">
+                    {meta.summary}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-tight text-sky-200/80">
+                    {meta.educationalNote}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <p className="mt-2.5 text-xs leading-relaxed text-slate-200 lg:text-sm">
-              {mission.objectiveSummary}
-            </p>
+            {/* Live Mission Objectives + Environment Hazards */}
+            <div className="mt-2.5 space-y-1.5">
+              {status.objectives.map((obj) => (
+                <div
+                  key={obj.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-slate-950/60 px-2.5 py-1.5 text-xs"
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-slate-100">
+                    {obj.completed ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 shrink-0 text-cyan-400/70" />
+                    )}
+                    <span className="truncate">{obj.label}</span>
+                  </span>
+                  <span
+                    className={`shrink-0 text-[11px] font-semibold whitespace-nowrap tabular-nums ${
+                      obj.completed ? 'text-emerald-300' : 'text-slate-400'
+                    }`}
+                  >
+                    {obj.detail}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {meta.challengeChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-md border border-sky-400/20 bg-slate-950/75 px-2 py-0.5 text-[11px] font-semibold text-sky-200"
+                >
+                  {chip}
+                </span>
+              ))}
+              {flareActive && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
+                  <AlertTriangle className="h-3 w-3" />
+                  DONKI {donki.classType} Flare
+                </span>
+              )}
+            </div>
           </section>
 
-          {/* SECTION 3: Campaign Carryover Status */}
+          {/* CAMPAIGN CARRYOVER */}
           <section className="flex flex-col justify-between rounded-2xl border border-emerald-400/25 bg-slate-900/65 p-3.5">
             <div className="flex items-center justify-between gap-2">
               <span className="font-hud text-xs font-bold tracking-wider text-emerald-300 uppercase">
@@ -331,56 +464,76 @@ export function BriefingOverlay({
               <div
                 className={`rounded-xl border px-3 py-2 ${
                   carryover.relaySatelliteOnline
-                    ? 'border-emerald-400/45 bg-emerald-950/60'
+                    ? 'border-emerald-400/45 bg-emerald-950/55'
                     : 'border-sky-400/15 bg-slate-950/75'
                 }`}
               >
-                <span className="block text-xs font-medium text-slate-400">HERMES Relay</span>
+                <span className="block text-[11px] font-medium text-slate-400">HERMES Relay</span>
                 <span
-                  className={`text-sm font-bold ${
+                  className={`block text-sm font-bold ${
                     carryover.relaySatelliteOnline ? 'text-emerald-300' : 'text-slate-300'
                   }`}
                 >
                   {carryover.relaySatelliteOnline ? 'Online' : 'Stowed'}
                 </span>
+                <span className="text-[11px] text-slate-400">
+                  {carryover.relaySatelliteOnline ? 'Active flare lock' : 'Pending (Mission 1)'}
+                </span>
               </div>
 
               <div className="rounded-xl border border-sky-400/20 bg-slate-950/75 px-3 py-2">
-                <span className="block text-xs font-medium text-slate-400">ISRU Harvest</span>
-                <span className="text-sm font-bold text-sky-300">
+                <span className="block text-[11px] font-medium text-slate-400">ISRU Harvest</span>
+                <span className="block text-sm font-bold text-sky-300">
                   {carryover.isruWaterKg} kg H₂O
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {carryover.isruWaterKg > 0 ? 'Active reserve' : 'Pending (Mission 2)'}
                 </span>
               </div>
 
               <div className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-2">
-                <span className="block text-xs font-medium text-slate-400">Fuel Carryover</span>
-                <span className="text-sm font-bold text-cyan-300">
+                <span className="block text-[11px] font-medium text-slate-400">Fuel Carryover</span>
+                <span className="block text-sm font-bold text-cyan-300">
                   +{carryover.isruFuelBonusPct}% Delta-V
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {carryover.isruFuelBonusPct > 0 ? 'Active bonus' : 'Earn via Mission 2'}
                 </span>
               </div>
 
               <div className="rounded-xl border border-amber-400/25 bg-slate-950/75 px-3 py-2">
-                <span className="block text-xs font-medium text-slate-400">Crew Dose</span>
-                <span className="text-sm font-bold text-amber-300">
+                <span className="block text-[11px] font-medium text-slate-400">Crew Dose</span>
+                <span className="block text-sm font-bold text-amber-300">
                   {carryover.radiationDoseMsv} / 150 mSv
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {carryover.radiationDoseMsv >= 100 ? 'Elevated dose' : 'Nominal limit'}
                 </span>
               </div>
             </div>
 
-            <p className="border-t border-emerald-400/20 pt-2 text-xs leading-snug text-emerald-200">
-              {mission.reuseOutput}
-            </p>
+            <div className="space-y-1 border-t border-emerald-400/20 pt-2 text-xs">
+              <p className="leading-snug text-slate-300">
+                <span className="font-semibold text-sky-300">Input: </span>
+                {mission.reuseInput}
+              </p>
+              <p className="leading-snug text-emerald-200">
+                <span className="font-semibold text-emerald-300">Reward: </span>
+                {mission.reuseOutput}
+              </p>
+            </div>
           </section>
         </div>
 
-        {/* SECTION 4: Starting Resource Statistics Preview */}
-        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 tabular-nums">
+        {/* ROW 2: STARTING RESOURCE TELEMETRY PREVIEW */}
+        <section className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3 tabular-nums">
           {[
             {
               label: 'Power Bus',
               icon: Battery,
               base: resources.power,
-              bonus: chosen.bonus.power || 0,
+              equipBonus: chosen.bonus.power || 0,
+              carryNote: solarCarryBonus > 0 ? `+${solarCarryBonus}% grid` : null,
               val: previewResources.power,
               bar: 'bg-amber-400',
               text: 'text-amber-300',
@@ -389,7 +542,8 @@ export function BriefingOverlay({
               label: 'O₂ Reserve',
               icon: Wind,
               base: resources.oxygen,
-              bonus: chosen.bonus.oxygen || 0,
+              equipBonus: chosen.bonus.oxygen || 0,
+              carryNote: null,
               val: previewResources.oxygen,
               bar: 'bg-sky-400',
               text: 'text-sky-300',
@@ -398,7 +552,8 @@ export function BriefingOverlay({
               label: 'Radiation Shield',
               icon: Shield,
               base: resources.shield,
-              bonus: chosen.bonus.shield || 0,
+              equipBonus: chosen.bonus.shield || 0,
+              carryNote: bermCarryBonus > 0 ? `+${bermCarryBonus}% berm` : null,
               val: previewResources.shield,
               bar: 'bg-emerald-400',
               text: 'text-emerald-300',
@@ -416,54 +571,62 @@ export function BriefingOverlay({
                     {r.label}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {r.bonus > 0 && (
-                      <span className="rounded bg-cyan-500/18 px-1.5 py-0.5 text-xs font-bold text-cyan-200">
-                        +{r.bonus}%
+                    {r.carryNote && (
+                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                        {r.carryNote}
+                      </span>
+                    )}
+                    {r.equipBonus > 0 && (
+                      <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[11px] font-bold text-cyan-200">
+                        +{r.equipBonus}%
                       </span>
                     )}
                     <span className={`text-sm font-bold ${r.text}`}>{Math.round(r.val)}%</span>
                   </div>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div className={`h-full rounded-full ${r.bar} transition-all duration-200`} style={{ width: `${r.val}%` }} />
+                  <div
+                    className={`h-full rounded-full ${r.bar} transition-all duration-200`}
+                    style={{ width: `${r.val}%` }}
+                  />
                 </div>
               </div>
             );
           })}
         </section>
 
-        {/* SECTION 5: 4-Card Equipment Loadout Comparison */}
-        <section className="mt-4">
-          <div className="mb-2 flex items-center justify-between">
+        {/* ROW 3: SIMPLIFIED MISSION-SPECIFIC 2x2 EQUIPMENT GRID */}
+        <section className="mt-3.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-hud text-xs font-bold tracking-wider text-cyan-300 uppercase">
-              Select Mission Payload &amp; Compare Tradeoffs
+              Select Equipment · {mission.shortLabel}
             </h3>
             <span className="text-xs text-slate-400">
-              Selected loadout adjusts launch mass, handling, and reserve boosts
+              Updates starting meters and live mission handling
             </span>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {payloadList.map((p) => {
-              const active = p.id === selectedPayload;
-              const bonuses = getPayloadBonuses(p);
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {equipmentList.map((eq) => {
+              const active = eq.id === selectedPayload;
+              const highlight = getSimpleEquipmentHighlight(eq);
               return (
                 <button
-                  key={p.id}
+                  key={eq.id}
                   type="button"
-                  onClick={() => onSelectPayload(p.id)}
-                  className={`flex items-start gap-3 rounded-2xl border p-3.5 text-left transition ${
+                  onClick={() => onSelectPayload(eq.id)}
+                  className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition ${
                     active
-                      ? 'border-cyan-400/85 bg-cyan-500/15 shadow-[0_0_24px_rgba(34,211,238,0.18)]'
+                      ? 'border-cyan-400/85 bg-cyan-500/15 shadow-[0_0_22px_rgba(34,211,238,0.18)]'
                       : 'border-sky-400/20 bg-slate-900/65 hover:border-cyan-400/55'
                   }`}
                 >
-                  <PayloadBlueprintIcon id={p.id} active={active} />
+                  <EquipmentIcon kind={eq.visualKind} missionId={activeMissionId} active={active} />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate font-display text-sm font-bold text-white">
-                        {p.name}
+                        {eq.name}
                       </span>
                       {active ? (
                         <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-cyan-400 px-2 py-0.5 text-xs font-bold text-slate-950">
@@ -471,37 +634,18 @@ export function BriefingOverlay({
                           Selected
                         </span>
                       ) : (
-                        <span className="shrink-0 rounded-md border border-white/10 bg-slate-800/80 px-2 py-0.5 text-xs font-semibold text-slate-300">
-                          {p.shortTag}
+                        <span className="shrink-0 rounded-md border border-white/10 bg-slate-800/80 px-2 py-0.5 text-xs font-semibold text-cyan-200">
+                          {eq.shortTag}
                         </span>
                       )}
                     </div>
 
-                    <p className="mt-1 text-xs leading-snug text-slate-300">{p.description}</p>
+                    <p className="mt-1 text-xs leading-snug text-slate-300">{eq.description}</p>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      {bonuses.map((b) => (
-                        <span
-                          key={b.label}
-                          className={`rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${b.tone}`}
-                        >
-                          {b.label}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] pt-2">
-                      <MassPips massMultiplier={p.massMultiplier} />
-                      <span
-                        className={`text-xs font-semibold ${
-                          p.fragile
-                            ? 'text-rose-300'
-                            : p.drillBoost > 1
-                              ? 'text-emerald-300'
-                              : 'text-amber-300'
-                        }`}
-                      >
-                        {p.tradeoffHint}
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] pt-1.5">
+                      <MassPips massMultiplier={eq.massMultiplier} />
+                      <span className={`text-xs font-semibold ${highlight.tone}`}>
+                        {highlight.text}
                       </span>
                     </div>
                   </div>
@@ -511,20 +655,28 @@ export function BriefingOverlay({
           </div>
         </section>
 
-        {/* SECTION 6: Loadout Summary + Back + Prominent Launch CTA */}
-        <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-sky-400/20 pt-4">
-          <div className="text-xs text-slate-300 tabular-nums lg:text-sm">
-            <span className="text-slate-400">Active Loadout: </span>
+        {/* FOOTER */}
+        <footer className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-sky-400/20 pt-3.5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 tabular-nums lg:text-sm">
+            <span className="text-slate-400">Active Loadout:</span>
             <span className="font-bold text-cyan-300">{chosen.name}</span>
-            <span className="mx-2 text-slate-500">·</span>
+            <span className="text-slate-500">·</span>
             <span>{chosen.massMultiplier.toFixed(2)}× Mass</span>
+            <span className="text-slate-500">·</span>
+            <span className="font-semibold text-sky-200">{chosen.shortTag}</span>
+            {chosen.perkBadge && (
+              <>
+                <span className="text-slate-500">·</span>
+                <span className="font-semibold text-emerald-300">{chosen.perkBadge}</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={onBack}
-              className="hud-btn-glass rounded-xl px-4 py-2.5 text-xs font-bold whitespace-nowrap uppercase transition"
+              className="hud-btn-glass rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap uppercase transition"
             >
               Back
             </button>
@@ -532,10 +684,10 @@ export function BriefingOverlay({
               type="button"
               data-testid="briefing-launch-btn"
               onClick={onLaunch}
-              className="hud-cta-cyan inline-flex items-center gap-2.5 rounded-xl px-6 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition lg:text-sm"
+              className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition lg:text-sm"
             >
               <Rocket className="h-4 w-4 shrink-0" />
-              {launchCtaLabel}
+              {meta.ctaLabel}
             </button>
           </div>
         </footer>

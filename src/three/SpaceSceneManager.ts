@@ -53,6 +53,11 @@ import {
   type SolarSystemHandles,
   type ViperRoverHandles,
 } from './models';
+import {
+  createRealPlanetMaps,
+  updateAtmosphereSunDirection,
+  type RealPlanetMaps,
+} from './planetMaps';
 import { createProceduralTextureSet, type ProceduralTextureSet } from './textures';
 
 export interface SceneSimulationBridge {
@@ -101,6 +106,7 @@ export class SpaceSceneManager {
   private pmremGenerator: THREE.PMREMGenerator;
   private envTarget: THREE.WebGLRenderTarget;
   private textures: ProceduralTextureSet;
+  private planetMaps: RealPlanetMaps;
   private isSoftwareGl: boolean;
   private disposed = false;
   private rafId = 0;
@@ -153,6 +159,7 @@ export class SpaceSceneManager {
   private scratchVec = new THREE.Vector3();
   private scratchFocusVec = new THREE.Vector3();
   private scratchShipAnchor = new THREE.Vector3();
+  private sunOriginVec = new THREE.Vector3(SOLAR_SUN_ORIGIN_X, 0, SOLAR_SUN_ORIGIN_Z);
   private scratchColor = new THREE.Color();
   private crashDummy = new THREE.Object3D();
 
@@ -236,11 +243,12 @@ export class SpaceSceneManager {
     this.starField = this.createStarField();
     this.scene.add(this.starField);
 
-    // Procedural Textures & World Models
+    // Procedural + Real Planetary Textures & World Models
     const maxAniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     this.textures = createProceduralTextureSet(maxAniso);
+    this.planetMaps = createRealPlanetMaps(maxAniso);
 
-    this.lunarEnv = createLunarEnvironment(this.textures);
+    this.lunarEnv = createLunarEnvironment(this.textures, this.planetMaps);
     this.scene.add(this.lunarEnv.group);
 
     this.lander = createLunarLander(this.textures);
@@ -251,10 +259,10 @@ export class SpaceSceneManager {
     this.roverModel.group.position.set(6, getSurfaceTerrainHeight('moon', 6, 6), 6);
     this.scene.add(this.roverModel.group);
 
-    this.launchComplex = createLaunchComplexAndSLS(this.textures);
+    this.launchComplex = createLaunchComplexAndSLS(this.textures, this.planetMaps);
     this.scene.add(this.launchComplex.group);
 
-    this.solarSystem = createSolarSystemScene(this.textures);
+    this.solarSystem = createSolarSystemScene(this.textures, this.planetMaps);
     this.scene.add(this.solarSystem.group);
 
     this.showcaseSatellite = createOrbitalSatellite(this.textures);
@@ -963,9 +971,15 @@ export class SpaceSceneManager {
       (phase === 'title' && (s.showcase === 'rover' || s.showcase === 'outpost')) ||
       (phase === 'inspector' && (s.showcase === 'rover' || s.showcase === 'outpost'));
 
-    // Rotate Earth gently in Lunar Sky
+    // Rotate Earth gently in Lunar Sky & keep atmospheric scattering aligned to sunlight
     this.lunarEnv.earthGlobe.rotation.y += dt * 0.025;
     this.lunarEnv.earthClouds.rotation.y += dt * 0.033;
+    updateAtmosphereSunDirection(
+      this.lunarEnv.earthAtmo,
+      this.lunarEnv.earthGroup.position,
+      this.sunLight.position,
+      this.scratchVec
+    );
 
     // Highlight parts during Vehicle Inspector
     this.updatePartHighlight(s.highlightedPart, phase);
@@ -1621,7 +1635,24 @@ export class SpaceSceneManager {
       marsPos.z + Math.sin(elapsedSec * 0.7) * phobosDist
     );
     ss.gatewayGroup.rotation.y += dt * 0.15;
+    if (ss.earthBodyGroup.children[0]) {
+      ss.earthBodyGroup.children[0].rotation.y += dt * 0.028;
+    }
     ss.earthClouds.rotation.y += dt * 0.04;
+    if (ss.extraBodies.earth) {
+      updateAtmosphereSunDirection(
+        ss.earthAtmo,
+        ss.extraBodies.earth.position,
+        this.sunOriginVec,
+        this.scratchVec
+      );
+    }
+    updateAtmosphereSunDirection(
+      ss.marsAtmo,
+      ss.planets.mars.position,
+      this.sunOriginVec,
+      this.scratchVec
+    );
     const sunScale = isSci ? 0.38 : 1.0;
     ss.sun.scale.setScalar(sunScale);
     ss.sunCorona.scale.setScalar(sunScale * (1 + Math.sin(elapsedSec * 2.2) * 0.025));
@@ -2426,6 +2457,7 @@ export class SpaceSceneManager {
     });
 
     Object.values(this.textures).forEach((t) => t.dispose());
+    this.planetMaps.dispose();
     this.envTarget.dispose();
     this.pmremGenerator.dispose();
     this.renderer.dispose();

@@ -14,6 +14,7 @@ import {
 } from '../game/solarSystemData';
 import { getLunarTerrainHeight, getSurfaceTerrainHeight } from '../game/physics';
 import type { RoverCollider, SpaceTargetId, SurfacePlanet } from '../game/types';
+import { createPlanetAtmosphereMaterial, type RealPlanetMaps } from './planetMaps';
 import type { ProceduralTextureSet } from './textures';
 
 export function tagPart(obj: THREE.Object3D, partId: string) {
@@ -54,6 +55,7 @@ export interface LunarEnvironmentHandles {
   earthGroup: THREE.Group;
   earthGlobe: THREE.Mesh;
   earthClouds: THREE.Mesh;
+  earthAtmo: THREE.Mesh;
   marsDecorGroup: THREE.Group;
   padLight: THREE.PointLight;
   objectiveMeshes: Array<{
@@ -81,45 +83,50 @@ export interface LunarEnvironmentHandles {
   wheelTrackMesh: THREE.InstancedMesh;
 }
 
-export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironmentHandles {
+export function createLunarEnvironment(
+  tex: ProceduralTextureSet,
+  planetMaps: RealPlanetMaps
+): LunarEnvironmentHandles {
   const group = new THREE.Group();
   const moonColliders: RoverCollider[] = [];
   const marsColliders: RoverCollider[] = [];
   let activePlanet: SurfacePlanet = 'moon';
 
-  // 1. Earth in Lunar Sky
+  // 1. Earth in Lunar Sky (Real geographic map + cloud veil + Rayleigh blue rim shader)
   const earthGroup = new THREE.Group();
   earthGroup.position.set(-180, 130, -390);
   const earthGlobe = new THREE.Mesh(
-    new THREE.SphereGeometry(28, 40, 40),
+    new THREE.SphereGeometry(28, 48, 36),
     new THREE.MeshStandardMaterial({
-      map: tex.earthAlbedo,
-      roughness: 0.52,
-      metalness: 0.1,
+      map: planetMaps.earthMap,
+      roughness: 0.58,
+      metalness: 0.06,
+      envMapIntensity: 0.25,
     })
   );
   earthGlobe.rotation.z = 0.41;
   earthGroup.add(earthGlobe);
 
   const earthClouds = new THREE.Mesh(
-    new THREE.SphereGeometry(28.4, 40, 40),
+    new THREE.SphereGeometry(28.35, 44, 32),
     new THREE.MeshStandardMaterial({
       map: tex.earthClouds,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.36,
       depthWrite: false,
-      roughness: 0.9,
+      roughness: 0.92,
     })
   );
   earthGroup.add(earthClouds);
 
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(30.4, 36, 36),
-    new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.22,
-      side: THREE.BackSide,
+    new THREE.SphereGeometry(29.9, 40, 32),
+    createPlanetAtmosphereMaterial({
+      dayColor: 0x38bdf8,
+      twilightColor: 0x93c5fd,
+      intensity: 1.05,
+      power: 2.35,
+      nightFloor: 0.14,
     })
   );
   earthGroup.add(earthAtmo);
@@ -950,6 +957,7 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     earthGroup,
     earthGlobe,
     earthClouds,
+    earthAtmo,
     marsDecorGroup,
     padLight,
     objectiveMeshes,
@@ -2283,7 +2291,10 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   return g;
 }
 
-export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComplexHandles {
+export function createLaunchComplexAndSLS(
+  tex: ProceduralTextureSet,
+  planetMaps: RealPlanetMaps
+): LaunchComplexHandles {
   // Blueprint Accurate: SLS Block 1 (111.3m height, Core 65.1m x 8.4m, Twin SRBs 54.9m x 3.7m, Orion + LAS 9.8m)
   const group = new THREE.Group();
   group.visible = false;
@@ -2304,16 +2315,15 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
 
   // Realistic Distant Moon Hanging High in the Upper-Right Sky (never floating near the launch tower)
   const moonMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(9.2, 36, 32),
+    new THREE.SphereGeometry(9.2, 44, 32),
     new THREE.MeshStandardMaterial({
-      map: tex.moonSphereAlbedo,
-      bumpMap: tex.moonBump,
-      bumpScale: 0.22,
+      map: planetMaps.moonMap,
       color: 0xf8fafc,
-      emissive: 0x334155,
-      emissiveIntensity: 0.36,
-      roughness: 0.88,
-      metalness: 0.04,
+      emissive: 0x1e293b,
+      emissiveIntensity: 0.22,
+      roughness: 0.92,
+      metalness: 0.0,
+      envMapIntensity: 0.12,
       fog: false,
     })
   );
@@ -2374,32 +2384,32 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   groundGroup.add(padSpotlight, padSpotlight.target);
   group.add(groundGroup);
 
-  // Curved Earth Horizon with Atmospheric Cyan Limb Halo for > 18 km
+  // Curved Earth Horizon with Real Surface Map & Atmospheric Cyan Limb Halo for > 18 km
   const earthLimb = new THREE.Group();
   earthLimb.position.set(0, -104, 0);
   earthLimb.add(
     new THREE.Mesh(
-      new THREE.SphereGeometry(95, 48, 32),
+      new THREE.SphereGeometry(95, 56, 36),
       new THREE.MeshStandardMaterial({
-        map: tex.earthAlbedo,
+        map: planetMaps.earthMap,
         color: 0xffffff,
-        roughness: 0.48,
-        metalness: 0.12,
-        emissive: 0x082f49,
-        emissiveIntensity: 0.18,
+        roughness: 0.56,
+        metalness: 0.08,
+        envMapIntensity: 0.24,
+        emissive: 0x051b2c,
+        emissiveIntensity: 0.08,
       })
     )
   );
   earthLimb.add(
     new THREE.Mesh(
-      new THREE.SphereGeometry(96.8, 44, 28),
-      new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
-        transparent: true,
-        opacity: 0.24,
-        blending: THREE.AdditiveBlending,
-        side: THREE.BackSide,
-        depthWrite: false,
+      new THREE.SphereGeometry(97.8, 48, 32),
+      createPlanetAtmosphereMaterial({
+        dayColor: 0x38bdf8,
+        twilightColor: 0xbae6fd,
+        intensity: 1.0,
+        power: 2.2,
+        nightFloor: 0.25,
       })
     )
   );
@@ -3065,6 +3075,8 @@ export interface SolarSystemHandles {
   shipWingsGroup: THREE.Group;
   earthBodyGroup: THREE.Group;
   earthClouds: THREE.Mesh;
+  earthAtmo: THREE.Mesh;
+  marsAtmo: THREE.Mesh;
   sunCorona: THREE.Mesh;
   asteroidBelt: THREE.InstancedMesh;
   stormRing: THREE.Mesh;
@@ -3265,7 +3277,10 @@ export function createVoyagerModel(tex: ProceduralTextureSet): { group: THREE.Gr
   return { group };
 }
 
-export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHandles {
+export function createSolarSystemScene(
+  tex: ProceduralTextureSet,
+  planetMaps: RealPlanetMaps
+): SolarSystemHandles {
   const group = new THREE.Group();
   group.visible = false;
 
@@ -3371,37 +3386,38 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   earthGroup.position.set(earth0.x, 0, earth0.z);
   const earthBodyGroup = new THREE.Group();
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize, 40, 32),
+    new THREE.SphereGeometry(earthSpec.explorationBodySize, 48, 36),
     new THREE.MeshStandardMaterial({
-      map: tex.earthAlbedo,
+      map: planetMaps.earthMap,
       color: 0xffffff,
-      roughness: 0.36,
-      metalness: 0.14,
-      emissive: 0x082f49,
-      emissiveIntensity: 0.16,
+      roughness: 0.58,
+      metalness: 0.06,
+      envMapIntensity: 0.22,
+      emissive: 0x041423,
+      emissiveIntensity: 0.04,
     })
   );
   earthBodyGroup.add(earth);
   const earthClouds = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.11, 36, 28),
+    new THREE.SphereGeometry(earthSpec.explorationBodySize * 1.014, 44, 32),
     new THREE.MeshStandardMaterial({
       map: tex.earthClouds,
       transparent: true,
-      opacity: 0.72,
-      roughness: 0.88,
+      opacity: 0.36,
+      roughness: 0.92,
+      metalness: 0.0,
       depthWrite: false,
     })
   );
   earthBodyGroup.add(earthClouds);
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.38, 32, 24),
-    new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.28,
-      blending: THREE.AdditiveBlending,
-      side: THREE.BackSide,
-      depthWrite: false,
+    new THREE.SphereGeometry(earthSpec.explorationBodySize * 1.068, 40, 32),
+    createPlanetAtmosphereMaterial({
+      dayColor: 0x38bdf8,
+      twilightColor: 0xbae6fd,
+      intensity: 1.12,
+      power: 2.3,
+      nightFloor: 0.09,
     })
   );
   earthBodyGroup.add(earthAtmo);
@@ -3470,26 +3486,25 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const marsSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
   const planets = {} as Record<SpaceTargetId, THREE.Mesh>;
   let marsPhobos = new THREE.Mesh();
+  let marsAtmo = new THREE.Mesh();
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
     const spec = SOLAR_TARGETS[id];
     const mat =
       id === 'moon'
         ? new THREE.MeshStandardMaterial({
-            map: tex.moonSphereAlbedo,
-            bumpMap: tex.moonBump,
-            bumpScale: 0.14,
+            map: planetMaps.moonMap,
             color: 0xffffff,
-            roughness: 0.84,
-            metalness: 0.05,
+            roughness: 0.92,
+            metalness: 0.0,
+            envMapIntensity: 0.12,
           })
         : id === 'mars'
           ? new THREE.MeshStandardMaterial({
-              map: tex.marsSphereAlbedo,
-              bumpMap: tex.marsBump,
-              bumpScale: 0.14,
+              map: planetMaps.marsMap,
               color: 0xffffff,
-              roughness: 0.78,
-              metalness: 0.06,
+              roughness: 0.86,
+              metalness: 0.0,
+              envMapIntensity: 0.16,
             })
           : new THREE.MeshStandardMaterial({
               color: spec.color,
@@ -3508,7 +3523,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     const geom =
       id === 'relay-orbit'
         ? new THREE.SphereGeometry(0.45, 12, 10)
-        : new THREE.SphereGeometry(visualBodyRadius, 36, 28);
+        : new THREE.SphereGeometry(visualBodyRadius, 44, 32);
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(spec.x, 0, spec.z);
     if (id === 'gateway' || id === 'relay-orbit') mesh.visible = false;
@@ -3518,15 +3533,15 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     planets[id] = mesh;
 
     if (id === 'mars') {
-      // Attach Mars atmosphere directly to Mars mesh so it moves cleanly in all orbital scales
-      const marsAtmo = new THREE.Mesh(
-        new THREE.SphereGeometry(visualBodyRadius * 1.1, 28, 22),
-        new THREE.MeshBasicMaterial({
-          color: 0xfb923c,
-          transparent: true,
-          opacity: 0.2,
-          side: THREE.BackSide,
-          depthWrite: false,
+      // Thin CO2/dust atmospheric Fresnel rim attached directly to Mars mesh
+      marsAtmo = new THREE.Mesh(
+        new THREE.SphereGeometry(visualBodyRadius * 1.055, 36, 28),
+        createPlanetAtmosphereMaterial({
+          dayColor: 0xea7a47,
+          twilightColor: 0xfdba74,
+          intensity: 0.72,
+          power: 2.6,
+          nightFloor: 0.06,
         })
       );
       mesh.add(marsAtmo);
@@ -3792,8 +3807,9 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       case 'pluto':
         return tex.plutoAlbedo;
       case 'ceres':
+        return tex.mercuryAlbedo;
       case 'eris':
-        return tex.moonSphereAlbedo;
+        return tex.plutoAlbedo;
       default:
         return undefined;
     }
@@ -4043,6 +4059,8 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     shipWingsGroup,
     earthBodyGroup,
     earthClouds,
+    earthAtmo,
+    marsAtmo,
     sunCorona,
     asteroidBelt,
     stormRing,
