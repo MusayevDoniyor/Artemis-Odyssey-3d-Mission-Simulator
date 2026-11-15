@@ -21,8 +21,6 @@ export function WorldTargetPins({
   const visiblePrompts = prompts.filter((p) => p.visible);
   if (visiblePrompts.length === 0) return null;
 
-  const isMarsIdle = planet === 'mars' && marsQueue?.phase === 'IDLE';
-
   return (
     <div
       data-testid="world-target-pins"
@@ -30,6 +28,13 @@ export function WorldTargetPins({
     >
       {visiblePrompts.map((p) => {
         const isBase = p.kind === 'basecamp';
+        const activeCmd = marsQueue?.queue[marsQueue.activeIndex];
+        const isAutoTarget =
+          marsQueue?.phase !== 'IDLE' &&
+          activeCmd &&
+          (activeCmd.objectiveId === p.id ||
+            Math.hypot(activeCmd.x - p.worldX, activeCmd.z - p.worldZ) < 4.5);
+
         return (
           <div
             key={p.id}
@@ -70,24 +75,36 @@ export function WorldTargetPins({
               ) : (
                 <button
                   type="button"
+                  data-testid={`world-pin-${p.id}`}
                   onClick={() => {
-                    if (isMarsIdle && onQueueMarsTarget) {
+                    if (onQueueMarsTarget) {
                       onQueueMarsTarget(p);
                     }
                   }}
-                  title={isMarsIdle ? `Queue rover drive to ${p.title}` : p.title}
-                  className={`flex flex-col items-center gap-0.5 ${
-                    isMarsIdle ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
-                  }`}
+                  title={`Click to Auto-Drive around obstacles to ${p.title}`}
+                  className="pointer-events-auto flex cursor-pointer flex-col items-center gap-0.5 transition-transform hover:scale-105"
                 >
-                  <span className="hud-soft inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-stone-100 tabular-nums">
+                  <span
+                    className={`hud-soft inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold tabular-nums transition ${
+                      isAutoTarget
+                        ? 'border-cyan-400/80 bg-cyan-950/85 text-cyan-100 shadow-[0_0_12px_rgba(34,211,238,0.35)]'
+                        : 'text-stone-100 hover:border-cyan-400/60'
+                    }`}
+                  >
+                    {isAutoTarget && (
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+                    )}
                     <span className="max-w-36 truncate">{p.title}</span>
                     <span className="font-bold text-amber-300">{p.distM} m</span>
                   </span>
                   {isBase ? (
                     <Home className="h-5 w-5 text-emerald-300 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]" />
                   ) : (
-                    <MapPin className="h-5 w-5 fill-amber-400 text-stone-950 drop-shadow-[0_2px_8px_rgba(245,158,11,0.7)]" />
+                    <MapPin
+                      className={`h-5 w-5 drop-shadow-[0_2px_8px_rgba(245,158,11,0.7)] ${
+                        isAutoTarget ? 'fill-cyan-400 text-slate-950' : 'fill-amber-400 text-stone-950'
+                      }`}
+                    />
                   )}
                 </button>
               )}

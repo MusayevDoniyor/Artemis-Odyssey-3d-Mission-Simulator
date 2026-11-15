@@ -73,6 +73,7 @@ interface GameMenuModalProps {
   onChangeQuality: (q: QualityPreset) => void;
   onResetCamera: () => void;
   onQueueMarsPoint: (x: number, z: number, label: string, objectiveId?: string) => void;
+  onAutoDriveToPoint?: (x: number, z: number, label: string, objectiveId?: string) => void;
   onClearMarsQueue: () => void;
   onTransmitMarsQueue: () => void;
   onSelectSpaceTarget: (id: SpaceTargetId) => void;
@@ -116,6 +117,7 @@ export function GameMenuModal({
   onChangeQuality,
   onResetCamera,
   onQueueMarsPoint,
+  onAutoDriveToPoint,
   onClearMarsQueue,
   onTransmitMarsQueue,
   onSelectSpaceTarget,
@@ -275,22 +277,25 @@ export function GameMenuModal({
                     relayOnline={carryover.relaySatelliteOnline}
                     expanded
                     onToggleExpand={() => {}}
-                    marsQueue={isMarsRover ? marsQueue : undefined}
-                    onMapClick={
-                      isMarsRover
-                        ? (wx, wz) => onQueueMarsPoint(wx, wz, `Point (${Math.round(wx)}, ${Math.round(wz)})`)
-                        : undefined
-                    }
+                    marsQueue={marsQueue}
+                    onMapClick={(wx, wz) => {
+                      if (isMarsRover) {
+                        onQueueMarsPoint(wx, wz, `Point (${Math.round(wx)}, ${Math.round(wz)})`);
+                      } else if (onAutoDriveToPoint) {
+                        onAutoDriveToPoint(wx, wz, `Point (${Math.round(wx)}, ${Math.round(wz)})`);
+                        onClose();
+                      }
+                    }}
                   />
                   <div className="flex flex-col justify-between gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                     <div>
                       <h3 className="text-lg font-bold text-white">
-                        {isMarsRover ? 'Mars Command Queue (14-Min Lag)' : 'Surface Waypoints'}
+                        {isMarsRover ? 'Mars A* Command Queue (14-Min Lag)' : 'Surface A* AutoNav & Waypoints'}
                       </h3>
                       <p className="mt-1 text-base text-slate-300">
                         {isMarsRover
-                          ? 'Click anywhere on the map or pick a science site to queue rover moves, then transmit.'
-                          : 'Track your 4 polar sampling sites and Base Camp shelter.'}
+                          ? 'Click anywhere on the map, queue a batch, or Auto-Drive directly around terrain hazards.'
+                          : 'Select any polar sampling site or click the map to plot an A* route around boulders.'}
                       </p>
 
                       <div className="mt-3 space-y-2">
@@ -306,6 +311,18 @@ export function GameMenuModal({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="text-amber-300">{o.completed ? 'Done' : `${dist} m`}</span>
+                                {!o.completed && onAutoDriveToPoint && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onAutoDriveToPoint(o.x, o.z, o.siteName, o.id);
+                                      onClose();
+                                    }}
+                                    className="rounded-lg bg-cyan-400 px-2.5 py-1 text-sm font-bold text-slate-950 hover:bg-cyan-300"
+                                  >
+                                    Auto-Drive
+                                  </button>
+                                )}
                                 {isMarsRover && !o.completed && (
                                   <button
                                     type="button"

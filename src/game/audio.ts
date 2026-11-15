@@ -16,22 +16,27 @@ const TRACK_URLS: Record<MusicTrackId, string> = {
   space: '/audio/space-flight-ambient.mp3',
 };
 
+// High-register, zero-hum Space Piano & Celesta harmonic progressions (no sub-bass drone < 196 Hz)
 const MENU_CHORDS: number[][] = [
-  [146.83, 220.0, 261.63, 329.63, 349.23, 440.0], // Dm9 warm lunar horizon
-  [116.54, 174.61, 220.0, 293.66, 329.63, 440.0], // Bbmaj7#11 cinematic lift
-  [130.81, 196.0, 246.94, 293.66, 329.63, 440.0], // Cmaj9 open orbit
-  [110.0, 164.81, 220.0, 246.94, 293.66, 392.0], // Am11 drift
+  [293.66, 349.23, 440.0, 523.25, 659.25], // Dm9 celestial piano
+  [233.08, 293.66, 349.23, 440.0, 587.33], // Bbmaj9 warm horizon
+  [261.63, 329.63, 392.0, 493.88, 587.33], // Cmaj9 orbital light
+  [220.0, 261.63, 329.63, 392.0, 493.88],  // Am9 quiet stars
 ];
 
 const SPACE_CHORDS: number[][] = [
-  [110.0, 164.81, 246.94, 329.63, 392.0, 493.88], // Am9 deep cosmos
-  [174.61, 220.0, 261.63, 329.63, 440.0, 523.25], // Fmaj7 expanse
-  [130.81, 196.0, 293.66, 329.63, 392.0, 493.88], // G6/9 solar wind
-  [146.83, 220.0, 261.63, 329.63, 440.0, 523.25], // Dm9 / A celestial
+  [220.0, 293.66, 329.63, 440.0, 659.25],  // Asus2 / Am9 deep cosmos
+  [261.63, 349.23, 440.0, 523.25, 659.25], // Fmaj7 expanse
+  [196.0, 293.66, 392.0, 493.88, 587.33],  // Gmaj7 solar wind
+  [293.66, 349.23, 440.0, 523.25, 783.99], // Dm9 cislunar drift
 ];
 
-const CHIME_FREQS_MENU = [440.0, 523.25, 587.33, 659.25, 698.46, 880.0];
-const CHIME_FREQS_SPACE = [392.0, 493.88, 523.25, 587.33, 659.25, 783.99];
+const ARPEGGIO_PATTERNS: number[][] = [
+  [0, 2, 4, 3],
+  [1, 3, 4, 2],
+  [0, 1, 3, 4],
+  [2, 4, 1, 3],
+];
 
 function loadMusicPrefs(): { musicEnabled: boolean; musicVolume: number } {
   try {
@@ -92,14 +97,12 @@ class SoundSynth {
   private trackAvailable: Partial<Record<MusicTrackId, boolean | 'checking'>> = {};
   private fadeTimerId: number | null = null;
 
-  // Evolving Web Audio Space Ambient Synth (used seamlessly whenever MP3 assets are absent)
+  // Zero-hum Generative Space Piano & Celesta Bus (transient notes with echo reverb, no continuous drone)
   private padGain: GainNode | null = null;
   private padFilter: BiquadFilterNode | null = null;
-  private padOscs: OscillatorNode[] = [];
-  private padSubOsc: OscillatorNode | null = null;
-  private padLfo: OscillatorNode | null = null;
   private padEvolutionTimerId: number | null = null;
   private padChordIndex = 0;
+  private padNoteStep = 0;
 
   init(): boolean {
     if (typeof window === 'undefined') return false;
@@ -194,9 +197,6 @@ class SoundSynth {
     }
     this.desiredTrack = nextTrack;
     this.musicState.activeTrack = nextTrack;
-    if (nextTrack) {
-      this.retunePadToTrack(nextTrack);
-    }
     this.syncMusicPlayback();
     this.emitMusicState();
   }
@@ -240,45 +240,64 @@ class SoundSynth {
     return Math.max(0, Math.min(1, this.musicState.musicVolume * this.settings.masterVolume));
   }
 
-  private retunePadToTrack(track: MusicTrackId) {
-    if (!this.ctx || !this.padGain || this.padOscs.length === 0) return;
-    const chords = track === 'space' ? SPACE_CHORDS : MENU_CHORDS;
-    const chord = chords[this.padChordIndex % chords.length];
-    const now = this.ctx.currentTime;
-    this.padOscs.forEach((osc, idx) => {
-      const freq = chord[idx] ?? chord[idx % chord.length];
-      osc.frequency.setTargetAtTime(freq, now, 0.9);
-    });
-    if (this.padSubOsc) {
-      this.padSubOsc.frequency.setTargetAtTime(chord[0] * 0.5, now, 0.9);
-    }
+  /** Plays a single pure Space Piano / Celesta note with natural exponential decay (zero continuous hum) */
+  private triggerPianoCelestaNote(freq: number, delaySec: number, durationSec: number, velocity = 1.0) {
+    if (!this.ctx || this.ctx.state !== 'running' || !this.padFilter) return;
+    const startTime = this.ctx.currentTime + delaySec;
+
+    // Fundamental pure sine voice
+    const osc = this.ctx.createOscillator();
+    const noteGain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, startTime);
+
+    const peak = Math.max(0.002, Math.min(0.11, 0.065 * velocity));
+    noteGain.gain.setValueAtTime(0.0001, startTime);
+    noteGain.gain.linearRampToValueAtTime(peak, startTime + 0.035);
+    noteGain.gain.exponentialRampToValueAtTime(peak * 0.35, startTime + 0.45);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
+
+    osc.connect(noteGain);
+    noteGain.connect(this.padFilter);
+    osc.start(startTime);
+    osc.stop(startTime + durationSec + 0.05);
+
+    // Subtle crystalline 2x harmonic overtone (decays quickly like a felt piano hammer)
+    const harmOsc = this.ctx.createOscillator();
+    const harmGain = this.ctx.createGain();
+    harmOsc.type = 'sine';
+    harmOsc.frequency.setValueAtTime(freq * 2, startTime);
+    const harmPeak = peak * 0.16;
+    harmGain.gain.setValueAtTime(0.0001, startTime);
+    harmGain.gain.linearRampToValueAtTime(harmPeak, startTime + 0.02);
+    harmGain.gain.exponentialRampToValueAtTime(0.0001, startTime + Math.min(0.55, durationSec * 0.4));
+
+    harmOsc.connect(harmGain);
+    harmGain.connect(this.padFilter);
+    harmOsc.start(startTime);
+    harmOsc.stop(startTime + Math.min(0.6, durationSec * 0.45));
   }
 
-  private playAmbientChime(track: MusicTrackId) {
-    if (!this.ctx || this.ctx.state !== 'running') return;
-    if (this.settings.muted || !this.musicState.musicEnabled) return;
+  /** Plays a gentle, transient warm chord swell that fades in and completely out to silence */
+  private triggerSoftChordBreath(chord: number[]) {
+    if (!this.ctx || this.ctx.state !== 'running' || !this.padFilter) return;
     const now = this.ctx.currentTime;
-    const chimes = track === 'space' ? CHIME_FREQS_SPACE : CHIME_FREQS_MENU;
-    const chimeFreq = chimes[(this.padChordIndex * 2 + Math.floor(Math.random() * 2)) % chimes.length];
-    const chimeOsc = this.ctx.createOscillator();
-    const chimeGain = this.ctx.createGain();
-    chimeOsc.type = 'sine';
-    chimeOsc.frequency.setValueAtTime(chimeFreq, now);
-    const chimePeak = Math.max(
-      0.008,
-      Math.min(0.14, this.musicState.musicVolume * this.settings.masterVolume * 0.24)
-    );
-    chimeGain.gain.setValueAtTime(0.0001, now);
-    chimeGain.gain.linearRampToValueAtTime(chimePeak, now + 0.28);
-    chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
-    chimeOsc.connect(chimeGain);
-    if (this.padFilter) {
-      chimeGain.connect(this.padFilter);
-    } else {
-      chimeGain.connect(this.ctx.destination);
-    }
-    chimeOsc.start(now);
-    chimeOsc.stop(now + 3.3);
+    const swellDuration = 3.2;
+    // Use only 3 mid-high voices (no low frequencies that could hum)
+    const voices = [chord[0], chord[2], chord[3]];
+    voices.forEach((freq) => {
+      const osc = this.ctx!.createOscillator();
+      const g = this.ctx!.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.022, now + 1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + swellDuration);
+      osc.connect(g);
+      g.connect(this.padFilter!);
+      osc.start(now);
+      osc.stop(now + swellDuration + 0.05);
+    });
   }
 
   private ensureFallbackPad(): boolean {
@@ -287,70 +306,50 @@ class SoundSynth {
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = this.desiredTrack === 'space' ? 1550 : 1250;
-    filter.Q.value = 0.7;
+    filter.frequency.value = 2200;
+    filter.Q.value = 0.5;
 
-    // Gentle LFO sweeping the filter cutoff for an organic breathing cosmic synth
-    const lfo = this.ctx.createOscillator();
-    const lfoDepth = this.ctx.createGain();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.09;
-    lfoDepth.gain.value = 340;
-    lfo.connect(lfoDepth);
-    lfoDepth.connect(filter.frequency);
-    lfo.start();
-    this.padLfo = lfo;
+    // Highpass filter at 160 Hz to guarantee zero low-frequency hum or DC rumble
+    const highpass = this.ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 160;
+    highpass.Q.value = 0.5;
 
-    const comp = this.ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    comp.knee.value = 12;
-    comp.ratio.value = 2.5;
+    // Lush space echo delay network
+    const delay = this.ctx.createDelay(1.0);
+    delay.delayTime.value = 0.42;
+    const delayFeedback = this.ctx.createGain();
+    delayFeedback.gain.value = 0.28;
+    const delayFilter = this.ctx.createBiquadFilter();
+    delayFilter.type = 'lowpass';
+    delayFilter.frequency.value = 1400;
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
 
-    const initialChord = this.desiredTrack === 'space' ? SPACE_CHORDS[0] : MENU_CHORDS[0];
-    const oscs: OscillatorNode[] = [];
-    initialChord.forEach((f, idx) => {
-      const osc = this.ctx!.createOscillator();
-      osc.type = idx < 2 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine';
-      osc.frequency.value = f;
-      osc.detune.value = (idx - 2.5) * 6.0;
-      const voiceGain = this.ctx!.createGain();
-      voiceGain.gain.value = idx === 0 ? 0.24 : idx === 1 ? 0.2 : idx < 4 ? 0.17 : 0.13;
-      osc.connect(voiceGain);
-      voiceGain.connect(filter);
-      osc.start();
-      oscs.push(osc);
-    });
+    filter.connect(highpass);
+    highpass.connect(gain);
 
-    // Warm sub-octave foundation voice
-    const subOsc = this.ctx.createOscillator();
-    subOsc.type = 'sine';
-    subOsc.frequency.value = initialChord[0] * 0.5;
-    const subGain = this.ctx.createGain();
-    subGain.gain.value = 0.22;
-    subOsc.connect(subGain);
-    subGain.connect(filter);
-    subOsc.start();
-    this.padSubOsc = subOsc;
+    // Wet reverb path
+    highpass.connect(delay);
+    delay.connect(delayFilter);
+    delayFilter.connect(delayFeedback);
+    delayFeedback.connect(delay);
+    delayFilter.connect(gain);
 
-    filter.connect(comp);
-    comp.connect(gain);
     gain.connect(this.ctx.destination);
+
     this.padFilter = filter;
     this.padGain = gain;
-    this.padOscs = oscs;
 
     if (this.padEvolutionTimerId === null && typeof window !== 'undefined') {
       this.padEvolutionTimerId = window.setInterval(() => {
         this.evolveAmbientPadStep();
-      }, 3600);
+      }, 1750);
     }
 
-    if (this.desiredTrack) {
-      this.playAmbientChime(this.desiredTrack);
-    }
+    this.syncFallbackPadGain();
+    this.evolveAmbientPadStep();
     return true;
   }
 
@@ -364,20 +363,30 @@ class SoundSynth {
       this.trackAvailable[track!] !== true;
     if (!active) return;
 
-    this.padChordIndex = (this.padChordIndex + 1) % MENU_CHORDS.length;
     const chords = track === 'space' ? SPACE_CHORDS : MENU_CHORDS;
-    const nextChord = chords[this.padChordIndex % chords.length];
-    const now = this.ctx.currentTime;
-    this.padOscs.forEach((osc, idx) => {
-      const freq = nextChord[idx] ?? nextChord[idx % nextChord.length];
-      osc.frequency.setTargetAtTime(freq, now, 1.1);
-    });
-    if (this.padSubOsc) {
-      this.padSubOsc.frequency.setTargetAtTime(nextChord[0] * 0.5, now, 1.1);
+    const chord = chords[this.padChordIndex % chords.length];
+    const pattern = ARPEGGIO_PATTERNS[this.padChordIndex % ARPEGGIO_PATTERNS.length];
+
+    // Trigger a soft chord breath at the start of every 4-step bar
+    if (this.padNoteStep % 4 === 0) {
+      this.triggerSoftChordBreath(chord);
     }
 
-    // Subtle crystalline space shimmer note on every harmonic shift
-    this.playAmbientChime(track!);
+    // Play a delicate Space Piano / Celesta note from the current chord
+    const noteIdx = pattern[this.padNoteStep % pattern.length];
+    const baseFreq = chord[noteIdx % chord.length];
+    const octaveMult = this.padNoteStep % 4 === 2 ? 2.0 : 1.0;
+    this.triggerPianoCelestaNote(
+      baseFreq * octaveMult,
+      0,
+      2.3,
+      this.padNoteStep % 2 === 0 ? 1.0 : 0.76
+    );
+
+    this.padNoteStep += 1;
+    if (this.padNoteStep % 4 === 0) {
+      this.padChordIndex = (this.padChordIndex + 1) % chords.length;
+    }
   }
 
   private syncFallbackPadGain() {
@@ -389,15 +398,10 @@ class SoundSynth {
       !this.settings.muted &&
       this.trackAvailable[track!] !== true;
 
-    if (this.padFilter && track) {
-      const targetFreq = track === 'space' ? 1550 : 1250;
-      this.padFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.7);
-    }
     const targetVol = usePad
-      ? Math.max(0, Math.min(0.65, this.musicState.musicVolume * this.settings.masterVolume * 0.78))
+      ? Math.max(0, Math.min(0.65, this.musicState.musicVolume * this.settings.masterVolume * 0.75))
       : 0;
-    this.padGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.35);
-    void this.padLfo;
+    this.padGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.18);
   }
 
   private checkTrackAvailability(track: MusicTrackId) {
@@ -631,8 +635,8 @@ class SoundSynth {
   }
 
   playRoverDrivePulse(speedAbs: number) {
-    if (speedAbs < 0.4) return;
-    this.playTone(120 + Math.min(90, speedAbs * 7), 0.04, 'triangle', 0.032);
+    if (speedAbs < 0.8) return;
+    this.playTone(420 + Math.min(140, speedAbs * 12), 0.024, 'sine', 0.012);
   }
 
   playAirlockCycle() {

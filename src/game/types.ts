@@ -597,6 +597,13 @@ export interface MarsQueueState {
   txTotalSec: number;
   realDelayMin: number;
   statusMessage: string;
+  plannedPath?: Array<{ x: number; z: number }>;
+  avoidingObstacleLabel?: string | null;
+  repathTimerSec?: number;
+  stuckTimerSec?: number;
+  reverseEscapeSec?: number;
+  lastProgressDist?: number;
+  lastPlannedGoalKey?: string;
 }
 
 export interface SurfaceWorldPrompt {

@@ -1,4 +1,4 @@
-import { Battery, BookOpen, Compass, Shield, Undo2, Wind, X } from 'lucide-react';
+import { Battery, BookOpen, Compass, Navigation, Shield, Undo2, Wind, X } from 'lucide-react';
 import { PHYSICS } from '../game/constants';
 import type {
   GameMenuTab,
@@ -30,6 +30,7 @@ interface RoverHUDProps {
   onTransmitMarsQueue: () => void;
   onUndoMarsQueue: () => void;
   onClearMarsQueue: () => void;
+  onStartAutoDriveNext?: () => void;
 }
 
 export function RoverHUD({
@@ -50,6 +51,7 @@ export function RoverHUD({
   onTransmitMarsQueue,
   onUndoMarsQueue,
   onClearMarsQueue,
+  onStartAutoDriveNext,
 }: RoverHUDProps) {
   const isMars = rover.planet === 'mars';
   const atBaseCamp = Math.hypot(rover.x + 15, rover.z + 13) <= 22;
@@ -65,8 +67,8 @@ export function RoverHUD({
     roverInput.backward ||
     roverInput.left ||
     roverInput.right;
-  const isMarsExecuting = isMars && marsQueue.phase !== 'IDLE';
-  const showSpeed = isMoving || isMarsExecuting;
+  const isAutoDriving = marsQueue.phase !== 'IDLE';
+  const showSpeed = isMoving || isAutoDriving;
 
   const slopeSteep = rover.wheelSlipPct >= 28;
   const marsHighDust = isMars && rover.dustAccumulationPct > 35;
@@ -75,18 +77,13 @@ export function RoverHUD({
   let objectiveText = 'Return to Base Camp airlock.';
   if (nearestObjective && !nearestObjective.completed) {
     objectiveText = `Press E to learn & sample ${nearestObjective.siteName}.`;
+  } else if (isAutoDriving) {
+    objectiveText = marsQueue.statusMessage;
   } else if (nextObj) {
-    if (isMars) {
-      objectiveText =
-        marsQueue.phase === 'IDLE'
-          ? marsQueue.queue.length > 0
-            ? `Send ${marsQueue.queue.length} queued drive commands.`
-            : `Drive WASD or click terrain toward ${nextObj.siteName}.`
-          : marsQueue.phase === 'TRANSMITTING'
-            ? `Sending commands across 14 min radio lag.`
-            : `Driving autonomously to ${nextObj.siteName}.`;
+    if (isMars && marsQueue.queue.length > 0) {
+      objectiveText = `Send ${marsQueue.queue.length} queued drive commands or click Auto-Drive.`;
     } else {
-      objectiveText = `Drive to ${nextObj.siteName} to study & sample.`;
+      objectiveText = `Drive WASD or click Auto-Drive / badge toward ${nextObj.siteName}.`;
     }
   } else if (atBaseCamp) {
     objectiveText = 'Enter Base Camp airlock to finish your sol.';
@@ -104,57 +101,48 @@ export function RoverHUD({
     return { x: 72 + dx * scale, y: 72 + dz * scale };
   };
   const nextPt = nextObj ? toCompassPt(nextObj.x, nextObj.z) : toCompassPt(-15, -13);
+  const plannedCompassPts = (marsQueue.plannedPath || []).map((pt) => toCompassPt(pt.x, pt.z));
 
   // Max 3 Contextual Hints (Bottom-Right)
-  const hints = isMars
-    ? marsQueue.phase === 'IDLE'
-      ? marsQueue.queue.length > 0
+  const hints = isAutoDriving
+    ? [
+        { keys: 'LiDAR', label: marsQueue.avoidingObstacleLabel ? 'Avoiding Rock' : 'Path Clear', action: undefined },
+        { keys: 'C', label: 'Stop Auto', action: onClearMarsQueue },
+        { keys: 'Tab', label: 'Map', action: () => onOpenMenuTab('map') },
+      ]
+    : isMars && marsQueue.queue.length > 0
+      ? [
+          { keys: 'Click', label: 'Add Point', action: undefined },
+          { keys: 'Space', label: 'Send Batch', action: onTransmitMarsQueue },
+          { keys: 'Tab', label: 'Topo Map', action: () => onOpenMenuTab('map') },
+        ]
+      : isMoving
         ? [
-            { keys: 'Click', label: 'Add Point', action: undefined },
-            { keys: 'Space', label: 'Send Batch', action: onTransmitMarsQueue },
-            { keys: 'Tab', label: 'Topo Map', action: () => onOpenMenuTab('map') },
+            { keys: 'W/S', label: 'Drive', hold: 'forward' as const },
+            { keys: 'A/D', label: 'Turn', hold: 'left' as const },
+            {
+              keys: 'E',
+              label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Interact',
+              action: nearestObjective
+                ? () => onOpenDrillConsole(nearestObjective)
+                : atBaseCamp
+                  ? onOpenOutpostConsole
+                  : undefined,
+            },
           ]
         : [
-            { keys: 'W/A/S/D', label: 'Drive', hold: 'forward' as const },
+            { keys: 'W', label: 'Drive', hold: 'forward' as const },
             {
-              keys: nearestObjective ? 'E' : 'Click',
-              label: nearestObjective ? 'Learn' : 'Queue Waypoint',
-              action: nearestObjective ? () => onOpenDrillConsole(nearestObjective) : undefined,
+              keys: nearestObjective ? 'E' : atBaseCamp ? 'E' : 'Auto',
+              label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Auto-Drive',
+              action: nearestObjective
+                ? () => onOpenDrillConsole(nearestObjective)
+                : atBaseCamp
+                  ? onOpenOutpostConsole
+                  : onStartAutoDriveNext,
             },
-            { keys: 'Tab', label: 'Map', action: () => onOpenMenuTab('map') },
-          ]
-      : [
-          { keys: '14m', label: 'Signal Lag', action: undefined },
-          { keys: 'C', label: 'Clear Queue', action: onClearMarsQueue },
-          { keys: 'Esc', label: 'Menu', action: () => onOpenMenuTab('settings') },
-        ]
-    : isMoving
-      ? [
-          { keys: 'W/S', label: 'Drive', hold: 'forward' as const },
-          { keys: 'A/D', label: 'Turn', hold: 'left' as const },
-          {
-            keys: 'E',
-            label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Interact',
-            action: nearestObjective
-              ? () => onOpenDrillConsole(nearestObjective)
-              : atBaseCamp
-                ? onOpenOutpostConsole
-                : undefined,
-          },
-        ]
-      : [
-          { keys: 'W', label: 'Drive', hold: 'forward' as const },
-          {
-            keys: nearestObjective ? 'E' : atBaseCamp ? 'E' : 'Q',
-            label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Turn Mast',
-            action: nearestObjective
-              ? () => onOpenDrillConsole(nearestObjective)
-              : atBaseCamp
-                ? onOpenOutpostConsole
-                : undefined,
-          },
-          { keys: 'Tab', label: 'Map & Menu', action: () => onOpenMenuTab('map') },
-        ];
+            { keys: 'Tab', label: 'Map & Menu', action: () => onOpenMenuTab('map') },
+          ];
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4 lg:p-5">
@@ -340,21 +328,32 @@ export function RoverHUD({
               E
             </text>
 
+            {/* Planned obstacle-avoidance path polyline */}
+            {plannedCompassPts.length >= 2 && (
+              <polyline
+                points={plannedCompassPts.map((p) => `${p.x},${p.y}`).join(' ')}
+                fill="none"
+                stroke="#22d3ee"
+                strokeWidth="2"
+                strokeDasharray="3 2"
+                opacity="0.9"
+              />
+            )}
+
             {/* Queued Mars waypoints */}
-            {isMars &&
-              marsQueue.queue.map((cmd) => {
-                const pt = toCompassPt(cmd.x, cmd.z);
-                return (
-                  <circle
-                    key={cmd.id}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r="3.2"
-                    fill="#f59e0b"
-                    opacity="0.85"
-                  />
-                );
-              })}
+            {marsQueue.queue.map((cmd) => {
+              const pt = toCompassPt(cmd.x, cmd.z);
+              return (
+                <circle
+                  key={cmd.id}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="3.2"
+                  fill="#f59e0b"
+                  opacity="0.85"
+                />
+              );
+            })}
 
             {/* Next Objective Diamond */}
             <polygon
@@ -371,7 +370,7 @@ export function RoverHUD({
           </svg>
         </button>
 
-        {/* GROUP 5: Bottom-Center Speedometer (Moving Only) or Mars Batch Controls */}
+        {/* GROUP 5: Bottom-Center Speedometer, Auto-Drive Controls & Mars Batch Bar */}
         <div data-testid="hud-group-speed" className="flex flex-col items-center gap-2">
           {nearestObjective && !nearestObjective.completed && (
             <button
@@ -383,6 +382,43 @@ export function RoverHUD({
               <BookOpen className="h-4 w-4 shrink-0" />
               Learn &amp; Sample ({nearestObjective.siteName})
             </button>
+          )}
+
+          {/* 1-Click Auto-Drive / Active AutoNav Bar (Moon & Mars) */}
+          {isAutoDriving ? (
+            <div
+              data-testid="autonav-active-bar"
+              className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl border-cyan-400/50 px-4 py-2 text-xs lg:text-sm"
+            >
+              <span className="inline-block h-2 w-2 animate-ping rounded-full bg-cyan-400" />
+              <span className="font-semibold whitespace-nowrap text-cyan-100">
+                {marsQueue.statusMessage}
+              </span>
+              <button
+                type="button"
+                data-testid="stop-autonav-btn"
+                onClick={onClearMarsQueue}
+                className="rounded-xl border border-rose-400/40 bg-rose-950/60 px-2.5 py-1 text-xs font-bold text-rose-200 hover:border-rose-300"
+              >
+                Stop Auto
+              </button>
+            </div>
+          ) : (
+            onStartAutoDriveNext &&
+            (!nearestObjective || nearestObjective.completed) &&
+            (nextObj || !atBaseCamp) && (
+              <button
+                type="button"
+                data-testid="start-autonav-btn"
+                onClick={onStartAutoDriveNext}
+                className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-2xl border-cyan-400/45 px-4 py-2 text-xs font-bold text-cyan-200 transition hover:border-cyan-300 hover:text-white lg:text-sm"
+              >
+                <Navigation className="h-4 w-4 text-cyan-300" />
+                <span>
+                  Auto-Drive to {nextObj ? nextObj.siteName : 'Base Camp'} ({distToNext} m)
+                </span>
+              </button>
+            )
           )}
 
           {isMars && marsQueue.phase === 'IDLE' && marsQueue.queue.length > 0 && (
@@ -426,10 +462,12 @@ export function RoverHUD({
               speedScale={speedScale}
               onToggleSpeedScale={onToggleSpeedScale}
               marsLagLabel={
-                isMarsExecuting
+                isAutoDriving
                   ? marsQueue.phase === 'TRANSMITTING'
                     ? 'Sending 14m lag'
-                    : 'Auto Drive'
+                    : marsQueue.avoidingObstacleLabel
+                      ? 'Avoiding Rock'
+                      : 'Auto Drive'
                   : undefined
               }
             />

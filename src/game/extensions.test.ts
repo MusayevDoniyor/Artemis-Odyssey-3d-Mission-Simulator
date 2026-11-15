@@ -45,15 +45,21 @@ import {
 } from './outpost';
 import {
   clearMarsQueue,
+  computeSafeRoverPath,
   createInitialMarsQueueState,
   enqueueMarsWaypoint,
   removeLastMarsCommand,
   shouldShowDidYouKnowToast,
+  startAutoDriveToWaypoint,
   stepMarsQueue,
   transmitMarsQueue,
 } from './marsQueue';
 import { getPlanetObjectives } from './constants';
-import { createInitialCampaignCarryover, createInitialRoverState } from './physics';
+import {
+  createInitialCampaignCarryover,
+  createInitialRoverState,
+  stepRoverPhysics,
+} from './physics';
 
 test('hardware catalog includes all 7 vehicles with parts, explode axes, and connections', () => {
   assert.equal(HARDWARE_ORDER.length, 7);
@@ -383,3 +389,116 @@ test('shouldShowDidYouKnowToast shows only during calm gameplay with zero alerts
     );
   }
 });
+
+test('Auto-Drive A* pathfinder plots detour around boulder clusters, recalculates dynamically, and arrives within <6.8m of target badge', () => {
+  const blockingRock1 = {
+    x: 0,
+    z: 18,
+    r: 2.5,
+    type: 'rock' as const,
+    label: 'Basalt Boulder A',
+  };
+  const blockingRock2 = {
+    x: -3.2,
+    z: 22,
+    r: 2.2,
+    type: 'rock' as const,
+    label: 'Basalt Boulder B',
+  };
+  const baseObj = getPlanetObjectives('mars')[0];
+  const targetObj = {
+    ...baseObj,
+    id: 'test-crater-sample',
+    title: 'Sample Crater Rim',
+    siteName: 'Crater Rim Outcrop',
+    x: 0,
+    z: 44,
+    progress: 0,
+    completed: false,
+  };
+  const stationCol = {
+    x: targetObj.x,
+    z: targetObj.z,
+    r: 1.5,
+    type: 'station' as const,
+    label: targetObj.siteName,
+  };
+  const colliders = [blockingRock1, blockingRock2, stationCol];
+
+  // 1. Verify A* + Theta* string-pulling creates a bypass waypoint around the boulder cluster
+  const path = computeSafeRoverPath(0, 0, targetObj.x, targetObj.z, colliders, false, 'mars');
+  assert.ok(path.length >= 2, `Expected A* bypass waypoint in planned path, got ${path.length} points`);
+  assert.ok(
+    Math.abs(path[0].x) > 2.5,
+    `Expected A* detour waypoint to deflect laterally around boulders, got x=${path[0].x}`
+  );
+
+  // 2. Verify off-center clicks near a real Mars objective snap to its exact coordinates and DRILL type
+  const snappedMq = startAutoDriveToWaypoint(
+    createInitialMarsQueueState(14),
+    baseObj.x + 6.5,
+    baseObj.z - 5.0,
+    'Rough Map Click'
+  );
+  assert.equal(snappedMq.queue[0].objectiveId, baseObj.id);
+  assert.equal(snappedMq.queue[0].x, baseObj.x);
+  assert.equal(snappedMq.queue[0].z, baseObj.z);
+  assert.equal(snappedMq.queue[0].type, 'DRILL');
+
+  // 3. Start rover at (0, 0) facing 180 degrees away from the target (heading = PI)
+  let rover = {
+    ...createInitialRoverState(0, 0, 'mars'),
+    headingRad: Math.PI,
+    speed: 0,
+  };
+  let mq = startAutoDriveToWaypoint(
+    createInitialMarsQueueState(14),
+    targetObj.x,
+    targetObj.z,
+    targetObj.siteName,
+    targetObj.id
+  );
+  assert.equal(mq.phase, 'EXECUTING');
+
+  let arrivedId: string | null = null;
+  let maxLateralDeflectionX = 0;
+  let dynamicBoulderInjected = false;
+  const activeColliders = [...colliders];
+
+  for (let step = 0; step < 750; step++) {
+    const dt = 0.05;
+    // Inject a new dynamic hazard ahead of the rover once it passes z > 25m to verify live A* recalculation
+    if (!dynamicBoulderInjected && rover.z > 25) {
+      dynamicBoulderInjected = true;
+      activeColliders.push({
+        x: rover.x * 0.5,
+        z: 33,
+        r: 2.0,
+        type: 'rock' as const,
+        label: 'Dynamic Ejecta Rock',
+      });
+    }
+    const res = stepMarsQueue(mq, rover, [targetObj], dt, activeColliders);
+    mq = res.queueState;
+    rover = stepRoverPhysics(rover, res.input, activeColliders, dt);
+    maxLateralDeflectionX = Math.max(maxLateralDeflectionX, Math.abs(rover.x));
+    if (res.triggerDrillObjectiveId) {
+      arrivedId = res.triggerDrillObjectiveId;
+      break;
+    }
+  }
+
+  assert.ok(
+    maxLateralDeflectionX > 2.8,
+    `Expected rover to steer laterally around the boulder cluster (max |x|=${maxLateralDeflectionX.toFixed(2)}m)`
+  );
+  assert.equal(arrivedId, targetObj.id, 'Expected rover to arrive at target objective behind boulders');
+  const finalDistToObj = Math.hypot(targetObj.x - rover.x, targetObj.z - rover.z);
+  assert.ok(
+    finalDistToObj < 6.8,
+    `Expected rover to stop strictly inside <6.8m objective interaction range, got ${finalDistToObj.toFixed(2)}m`
+  );
+  assert.equal(mq.phase, 'IDLE');
+});
+
+

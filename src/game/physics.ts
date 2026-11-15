@@ -1608,7 +1608,16 @@ export function stepRoverPhysics(
     vx = Math.sin(crabHeading) * r.speed;
     vz = Math.cos(crabHeading) * r.speed;
   } else if (r.driveMode !== 'SPIN') {
-    const yawRate = (r.speed * Math.tan(r.steerAngleRad)) / PHYSICS.ROVER_WHEELBASE;
+    const ackermannYaw = (r.speed * Math.tan(r.steerAngleRad)) / PHYSICS.ROVER_WHEELBASE;
+    const steerInputDir = input.left ? 1 : input.right ? -1 : 0;
+    const lowSpeedPivot =
+      steerInputDir *
+      PHYSICS.ROVER_TURN_RATE *
+      (Math.abs(r.speed) < 1.2 ? 0.92 : 0.28);
+    const yawRate =
+      Math.abs(ackermannYaw) >= Math.abs(lowSpeedPivot)
+        ? ackermannYaw
+        : ackermannYaw * 0.4 + lowSpeedPivot;
     r.headingRad += yawRate * dt;
     vx = Math.sin(r.headingRad) * r.speed;
     vz = Math.cos(r.headingRad) * r.speed;

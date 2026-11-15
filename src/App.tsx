@@ -47,6 +47,7 @@ import {
   enqueueMarsWaypoint,
   removeLastMarsCommand,
   shouldShowDidYouKnowToast,
+  startAutoDriveToWaypoint,
   stepMarsQueue,
   transmitMarsQueue,
 } from './game/marsQueue';
@@ -770,6 +771,8 @@ export default function App() {
         s.mastPanRad = 0;
         sceneMgrRef.current?.resetWheelTracks();
         s.objectives = clonePlanetObjectives(targetPlanet);
+        marsQueueRef.current = createInitialMarsQueueState(targetPlanet === 'mars' ? 14 : 0);
+        setMarsQueueUi(marsQueueRef.current);
         scienceMultRef.current = 1.0;
       }
       syncUiNow();
@@ -1376,10 +1379,30 @@ export default function App() {
       } else if (s.phase === 'rover') {
         soundSynth.setThrustVolume(0);
         s.mastPanRad = (mastPanDegRef.current * Math.PI) / 180;
-        const colliders = sceneMgrRef.current?.getSurfaceColliders(s.rover.planet) || [];
+        const rawColliders = sceneMgrRef.current?.getSurfaceColliders(s.rover.planet) || [];
+        const landerCollider = {
+          x: s.landedPose?.x ?? 0,
+          z: s.landedPose?.z ?? 0,
+          r: 3.6,
+          type: 'habitat' as const,
+          label: 'Parked Lander',
+        };
+        const colliders = [...rawColliders, landerCollider];
+        const manualDrivePressed =
+          s.input.forward || s.input.backward || s.input.left || s.input.right;
+        if (manualDrivePressed && marsQueueRef.current.phase !== 'IDLE') {
+          marsQueueRef.current = clearMarsQueue(marsQueueRef.current);
+        }
         let effectiveInput = s.input;
-        if (s.rover.planet === 'mars') {
-          const mq = stepMarsQueue(marsQueueRef.current, s.rover, s.objectives, dt);
+        if (s.rover.planet === 'mars' || marsQueueRef.current.phase !== 'IDLE') {
+          if (marsQueueRef.current.phase === 'EXECUTING') {
+            if (s.rover.driveMode === 'SPIN' || s.rover.driveMode === 'CRAB') {
+              s.rover.driveMode = 'DRIVE';
+            } else if (s.rover.wheelSlipPct >= 28 && s.rover.driveMode !== 'WALKER') {
+              s.rover.driveMode = 'WALKER';
+            }
+          }
+          const mq = stepMarsQueue(marsQueueRef.current, s.rover, s.objectives, dt, colliders);
           marsQueueRef.current = mq.queueState;
           effectiveInput = mq.queueState.phase === 'IDLE' ? s.input : mq.input;
           if (mq.triggerDrillObjectiveId) {
@@ -2701,8 +2724,8 @@ export default function App() {
               syncUiNow();
             }}
             onQueueMarsTarget={(prompt) => {
-              if (marsQueueRef.current.phase !== 'IDLE') return;
-              marsQueueRef.current = enqueueMarsWaypoint(
+              soundSynth.init();
+              marsQueueRef.current = startAutoDriveToWaypoint(
                 marsQueueRef.current,
                 prompt.worldX,
                 prompt.worldZ,
@@ -3015,6 +3038,28 @@ export default function App() {
             setMarsQueueUi(marsQueueRef.current);
             soundSynth.playClick();
           }}
+          onStartAutoDriveNext={() => {
+            soundSynth.init();
+            const nextObj = simRef.current.objectives.find((o) => !o.completed);
+            if (nextObj) {
+              marsQueueRef.current = startAutoDriveToWaypoint(
+                marsQueueRef.current,
+                nextObj.x,
+                nextObj.z,
+                nextObj.siteName,
+                nextObj.id
+              );
+            } else {
+              marsQueueRef.current = startAutoDriveToWaypoint(
+                marsQueueRef.current,
+                -15,
+                -13,
+                'Base Camp Airlock'
+              );
+            }
+            setMarsQueueUi(marsQueueRef.current);
+            soundSynth.playClick();
+          }}
         />
       )}
 
@@ -3111,6 +3156,18 @@ export default function App() {
         onResetCamera={handleResetCamera}
         onQueueMarsPoint={(wx, wz, label, objectiveId) => {
           marsQueueRef.current = enqueueMarsWaypoint(
+            marsQueueRef.current,
+            wx,
+            wz,
+            label,
+            objectiveId
+          );
+          setMarsQueueUi(marsQueueRef.current);
+          soundSynth.playClick();
+        }}
+        onAutoDriveToPoint={(wx, wz, label, objectiveId) => {
+          soundSynth.init();
+          marsQueueRef.current = startAutoDriveToWaypoint(
             marsQueueRef.current,
             wx,
             wz,

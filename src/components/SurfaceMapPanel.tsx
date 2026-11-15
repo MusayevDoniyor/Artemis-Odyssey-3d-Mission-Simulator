@@ -359,6 +359,24 @@ export function SurfaceMapPanel({
             );
           })}
 
+          {/* Active A* Obstacle-Avoiding Planned Path */}
+          {marsQueue?.plannedPath && marsQueue.plannedPath.length > 0 && (
+            <polyline
+              points={[
+                `${rovPt.sx.toFixed(1)},${rovPt.sy.toFixed(1)}`,
+                ...marsQueue.plannedPath.map((wp) => {
+                  const p = toSvg(wp.x, wp.z);
+                  return `${p.sx.toFixed(1)},${p.sy.toFixed(1)}`;
+                }),
+              ].join(' ')}
+              fill="none"
+              stroke="#22d3ee"
+              strokeWidth="1.9"
+              strokeDasharray="3 2"
+              opacity="0.95"
+            />
+          )}
+
           {/* Mars Queued Command Waypoints */}
           {marsQueue && marsQueue.queue.length > 0 && (
             <g>
@@ -372,9 +390,9 @@ export function SurfaceMapPanel({
                 ].join(' ')}
                 fill="none"
                 stroke="#f59e0b"
-                strokeWidth="1.6"
+                strokeWidth="1.4"
                 strokeDasharray="4 3"
-                opacity="0.88"
+                opacity="0.65"
               />
               {marsQueue.queue.map((cmd, idx) => {
                 const p = toSvg(cmd.x, cmd.z);
