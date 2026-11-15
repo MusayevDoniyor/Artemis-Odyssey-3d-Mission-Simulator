@@ -134,6 +134,86 @@ export function getPropulsionProfileForPart(
     };
   }
 
+  if (showcase === 'saturn-v') {
+    if (partId === 'saturn-sii') {
+      return {
+        engineLabel: '5× J-2 Cryogenic Cluster (S-II)',
+        ratedThrustKn: 5140,
+        ispVacS: 421,
+        ispSeaLevelS: 200,
+        referenceMassKg: 480000,
+        burnRateNominalKgS: 1245,
+        gravityMs2: G0,
+        minThrottlePct: 100,
+        maxThrottlePct: 100,
+      };
+    }
+    if (partId === 'saturn-sivb') {
+      return {
+        engineLabel: '1× J-2 Restartable Cryo (S-IVB)',
+        ratedThrustKn: 1000,
+        ispVacS: 421,
+        ispSeaLevelS: 200,
+        referenceMassKg: 120000,
+        burnRateNominalKgS: 242,
+        gravityMs2: G0,
+        minThrottlePct: 100,
+        maxThrottlePct: 100,
+      };
+    }
+    if (partId === 'saturn-csm') {
+      return {
+        engineLabel: '1× AJ10-137 SPS (Apollo CSM)',
+        ratedThrustKn: 91,
+        ispVacS: 314,
+        ispSeaLevelS: 314,
+        referenceMassKg: 30300,
+        burnRateNominalKgS: 29.5,
+        gravityMs2: G0,
+        minThrottlePct: 100,
+        maxThrottlePct: 100,
+      };
+    }
+    return {
+      engineLabel: '5× F-1 Kerosene Cluster (S-IC)',
+      ratedThrustKn: 34500,
+      ispVacS: 304,
+      ispSeaLevelS: 263,
+      referenceMassKg: 2970000,
+      burnRateNominalKgS: 13370,
+      gravityMs2: G0,
+      minThrottlePct: 100,
+      maxThrottlePct: 100,
+    };
+  }
+
+  if (showcase === 'falcon-9') {
+    if (partId === 'falcon-stage2') {
+      return {
+        engineLabel: '1× Merlin 1D Vacuum (MVacD)',
+        ratedThrustKn: 981,
+        ispVacS: 348,
+        ispSeaLevelS: 348,
+        referenceMassKg: 111500,
+        burnRateNominalKgS: 287.5,
+        gravityMs2: G0,
+        minThrottlePct: 40,
+        maxThrottlePct: 100,
+      };
+    }
+    return {
+      engineLabel: '9× Merlin 1D Octaweb (Stage 1)',
+      ratedThrustKn: 7607,
+      ispVacS: 311,
+      ispSeaLevelS: 282,
+      referenceMassKg: 549054,
+      burnRateNominalKgS: 2748,
+      gravityMs2: G0,
+      minThrottlePct: 40,
+      maxThrottlePct: 100,
+    };
+  }
+
   return {
     engineLabel: '4× RS-25 Core Cluster',
     ratedThrustKn: 9116,

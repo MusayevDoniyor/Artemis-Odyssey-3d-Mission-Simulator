@@ -47,11 +47,13 @@ import type {
 } from '../game/types';
 import {
   createCrashFxSystem,
+  createFalcon9Showcase,
   createJWSTModel,
   createLaunchComplexAndSLS,
   createLunarEnvironment,
   createLunarLander,
   createOrbitalSatellite,
+  createSaturnVShowcase,
   createSolarSystemScene,
   createViperRover,
   createVoyagerModel,
@@ -292,6 +294,8 @@ export class SpaceSceneManager {
   private showcaseSatellite: OrbitalSatelliteHandles;
   private jwstModel: { group: THREE.Group };
   private voyagerModel: { group: THREE.Group };
+  private saturnVModel: { group: THREE.Group };
+  private falcon9Model: { group: THREE.Group };
   private crashFxSys: CrashFxHandles;
 
   private trackIdx = 0;
@@ -542,6 +546,14 @@ export class SpaceSceneManager {
     this.voyagerModel.group.visible = false;
     this.scene.add(this.voyagerModel.group);
 
+    this.saturnVModel = createSaturnVShowcase(this.textures);
+    this.saturnVModel.group.visible = false;
+    this.scene.add(this.saturnVModel.group);
+
+    this.falcon9Model = createFalcon9Showcase(this.textures);
+    this.falcon9Model.group.visible = false;
+    this.scene.add(this.falcon9Model.group);
+
     this.crashFxSys = createCrashFxSystem(this.textures);
     this.scene.add(this.crashFxSys.group);
 
@@ -742,6 +754,10 @@ export class SpaceSceneManager {
         return [this.roverModel.group];
       case 'outpost':
         return [this.lunarEnv.habGroup];
+      case 'saturn-v':
+        return [this.saturnVModel.group];
+      case 'falcon-9':
+        return [this.falcon9Model.group];
     }
   }
 
@@ -1299,6 +1315,8 @@ export class SpaceSceneManager {
       this.lander.group,
       this.roverModel.group,
       this.lunarEnv.habGroup,
+      this.saturnVModel.group,
+      this.falcon9Model.group,
     ];
 
     craftList.forEach((root) => {
@@ -1432,15 +1450,25 @@ export class SpaceSceneManager {
     const showSatelliteShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'satellite';
     const showJwstShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'jwst';
     const showVoyagerShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'voyager';
+    const showSaturnVShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'saturn-v';
+    const showFalcon9Showcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'falcon-9';
     const showSpace = phase === 'space' || (phase === 'gameover' && s.crashFx.active && s.crashFx.kind === 'space');
     const showLunar =
-      !showLaunch && !showSpace && !showSatelliteShowcase && !showJwstShowcase && !showVoyagerShowcase;
+      !showLaunch &&
+      !showSpace &&
+      !showSatelliteShowcase &&
+      !showJwstShowcase &&
+      !showVoyagerShowcase &&
+      !showSaturnVShowcase &&
+      !showFalcon9Showcase;
 
     this.launchComplex.group.visible = showLaunch;
     this.solarSystem.group.visible = showSpace;
     this.showcaseSatellite.group.visible = showSatelliteShowcase;
     this.jwstModel.group.visible = showJwstShowcase;
     this.voyagerModel.group.visible = showVoyagerShowcase;
+    this.saturnVModel.group.visible = showSaturnVShowcase;
+    this.falcon9Model.group.visible = showFalcon9Showcase;
     this.lunarEnv.group.visible = showLunar;
     this.lunarEnv.kilopowerGroup.visible =
       Boolean(s.kilopowerActive) ||
@@ -1466,7 +1494,13 @@ export class SpaceSceneManager {
       phase === 'victory' ||
       (phase === 'gameover' && s.crashFx.kind !== 'space') ||
       phase === 'briefing' ||
-      (phase === 'title' && s.showcase !== 'rocket' && s.showcase !== 'satellite' && s.showcase !== 'jwst' && s.showcase !== 'voyager') ||
+      (phase === 'title' &&
+        s.showcase !== 'rocket' &&
+        s.showcase !== 'satellite' &&
+        s.showcase !== 'jwst' &&
+        s.showcase !== 'voyager' &&
+        s.showcase !== 'saturn-v' &&
+        s.showcase !== 'falcon-9') ||
       (phase === 'inspector' && s.showcase === 'lander');
 
     this.roverModel.group.visible =
@@ -1546,10 +1580,25 @@ export class SpaceSceneManager {
       this.solarSystem.group.position.set(0, 0, 0);
       this.starField.position.set(0, 0, 0);
       this.syncLaunchScene(s, dt, elapsedSec);
-    } else if (showSatelliteShowcase || showJwstShowcase || showVoyagerShowcase) {
+    } else if (
+      showSatelliteShowcase ||
+      showJwstShowcase ||
+      showVoyagerShowcase ||
+      showSaturnVShowcase ||
+      showFalcon9Showcase
+    ) {
       this.solarSystem.group.position.set(0, 0, 0);
       this.starField.position.set(0, 0, 0);
-      this.syncSpacecraftShowcaseScene(s, dt, showJwstShowcase ? 'jwst' : showVoyagerShowcase ? 'voyager' : 'satellite');
+      const kind = showSaturnVShowcase
+        ? 'saturn-v'
+        : showFalcon9Showcase
+          ? 'falcon-9'
+          : showJwstShowcase
+            ? 'jwst'
+            : showVoyagerShowcase
+              ? 'voyager'
+              : 'satellite';
+      this.syncSpacecraftShowcaseScene(s, dt, kind);
     } else if (showSpace) {
       this.syncSpaceScene(s, dt, elapsedSec);
     } else {
@@ -1634,7 +1683,7 @@ export class SpaceSceneManager {
   private syncSpacecraftShowcaseScene(
     s: SceneSimulationBridge,
     dt: number,
-    kind: 'satellite' | 'jwst' | 'voyager'
+    kind: 'satellite' | 'jwst' | 'voyager' | 'saturn-v' | 'falcon-9'
   ) {
     const isInspector = s.phase === 'inspector';
     (this.scene.background as THREE.Color).setHex(isInspector ? 0x050914 : 0x020617);
@@ -1662,16 +1711,34 @@ export class SpaceSceneManager {
     } else if (kind === 'jwst') {
       this.jwstModel.group.position.set(0, 0.2, 0);
       this.jwstModel.group.rotation.set(0.12, 0.45, 0);
-    } else {
+    } else if (kind === 'voyager') {
       this.voyagerModel.group.position.set(0, 0.2, 0);
       this.voyagerModel.group.rotation.set(0.16, -0.4, 0);
+    } else if (kind === 'saturn-v') {
+      this.saturnVModel.group.position.set(0, 0, 0);
+      this.saturnVModel.group.rotation.set(0, 0, 0);
+    } else if (kind === 'falcon-9') {
+      this.falcon9Model.group.position.set(0, 0, 0);
+      this.falcon9Model.group.rotation.set(0, 0, 0);
     }
 
-    const focusY = kind === 'satellite' ? 0 : 0.2;
+    const focusY =
+      kind === 'saturn-v' ? 12.5 : kind === 'falcon-9' ? 9.5 : kind === 'satellite' ? 0 : 0.2;
     if (isInspector) {
-      this.applyInspectorOrbitCamera(s, dt, 0, focusY, 0, 2.8, 32);
+      const minDist = kind === 'saturn-v' ? 6.0 : kind === 'falcon-9' ? 4.5 : 2.8;
+      const maxDist = kind === 'saturn-v' ? 65 : kind === 'falcon-9' ? 48 : 32;
+      this.applyInspectorOrbitCamera(s, dt, 0, focusY, 0, minDist, maxDist);
     } else if (s.phase === 'title' && !s.userOrbitActive) {
-      const dist = kind === 'satellite' ? 8.8 : kind === 'jwst' ? 10.8 : 11.2;
+      const dist =
+        kind === 'saturn-v'
+          ? 32.0
+          : kind === 'falcon-9'
+            ? 24.0
+            : kind === 'satellite'
+              ? 8.8
+              : kind === 'jwst'
+                ? 10.8
+                : 11.2;
       const a = this.titleOrbitAngle;
       const camX = Math.sin(a) * dist;
       const camY = focusY + 2.6 + Math.sin(a * 0.5) * 0.45;
@@ -1679,7 +1746,8 @@ export class SpaceSceneManager {
       const len = Math.max(0.01, Math.hypot(camX, camZ));
       const rightX = camZ / len;
       const rightZ = -camX / len;
-      const leftShift = kind === 'satellite' ? 1.8 : 2.1;
+      const leftShift =
+        kind === 'saturn-v' ? 3.5 : kind === 'falcon-9' ? 2.8 : kind === 'satellite' ? 1.8 : 2.1;
       this.camPosTarget.set(camX, camY, camZ);
       this.camLookTarget.set(-rightX * leftShift, focusY, -rightZ * leftShift);
       const rate = 1 - Math.exp(-4.2 * dt);
@@ -1687,7 +1755,10 @@ export class SpaceSceneManager {
       this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-4.8 * dt));
       this.camera.lookAt(this.camLookCurrent);
     } else {
-      const dist = Math.min(34, Math.max(3.2, s.orbitDistance));
+      const dist = Math.min(
+        kind === 'saturn-v' ? 65 : 34,
+        Math.max(3.2, s.orbitDistance)
+      );
       this.camPosTarget.set(
         Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
         focusY + Math.sin(s.orbitPitch) * dist,
@@ -2036,7 +2107,7 @@ export class SpaceSceneManager {
     // Flame + trench fire + deluge steam cloud + Transonic Mach Cone + Vacuum Plume Expansion
     const tliBurning = Boolean(L.orbitReached && s.leoTransfer?.tliBurnActive);
     const thrusting = (L.ignited && L.throttle > 0.05 && L.fuelPct > 0 && !L.orbitReached) || tliBurning;
-    const vacuumExpand = 1 + (1 - atmoDensityRatio) * 0.72;
+    const vacuumExpand = 1.0 + (1 - Math.max(0, atmoDensityRatio)) * 1.85;
     lc.flameGroup.visible = thrusting && !L.coreSeparated;
     lc.icpsFlame.visible = thrusting && L.coreSeparated;
     if (lc.icpsFlame.visible) {
@@ -2051,12 +2122,29 @@ export class SpaceSceneManager {
     lc.rocketEngineGlow.color.setHex(L.coreSeparated ? 0x38bdf8 : 0xffb347);
     lc.rocketEngineGlow.intensity = thrusting ? (L.coreSeparated ? 4.4 : 9.2 * L.throttle) : 0;
 
+    // RS-25 Shock Train / Mach Diamonds (Sea-Level Core Plume Shock Disks, fading out by 14 km)
+    lc.machDiamondsGroup.visible = thrusting && !L.coreSeparated && alt < 14;
+    if (lc.machDiamondsGroup.visible) {
+      const diamondFade = Math.max(0, 1 - alt / 14) * Math.min(1, L.throttle * 1.2);
+      lc.machDiamondsGroup.children.forEach((ch) => {
+        if ((ch as THREE.Mesh).material) {
+          ((ch as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.92 * diamondFade;
+        }
+      });
+    }
+
+    // Transonic Prandtl-Glauert Condensation Vapour Cone (Mach 0.92 to 1.18)
     const machNum = L.machNumber ?? 0;
-    lc.machCone.visible =
-      thrusting && !L.orbitReached && ((machNum >= 0.88 && machNum <= 1.45) || (alt >= 7 && alt <= 19));
+    const isTransonic =
+      thrusting && !L.orbitReached && ((machNum >= 0.92 && machNum <= 1.18) || (alt >= 9 && alt <= 15));
+    lc.machCone.visible = isTransonic;
     if (lc.machCone.visible) {
-      const pulse = 0.94 + Math.sin(elapsedSec * 28) * 0.07;
-      lc.machCone.scale.set(pulse, 1, pulse);
+      const transonicPeak = 1 - Math.min(1, Math.abs(machNum - 1.02) / 0.16);
+      const pulse = 0.94 + Math.sin(elapsedSec * 32) * 0.08;
+      lc.machCone.scale.set(pulse * (1 + transonicPeak * 0.25), 1, pulse * (1 + transonicPeak * 0.25));
+      if ((lc.machCone.material as THREE.MeshBasicMaterial)) {
+        (lc.machCone.material as THREE.MeshBasicMaterial).opacity = Math.max(0.12, 0.42 * transonicPeak);
+      }
     }
 
     if (thrusting) {
@@ -2084,6 +2172,26 @@ export class SpaceSceneManager {
             L.coreSeparated ? 0.86 : 0.7,
             L.coreSeparated ? 1.0 : 0.24
           );
+        }
+        // Cryogenic ice / frost shedding from core LOX/LH2 tank during liftoff (alt 0 to 0.22 km)
+        if (alt < 0.22 && alt > 0.01) {
+          for (let k = 0; k < 3; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = 1.1 + Math.random() * 0.25;
+            const frostH = liftY + 6 + Math.random() * 10;
+            this.emitParticle(
+              focusX + Math.cos(angle) * r,
+              frostH,
+              Math.sin(angle) * r,
+              Math.cos(angle) * (0.8 + Math.random() * 1.2),
+              -2.5 - Math.random() * 3.5,
+              Math.sin(angle) * (0.8 + Math.random() * 1.2),
+              0.45,
+              0.96,
+              0.98,
+              1.0
+            );
+          }
         }
         // Billowing white sound-suppression deluge steam from flame trench during ignition & liftoff
         if (alt < 0.85) {
@@ -2188,7 +2296,12 @@ export class SpaceSceneManager {
     }
 
     // Smooth camera tracking with continuous pad-to-ascent interpolation & camera mode support
-    const shakeAmp = thrusting && alt < 20 ? (alt < 2.2 ? 0.14 : 0.06) : 0;
+    const reducedMotionActive = this.prefersReducedMotion || Boolean((s as any).reducedMotion);
+    const maxAcousticShake = reducedMotionActive ? 0 : 0.06;
+    const shakeAmp =
+      thrusting && alt < 20 && !reducedMotionActive
+        ? Math.min(maxAcousticShake, (alt < 2.2 ? 0.06 : 0.035) * Math.min(1, L.throttle * 1.2))
+        : 0;
     const shakeX = shakeAmp > 0 ? Math.sin(elapsedSec * 52) * shakeAmp : 0;
     const shakeY = shakeAmp > 0 ? Math.cos(elapsedSec * 61) * shakeAmp * 0.7 : 0;
     if (s.userOrbitActive) {

@@ -24,7 +24,9 @@ export type VehicleShowcaseId =
   | 'voyager'
   | 'lander'
   | 'rover'
-  | 'outpost';
+  | 'outpost'
+  | 'saturn-v'
+  | 'falcon-9';
 
 export type PayloadId = 'heavy-shield' | 'oxygen-tanks' | 'solar-panels' | 'water-drill';
 

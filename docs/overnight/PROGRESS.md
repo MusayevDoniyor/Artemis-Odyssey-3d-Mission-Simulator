@@ -23,12 +23,12 @@
   - [x] 2.5 Orbit lines (J2000 Keplerian elements) and hover telemetry cards.
   - [x] 2.6 Verify and tag `overnight-phase-2-green`.
 
-- [ ] **PHASE 3: Rockets (launch vehicles), exact and detailed**
-  - [ ] 3.1 Research & source: SLS Block 1, Saturn V, Falcon 9 / Starship stack.
-  - [ ] 3.2 Authentic stage structure, separated moving nodes (fairings, LAS, SRBs, gimbal bells).
-  - [ ] 3.3 Flight aerodynamics: Mach-dependent drag, Max-Q altitude, real thrust/Isp profiles.
-  - [ ] 3.4 Visual effects: transparent hydrolox plumes + Mach diamonds, sooty SRB plumes, plume expansion in vacuum, condensation cone, pad smoke deluge.
-  - [ ] 3.5 Verify and tag `overnight-phase-3-green`.
+- [x] **PHASE 3: Rockets (launch vehicles), exact and detailed**
+  - [x] 3.1 Research & source: SLS Block 1, Saturn V, Falcon 9 / Starship stack.
+  - [x] 3.2 Authentic stage structure, separated moving nodes (fairings, LAS, SRBs, gimbal bells).
+  - [x] 3.3 Flight aerodynamics: Mach-dependent drag, Max-Q altitude, real thrust/Isp profiles.
+  - [x] 3.4 Visual effects: transparent hydrolox plumes + Mach diamonds, sooty SRB plumes, plume expansion in vacuum, condensation cone, pad smoke deluge.
+  - [x] 3.5 Verify and tag `overnight-phase-3-green`.
 
 - [ ] **PHASE 4: Real rocket sound (not synthetic slop)**
   - [ ] 4.1 Source authentic public-domain/CC0 rocket audio recordings (Apollo/Shuttle/NASA archives).

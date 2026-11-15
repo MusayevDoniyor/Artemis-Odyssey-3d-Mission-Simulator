@@ -72,3 +72,36 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **Atmosphere Shaders**: Rayleigh limb glow shaders tuned for Venus (dense runaway greenhouse haze), Mars (thin CO₂ limb), and gas giants. Earth features dynamic night lights masked by live solar direction (`uSunDir`).
   - **NASA Asteroid 101955 Bennu**: Sourced and loaded official NASA OSIRIS-REx 3D model (`public/assets/asteroids/bennu.glb`, 329 KB). Integrated into Keplerian orbit solver with real info card telemetry and NASA fact sheet source links.
   - **Atmospheric Meteors**: Added subtle shooting star entry streaks in Earth's orbital sky.
+
+---
+
+### [2026-11-16T03:40:00+05:00] Phase 3: Rockets / Launch Vehicles (SLS Block 1, Saturn V, Commercial)
+- **Verification Commands Executed**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 70 tests passing, 0 failing (duration 1252 ms).
+  - `npm run build`: dist/index.html (1.18 kB), dist/assets/index.css (114.63 kB), dist/assets/index.js (1627.64 kB).
+  - Headless browser verification (Puppeteer 1440x900):
+    - Title screen showcase selection for Saturn V and Falcon 9.
+    - Vehicle Inspector (Hardware Bay) navigation for all 9 vehicles, inspecting Saturn V (S-IC, S-II, S-IVB, IU/SLA, CSM, LES) and Falcon 9 (Stage 1, Octaweb, Grid Fins, Landing Legs, Interstage, Stage 2, Fairing).
+    - SLS pad ignition, liftoff, Max-Q transonic ascent, and continuous orbital parking insertion.
+    - Console errors: 0.
+- **Artifacts & Screens Generated**:
+  - Research docs:
+    - `docs/overnight/research/sls_block1.md`: SLS Block 1 flight vehicle specifications, stage timings, RS-25 propulsion, and SRB ballistic thrust curves.
+    - `docs/overnight/research/saturn_v.md`: Saturn V Apollo flight configuration, F-1 kerosene cluster, S-II/S-IVB cryogenics, and staging milestones.
+    - `docs/overnight/research/commercial_launcher.md`: Falcon 9 Full Thrust / Block 5 specifications, Octaweb, titanium grid fins, landing leg pneumatic geometry, and MVacD vacuum nozzle.
+  - Test suites:
+    - `src/sim/launch/launchVehicles.test.ts`: 4 verified aerospace tests covering SLS Block 1 liftoff TWR, Max-Q transonic pressure at 10-14 km, staging altitudes, and Saturn V / Falcon 9 catalog specifications.
+  - Screenshots:
+    - `docs/overnight/screens/phase3-title-saturn-v.png`: Saturn V on title screen 360-degree showcase orbit.
+    - `docs/overnight/screens/phase3-saturn-v-inspector.png`: Saturn V in Hardware Bay with 6 inspectable subsystems, educational levels, and propulsion metrics.
+    - `docs/overnight/screens/phase3-falcon-9-inspector.png`: Falcon 9 Full Thrust in Hardware Bay with titanium grid fins highlighted.
+    - `docs/overnight/screens/phase3-sls-launch-plume-mach.png`: SLS ascent showing RS-25 Mach diamonds, SRB flame, and liftoff cryogenic frost shedding.
+- **Features Implemented & Verified**:
+  - **Saturn V Integration**: Sourced official NASA 3D Resources model (`public/assets/rockets/saturn_v.glb`, 927 KB). Built `createSaturnVShowcase` with 6 interactive subsystems (`saturn-sic`, `saturn-sii`, `saturn-sivb`, `saturn-iu-sla`, `saturn-csm`, `saturn-les`).
+  - **Falcon 9 Full Thrust Integration**: Built high-fidelity `createFalcon9Showcase` with 6 subsystems (`falcon-stage1`, `falcon-grid-fins`, `falcon-landing-legs`, `falcon-interstage`, `falcon-stage2`, `falcon-fairing`).
+  - **Catalog & Propulsion Integration**: Added both vehicles to `HARDWARE_CATALOG`, `HARDWARE_ORDER`, `VEHICLE_CATALOG`, and `SPACECRAFT_CATALOG_SI`. Wired `getPropulsionProfileForPart` to compute authentic mass flow, exhaust velocity, and TWR for F-1, J-2, Merlin 1D, and MVacD engines.
+  - **Plume Aerodynamics & Vacuum Expansion**: Modeled altitude-dependent exhaust expansion where plume widens smoothly up to 2.85x in near-vacuum. Added 4-stage RS-25 shock train (Mach diamonds) at sea level, fading out cleanly below 14 km altitude.
+  - **Transonic Condensation Cone**: Modeled Prandtl-Glauert vapour cone dynamically rendered between Mach 0.92 and 1.18 (peaking at Mach 1.02).
+  - **Cryogenic Frost Shedding**: Emitted white tumbling ice flake particles falling from core tank during liftoff (0-220 m).
+  - **Acoustic Load Camera Shake**: Capped at 0.06 Three.js units and completely disabled if `prefersReducedMotion` or `reducedMotion` is true.

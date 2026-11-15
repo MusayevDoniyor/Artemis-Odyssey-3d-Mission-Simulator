@@ -1857,6 +1857,7 @@ export interface LaunchComplexHandles {
   abortTower: THREE.Group;
   lasFlame: THREE.Mesh;
   flameGroup: THREE.Group;
+  machDiamondsGroup: THREE.Group;
   trenchLight: THREE.PointLight;
   rocketEngineGlow: THREE.PointLight;
   padSpotlight: THREE.SpotLight;
@@ -2942,6 +2943,35 @@ export function createLaunchComplexAndSLS(
     srbInner.position.set(bx, -1.35, 0);
     flameGroup.add(srbInner);
   });
+
+  // RS-25 Shock Train / Mach Diamonds (Sea-Level Core Plume Shock Disks)
+  const machDiamondsGroup = new THREE.Group();
+  const outerDiamondMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.92,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const innerDiamondMat = new THREE.MeshBasicMaterial({
+    color: 0xfef9c3,
+    transparent: true,
+    opacity: 0.98,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  [0.85, 1.55, 2.3, 3.05].forEach((dy, idx) => {
+    const s = 1.0 - idx * 0.16;
+    const outerD = new THREE.Mesh(new THREE.OctahedronGeometry(0.18 * s, 0), outerDiamondMat);
+    outerD.scale.set(0.9, 1.8, 0.9);
+    outerD.position.set(0, -dy, 0);
+    const innerD = new THREE.Mesh(new THREE.OctahedronGeometry(0.09 * s, 0), innerDiamondMat);
+    innerD.scale.set(0.8, 1.5, 0.8);
+    innerD.position.set(0, -dy, 0);
+    machDiamondsGroup.add(outerD, innerD);
+  });
+  flameGroup.add(machDiamondsGroup);
+
   flameGroup.position.y = 0.6;
   flameGroup.visible = false;
   coreGroup.add(flameGroup);
@@ -2983,6 +3013,7 @@ export function createLaunchComplexAndSLS(
     abortTower,
     lasFlame,
     flameGroup,
+    machDiamondsGroup,
     trenchLight,
     rocketEngineGlow,
     padSpotlight,
@@ -3456,6 +3487,261 @@ export function createVoyagerModel(tex: ProceduralTextureSet): { group: THREE.Gr
   tagPart(scanGroup, 'voy-scan');
 
   group.add(dishGroup, busGroup, rtgGroup, scanGroup);
+  return { group };
+}
+
+export function createSaturnVShowcase(tex: ProceduralTextureSet): { group: THREE.Group } {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.32, metalness: 0.18 });
+  const blackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.42, metalness: 0.1 });
+  const darkInconel = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.82 });
+  const goldFoil = new THREE.MeshStandardMaterial({
+    color: 0xfacc15,
+    emissive: 0x713f12,
+    emissiveIntensity: 0.28,
+    metalness: 0.92,
+    roughness: 0.18,
+  });
+  const csmMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.22, metalness: 0.85 });
+  const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.38, metalness: 0.25 });
+
+  // 1. S-IC First Stage (Base to y = 10.5u · 42.1m)
+  const s1Group = new THREE.Group();
+  s1Group.position.set(0, 5.25, 0);
+
+  // S-IC Main Tank with Apollo roll pattern (alternating black/white quadrant sections)
+  const s1Body = new THREE.Mesh(new THREE.CylinderGeometry(1.26, 1.26, 9.8, 36), whiteMat);
+  s1Group.add(s1Body);
+
+  // Black roll pattern quadrants on lower S-IC
+  const rollGeo = new THREE.CylinderGeometry(1.265, 1.265, 4.2, 36, 1, false, 0, Math.PI / 2);
+  const q1 = new THREE.Mesh(rollGeo, blackMat);
+  q1.position.y = -2.2;
+  const q2 = q1.clone();
+  q2.rotation.y = Math.PI;
+  s1Group.add(q1, q2);
+
+  // 5 F-1 Engine Bells at base (y = -5.25 within group)
+  const f1Positions: Array<[number, number]> = [
+    [0, 0],
+    [0.72, 0.72],
+    [-0.72, 0.72],
+    [0.72, -0.72],
+    [-0.72, -0.72],
+  ];
+  f1Positions.forEach(([fx, fz]) => {
+    const bell = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.35, 20, 1, true), darkInconel);
+    bell.rotation.x = Math.PI;
+    bell.position.set(fx, -5.5, fz);
+    s1Group.add(bell);
+  });
+
+  // 4 Aerodynamic Stabilizing Fins
+  for (let f = 0; f < 4; f++) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 1.1), whiteMat);
+    const ang = (f * Math.PI) / 2;
+    fin.position.set(Math.cos(ang) * 1.65, -4.6, Math.sin(ang) * 1.65);
+    fin.rotation.y = -ang;
+    s1Group.add(fin);
+  }
+  tagPart(s1Group, 'saturn-sic');
+
+  // 2. S-II Second Stage (y = 10.5u to 16.7u · 24.8m)
+  const s2Group = new THREE.Group();
+  s2Group.position.set(0, 13.6, 0);
+  const s2Body = new THREE.Mesh(new THREE.CylinderGeometry(1.26, 1.26, 6.2, 36), whiteMat);
+  s2Group.add(s2Body);
+
+  // S-II Vertical Black Tracking Stripes
+  const s2StripeGeo = new THREE.CylinderGeometry(1.265, 1.265, 6.2, 36, 1, false, 0, Math.PI / 4);
+  const s2s1 = new THREE.Mesh(s2StripeGeo, blackMat);
+  const s2s2 = s2s1.clone();
+  s2s2.rotation.y = Math.PI;
+  s2Group.add(s2s1, s2s2);
+
+  // 5 J-2 Cryogenic Engine Bells inside interstage
+  const j2Positions: Array<[number, number]> = [
+    [0, 0],
+    [0.55, 0],
+    [-0.55, 0],
+    [0, 0.55],
+    [0, -0.55],
+  ];
+  j2Positions.forEach(([jx, jz]) => {
+    const bell = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.95, 18, 1, true), darkInconel);
+    bell.rotation.x = Math.PI;
+    bell.position.set(jx, -3.4, jz);
+    s2Group.add(bell);
+  });
+  tagPart(s2Group, 'saturn-sii');
+
+  // 3. S-IVB Third Stage (y = 16.7u to 21.15u · 17.8m)
+  const s3Group = new THREE.Group();
+  s3Group.position.set(0, 18.9, 0);
+  // Interstage conical taper from 2.52u to 1.65u
+  const s3Adapter = new THREE.Mesh(new THREE.CylinderGeometry(0.825, 1.26, 1.1, 36), whiteMat);
+  s3Adapter.position.y = -1.65;
+  // S-IVB Main Tank
+  const s3Body = new THREE.Mesh(new THREE.CylinderGeometry(0.825, 0.825, 3.35, 36), whiteMat);
+  s3Body.position.y = 0.55;
+  // Single J-2 engine bell
+  const j2Single = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.05, 18, 1, true), darkInconel);
+  j2Single.rotation.x = Math.PI;
+  j2Single.position.y = -2.1;
+  s3Group.add(s3Adapter, s3Body, j2Single);
+  tagPart(s3Group, 'saturn-sivb');
+
+  // 4. Instrument Unit & Spacecraft-LM Adapter (y = 21.15u to 23.5u · 9.4m)
+  const iuGroup = new THREE.Group();
+  iuGroup.position.set(0, 22.3, 0);
+  // Ring-shaped IBM LVDC Instrument Unit
+  const iuRing = new THREE.Mesh(new THREE.CylinderGeometry(0.83, 0.83, 0.35, 36), darkInconel);
+  iuRing.position.y = -1.0;
+  // Conical 4-petal SLA fairing
+  const slaCone = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.825, 1.95, 36), whiteMat);
+  slaCone.position.y = 0.15;
+  // Miniature Apollo Lunar Module inside SLA
+  const lmInside = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.45, 0.55), goldFoil);
+  lmInside.position.y = 0.1;
+  iuGroup.add(iuRing, slaCone, lmInside);
+  tagPart(iuGroup, 'saturn-iu-sla');
+
+  // 5. Apollo Command & Service Module (y = 23.5u to 26.25u · 11.0m)
+  const csmGroup = new THREE.Group();
+  csmGroup.position.set(0, 24.85, 0);
+  // Service Module cylinder
+  const smCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.49, 1.75, 32), csmMat);
+  smCyl.position.y = -0.45;
+  // SPS Engine Bell
+  const spsBell = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.75, 16, 1, true), darkInconel);
+  spsBell.rotation.x = Math.PI;
+  spsBell.position.y = -1.6;
+  // Command Module cone
+  const cmCone = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.49, 0.95, 32), csmMat);
+  cmCone.position.y = 0.9;
+  csmGroup.add(smCyl, spsBell, cmCone);
+  tagPart(csmGroup, 'saturn-csm');
+
+  // 6. Launch Escape System (y = 26.25u to 28.8u · 10.2m)
+  const lesGroup = new THREE.Group();
+  lesGroup.position.set(0, 27.5, 0);
+  // Open truss tower
+  const towerTruss = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 1.5, 8, 1, true), redMat);
+  towerTruss.position.y = -0.4;
+  // Solid escape motor body & canard nosecone
+  const lesMotor = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.05, 16), whiteMat);
+  lesMotor.position.y = 0.85;
+  const lesNose = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.35, 16), redMat);
+  lesNose.position.y = 1.5;
+  lesGroup.add(towerTruss, lesMotor, lesNose);
+  tagPart(lesGroup, 'saturn-les');
+
+  group.add(s1Group, s2Group, s3Group, iuGroup, csmGroup, lesGroup);
+  return { group };
+}
+
+export function createFalcon9Showcase(tex: ProceduralTextureSet): { group: THREE.Group } {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const whiteCore = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.2 });
+  const darkCarbon = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.45, metalness: 0.65 });
+  const titaniumMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.35, metalness: 0.92 });
+  const niobiumBell = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    emissive: 0x7c2d12,
+    emissiveIntensity: 0.28,
+    metalness: 0.88,
+    roughness: 0.25,
+  });
+  const merlinBell = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.85 });
+
+  // 1. Stage 1 Booster Core (y = 0 to 10.65u · 42.6m)
+  const s1Group = new THREE.Group();
+  s1Group.position.set(0, 5.32, 0);
+  const coreBody = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 10.65, 32), whiteCore);
+  s1Group.add(coreBody);
+
+  // Black raceway strip running along booster
+  const raceway = new THREE.Mesh(new THREE.BoxGeometry(0.06, 10.2, 0.08), darkCarbon);
+  raceway.position.set(0.46, 0, 0);
+  s1Group.add(raceway);
+
+  // Octaweb: 9 Merlin 1D Engine Bells (1 center + 8 ring at r = 0.26u)
+  const octawebPositions: Array<[number, number]> = [[0, 0]];
+  for (let m = 0; m < 8; m++) {
+    const rad = (m * Math.PI) / 4;
+    octawebPositions.push([Math.cos(rad) * 0.26, Math.sin(rad) * 0.26]);
+  }
+  octawebPositions.forEach(([mx, mz]) => {
+    const bell = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 14, 1, true), merlinBell);
+    bell.rotation.x = Math.PI;
+    bell.position.set(mx, -5.5, mz);
+    s1Group.add(bell);
+  });
+  tagPart(s1Group, 'falcon-stage1');
+
+  // 2. 4× Titanium Hypersonic Grid Fins (near top of Stage 1 at y = 10.2u)
+  const gridGroup = new THREE.Group();
+  gridGroup.position.set(0, 10.2, 0);
+  for (let g = 0; g < 4; g++) {
+    const finP = new THREE.Group();
+    const ang = (g * Math.PI) / 2;
+    finP.rotation.y = ang;
+    const finMesh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.42, 0.32), titaniumMat);
+    finMesh.position.set(0.58, 0, 0);
+    finP.add(finMesh);
+    gridGroup.add(finP);
+  }
+  tagPart(gridGroup, 'falcon-grid-fins');
+
+  // 3. 4× Carbon Fiber Landing Legs (folded along base of Stage 1)
+  const legsGroup = new THREE.Group();
+  legsGroup.position.set(0, 1.6, 0);
+  for (let l = 0; l < 4; l++) {
+    const legP = new THREE.Group();
+    const ang = (l * Math.PI) / 2 + Math.PI / 4;
+    legP.rotation.y = ang;
+    const legA = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.8, 8), darkCarbon);
+    legA.position.set(0.48, 0, 0);
+    legP.add(legA);
+    legsGroup.add(legP);
+  }
+  tagPart(legsGroup, 'falcon-landing-legs');
+
+  // 4. Carbon Composite Interstage (y = 10.65u to 12.65u · 8.0m)
+  const interGroup = new THREE.Group();
+  interGroup.position.set(0, 11.65, 0);
+  const interBody = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 2.0, 32), darkCarbon);
+  interGroup.add(interBody);
+  tagPart(interGroup, 'falcon-interstage');
+
+  // 5. Stage 2 & Merlin 1D Vacuum Engine (y = 12.65u to 15.8u · 12.6m)
+  const s2Group = new THREE.Group();
+  s2Group.position.set(0, 14.2, 0);
+  const s2Tank = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 3.15, 32), whiteCore);
+  // Large Vacuum Niobium Nozzle
+  const mvacBell = new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.25, 24, 1, true), niobiumBell);
+  mvacBell.rotation.x = Math.PI;
+  mvacBell.position.y = -2.1;
+  s2Group.add(s2Tank, mvacBell);
+  tagPart(s2Group, 'falcon-stage2');
+
+  // 6. 5.2m Clamshell Payload Fairing (y = 15.8u to 19.1u · 13.1m)
+  const fairingGroup = new THREE.Group();
+  fairingGroup.position.set(0, 17.45, 0);
+  // Split Left Half
+  const fairingGeoLeft = new THREE.CylinderGeometry(0.1, 0.65, 3.3, 24, 1, false, 0, Math.PI);
+  const fLeft = new THREE.Mesh(fairingGeoLeft, whiteCore);
+  // Split Right Half
+  const fairingGeoRight = new THREE.CylinderGeometry(0.1, 0.65, 3.3, 24, 1, false, Math.PI, Math.PI);
+  const fRight = new THREE.Mesh(fairingGeoRight, whiteCore);
+  fairingGroup.add(fLeft, fRight);
+  tagPart(fairingGroup, 'falcon-fairing');
+
+  group.add(s1Group, gridGroup, legsGroup, interGroup, s2Group, fairingGroup);
   return { group };
 }
 

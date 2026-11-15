@@ -863,6 +863,92 @@ export const VEHICLE_CATALOG: Partial<
       },
     ],
   },
+  'saturn-v': {
+    title: 'Apollo Saturn V Launch Vehicle',
+    subtitle: '110.6 m · 2,970 t · 5× F-1 + 5× J-2 + 1× J-2',
+    summary: 'NASA Moon rocket that sent Apollo 8 through 17 crews into translunar injection.',
+    parts: [
+      {
+        id: 'saturn-sic',
+        name: 'S-IC First Stage & 5× F-1s',
+        role: '34.5 MN Pad Acceleration',
+        fact: 'Five Rocketdyne F-1 engines burn 15 tons of RP-1 kerosene and LOX every second.',
+      },
+      {
+        id: 'saturn-sii',
+        name: 'S-II Second Stage & 5× J-2s',
+        role: 'Cryogenic Upper Ascent',
+        fact: 'Burns liquid hydrogen at 421s vacuum Isp to climb to 175 km altitude.',
+      },
+      {
+        id: 'saturn-sivb',
+        name: 'S-IVB Third Stage & 1× J-2',
+        role: 'Restartable TLI Burn',
+        fact: 'Reignites in Earth orbit for 5.8 minutes to push Apollo to 10.8 km/s lunar escape speed.',
+      },
+      {
+        id: 'saturn-iu-sla',
+        name: 'Instrument Unit & SLA',
+        role: 'LVDC Guidance & LM Bay',
+        fact: 'IBM triple-redundant LVDC guidance computer plus 4 hinged petals housing the Lunar Module.',
+      },
+      {
+        id: 'saturn-csm',
+        name: 'Apollo Command & Service Module',
+        role: 'Crew Habitat & SPS Engine',
+        fact: 'Carried 3 astronauts and fired hypergolic SPS engine for lunar capture and Earth return.',
+      },
+      {
+        id: 'saturn-les',
+        name: 'Launch Escape Tower',
+        role: 'Pad & In-Flight Abort',
+        fact: '667 kN solid rocket motor capable of rocketing the crew capsule clear at 15g.',
+      },
+    ],
+  },
+  'falcon-9': {
+    title: 'Falcon 9 Full Thrust Launch System',
+    subtitle: '70.0 m · 549 t · Octaweb 9× Merlin 1D',
+    summary: 'Commercial orbital launcher with propulsive vertical booster recovery.',
+    parts: [
+      {
+        id: 'falcon-stage1',
+        name: 'Booster Core & 9× Merlin 1D',
+        role: 'Reusable Booster Stage',
+        fact: 'Octaweb engine cluster throttling from 40% to 100% for pinpoint vertical landing.',
+      },
+      {
+        id: 'falcon-grid-fins',
+        name: '4× Titanium Grid Fins',
+        role: 'Hypersonic Re-entry Steering',
+        fact: 'Single forged titanium grid fins steering the booster through Mach 4.5 entry heating.',
+      },
+      {
+        id: 'falcon-landing-legs',
+        name: '4× Carbon Fiber Legs',
+        role: 'Vertical Touchdown Gear',
+        fact: '18m stance pneumatic deployable legs with aluminum honeycomb crush cores.',
+      },
+      {
+        id: 'falcon-interstage',
+        name: 'Composite Interstage',
+        role: 'Pneumatic Separation',
+        fact: 'Carbon composite structure with four debris-free pneumatic pushers.',
+      },
+      {
+        id: 'falcon-stage2',
+        name: 'Stage 2 & Merlin Vacuum',
+        role: 'Orbital Insertion',
+        fact: 'Single MVacD engine with 165:1 radiation-cooled niobium nozzle yielding 348s Isp.',
+      },
+      {
+        id: 'falcon-fairing',
+        name: '5.2m Clamshell Fairing',
+        role: 'Payload Protection',
+        fact: 'Split carbon composite fairing halves with cold-gas thrusters and parafoil recovery.',
+      },
+    ],
+  },
 };
 
 export const OSDR_FACTS = [

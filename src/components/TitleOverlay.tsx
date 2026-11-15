@@ -72,6 +72,8 @@ interface TitleOverlayProps {
 const SHOWCASE_OPTIONS: Array<{ id: VehicleShowcaseId; label: string }> = [
   { id: 'outpost', label: 'Moon Base' },
   { id: 'rocket', label: 'SLS Rocket' },
+  { id: 'saturn-v', label: 'Saturn V' },
+  { id: 'falcon-9', label: 'Falcon 9' },
   { id: 'satellite', label: 'HERMES Sat' },
   { id: 'jwst', label: 'JWST' },
   { id: 'voyager', label: 'Voyager' },

@@ -54,8 +54,8 @@ import {
   stepRoverPhysics,
 } from './physics';
 
-test('hardware catalog includes all 7 vehicles with parts, explode axes, and connections', () => {
-  assert.equal(HARDWARE_ORDER.length, 7);
+test('hardware catalog includes all vehicles with parts, explode axes, and connections', () => {
+  assert.equal(HARDWARE_ORDER.length, 9);
   for (const id of HARDWARE_ORDER) {
     const spec = HARDWARE_CATALOG[id];
     assert.ok(spec, `Missing hardware spec for ${id}`);

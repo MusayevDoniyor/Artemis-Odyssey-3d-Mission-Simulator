@@ -4,6 +4,28 @@ This file records all architectural, engineering, and asset decisions made auton
 
 ---
 
+## Decision D3: Launch Vehicles Architecture & Plume Aerodynamics (Phase 3)
+- **Date**: 2026-11-16T03:38:00+05:00
+- **Decision**:
+  1. **Historical & Commercial Launch Vehicles**:
+     - Saturn V: Sourced official NASA 3D Resources Public Domain model (`saturn_v.glb`, 927 KB). Built `createSaturnVShowcase` dividing the stack into 6 inspectable subsystems (`saturn-sic`, `saturn-sii`, `saturn-sivb`, `saturn-iu-sla`, `saturn-csm`, `saturn-les`) with authentic roll patterns, 5 F-1 engines, 5 J-2 engines, IBM LVDC Instrument Unit, Lunar Module SLA bay, Apollo CSM, and Launch Escape System.
+     - Falcon 9: Built high-detail `createFalcon9Showcase` with 6 inspectable subsystems (`falcon-stage1`, `falcon-grid-fins`, `falcon-landing-legs`, `falcon-interstage`, `falcon-stage2`, `falcon-fairing`) with 9 Merlin 1D Octaweb cluster, single-forged titanium grid fins, 4 deployable carbon-fiber legs, 165:1 radiatively cooled niobium MVacD engine, and 5.2 m clamshell fairing halves.
+     - Added both vehicles to `HARDWARE_CATALOG`, `HARDWARE_ORDER`, `VEHICLE_CATALOG`, and `SPACECRAFT_CATALOG_SI` with complete aerospace specs, 3-level educational copy, interactive quizzes, and explode vectors.
+  2. **Plume Aerodynamics & Vacuum Expansion**:
+     - Modeled atmospheric pressure expansion: sea level plume is compressed/columnar, expanding smoothly up to 2.85x radial width in vacuum ($p_{amb} \approx 0$) as atmospheric density drops between 0 km and 165 km.
+     - Added 4-stage shock diamond train (Mach diamonds) in the central RS-25 hydrolox core plume at sea level, smoothly fading out as ambient pressure drops below 14 km altitude.
+  3. **Transonic Condensation Cone**:
+     - Transonic Prandtl-Glauert vapour cone dynamically rendered between Mach 0.92 and 1.18 (peaking at Mach 1.02), responding to live airspeed and condensation opacity.
+  4. **Pad Release & Liftoff Cryogenic Shedding**:
+     - Emitted fluttering white ice/frost flake particles falling from the cryogenic core tank during liftoff (alt 0 to 220 m).
+  5. **Acoustic Camera Shake**:
+     - Hard-capped at 0.06 Three.js units, scaled with engine throttle and altitude, and completely disabled (`0`) if `prefersReducedMotion` or `reducedMotion` is active.
+- **Why**: Implements Phase 3 requirements, giving players deep engineering insight into Apollo and commercial heavy lift architectures alongside SLS Block 1, while grounding launch visual effects in authentic aerodynamic physics.
+- **Alternatives Considered**:
+  - Full procedural generation only for Saturn V (rejected: having NASA's authentic Public Domain CAD geometry ensures historically accurate scale and silhouette).
+  - Unbounded camera shake (rejected: violates accessibility guidelines and causes visual disorientation).
+
+
 ## Decision D2: Real Planetary Textures, Ring Systems, Atmosphere Shaders & Asteroid Bennu (Phase 2)
 - **Date**: 2026-11-16T03:05:00+05:00
 - **Decision**:

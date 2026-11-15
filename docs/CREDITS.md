@@ -56,3 +56,7 @@ The following fonts are bundled locally under the SIL Open Font License 1.1 (OFL
 - **NASA LRO & MGS Planetary Datasets (Public Domain)**:
   - Moon LROC WAC mosaic and LOLA altimetry (NASA GSFC / Arizona State University).
   - Mars MGS MOC / Viking MDIM 2.1 mosaic (NASA JPL / Malin Space Science Systems).
+- **NASA 3D Resources — Apollo Saturn V Launch Vehicle (Public Domain)**:
+  - 3D model of the Apollo Saturn V launch vehicle.
+  - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Saturn%20V)
+  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
