@@ -1,3 +1,4 @@
+import { Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BriefingOverlay } from './components/BriefingOverlay';
 import { CalmFactToast } from './components/CalmFactToast';
@@ -572,16 +573,21 @@ export default function App() {
   useEffect(() => {
     const unsub = soundSynth.subscribeMusicState(setMusicState);
     const unlock = () => soundSynth.unlockMusicOnGesture();
-    window.addEventListener('pointerdown', unlock, { passive: true });
-    window.addEventListener('click', unlock, { passive: true });
-    window.addEventListener('touchstart', unlock, { passive: true });
-    window.addEventListener('keydown', unlock, { passive: true });
+    const opts = { capture: true, passive: true } as const;
+    window.addEventListener('pointerdown', unlock, opts);
+    window.addEventListener('pointerup', unlock, opts);
+    window.addEventListener('click', unlock, opts);
+    window.addEventListener('touchstart', unlock, opts);
+    window.addEventListener('touchend', unlock, opts);
+    window.addEventListener('keydown', unlock, opts);
     return () => {
       unsub();
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('pointerup', unlock, true);
+      window.removeEventListener('click', unlock, true);
+      window.removeEventListener('touchstart', unlock, true);
+      window.removeEventListener('touchend', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
     };
   }, []);
 
@@ -2401,6 +2407,9 @@ export default function App() {
           onUpdateAudio={handleUpdateAudio}
           onToggleMusic={() => {
             soundSynth.unlockMusicOnGesture();
+            if (musicState.audioBlocked && musicState.musicEnabled) {
+              return;
+            }
             soundSynth.setMusicEnabled(!musicState.musicEnabled);
           }}
           onChangeMusicVolume={(v) => {
@@ -2920,6 +2929,9 @@ export default function App() {
         onUpdateAudio={handleUpdateAudio}
         onToggleMusic={() => {
           soundSynth.unlockMusicOnGesture();
+          if (musicState.audioBlocked && musicState.musicEnabled) {
+            return;
+          }
           soundSynth.setMusicEnabled(!musicState.musicEnabled);
         }}
         onChangeMusicVolume={(v) => {
@@ -3203,6 +3215,22 @@ export default function App() {
         carryover={carryoverUi}
         onClose={() => setFieldNotebookOpen(false)}
       />
+
+      {phase !== 'title' &&
+        phase !== 'space' &&
+        musicState.audioBlocked &&
+        musicState.musicEnabled &&
+        !muted && (
+          <button
+            type="button"
+            data-testid="global-enable-audio-btn"
+            onClick={() => soundSynth.unlockMusicOnGesture()}
+            className="hud-cta-cyan fixed bottom-4 left-4 z-50 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-hud text-xs font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(34,211,238,0.45)]"
+          >
+            <Volume2 className="h-4 w-4" />
+            Enable Audio
+          </button>
+        )}
     </div>
   );
 }

@@ -955,7 +955,7 @@ export function stepSpaceFlightPhysics(
   const tangVelTarget = Math.abs(s.vx * -dz + s.vz * dx) / relDist;
 
   // Compute physical SI radius around dominant body
-  let domRadiusPhysM = SI.AU_M;
+  let domRadiusPhysM: number = SI.AU_M;
   if (solarScaleMode === 'local') {
     domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI[domId].meanRadiusM + 120_000, domDist * 1_000_000);
   } else if (solarScaleMode === 'scientific') {

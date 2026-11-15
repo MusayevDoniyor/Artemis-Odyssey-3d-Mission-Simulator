@@ -17,21 +17,21 @@ const TRACK_URLS: Record<MusicTrackId, string> = {
 };
 
 const MENU_CHORDS: number[][] = [
-  [73.42, 110.0, 146.83, 174.61, 220.0, 261.63], // Dm9 warm lunar horizon
-  [58.27, 116.54, 146.83, 174.61, 220.0, 293.66], // Bbmaj7#11 cinematic lift
-  [65.41, 98.0, 130.81, 164.81, 196.0, 246.94], // Cmaj9 open orbit
-  [55.0, 110.0, 130.81, 164.81, 196.0, 246.94], // Am9 drift
+  [146.83, 220.0, 261.63, 329.63, 349.23, 440.0], // Dm9 warm lunar horizon
+  [116.54, 174.61, 220.0, 293.66, 329.63, 440.0], // Bbmaj7#11 cinematic lift
+  [130.81, 196.0, 246.94, 293.66, 329.63, 440.0], // Cmaj9 open orbit
+  [110.0, 164.81, 220.0, 246.94, 293.66, 392.0], // Am11 drift
 ];
 
 const SPACE_CHORDS: number[][] = [
-  [55.0, 110.0, 164.81, 196.0, 246.94, 329.63], // Am9 deep cosmos
-  [43.65, 87.31, 130.81, 174.61, 220.0, 261.63], // Fmaj7 expanse
-  [65.41, 98.0, 146.83, 196.0, 246.94, 293.66], // G6/9 solar wind
-  [73.42, 110.0, 164.81, 220.0, 261.63, 329.63], // Dm9 / A celestial
+  [110.0, 164.81, 246.94, 329.63, 392.0, 493.88], // Am9 deep cosmos
+  [174.61, 220.0, 261.63, 329.63, 440.0, 523.25], // Fmaj7 expanse
+  [130.81, 196.0, 293.66, 329.63, 392.0, 493.88], // G6/9 solar wind
+  [146.83, 220.0, 261.63, 329.63, 440.0, 523.25], // Dm9 / A celestial
 ];
 
-const CHIME_FREQS_MENU = [293.66, 329.63, 349.23, 440.0, 523.25, 587.33];
-const CHIME_FREQS_SPACE = [329.63, 392.0, 440.0, 493.88, 523.25, 659.25];
+const CHIME_FREQS_MENU = [440.0, 523.25, 587.33, 659.25, 698.46, 880.0];
+const CHIME_FREQS_SPACE = [392.0, 493.88, 523.25, 587.33, 659.25, 783.99];
 
 function loadMusicPrefs(): { musicEnabled: boolean; musicVolume: number } {
   try {
@@ -96,6 +96,7 @@ class SoundSynth {
   private padGain: GainNode | null = null;
   private padFilter: BiquadFilterNode | null = null;
   private padOscs: OscillatorNode[] = [];
+  private padSubOsc: OscillatorNode | null = null;
   private padLfo: OscillatorNode | null = null;
   private padEvolutionTimerId: number | null = null;
   private padChordIndex = 0;
@@ -153,7 +154,12 @@ class SoundSynth {
             this.emitMusicState();
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          if (this.desiredTrack && this.musicState.musicEnabled && !this.settings.muted) {
+            this.musicState.audioBlocked = true;
+            this.emitMusicState();
+          }
+        });
     }
 
     return this.ctx.state === 'running';
@@ -178,9 +184,9 @@ class SoundSynth {
 
   setMusicModeForPhase(phase: GamePhase) {
     const nextTrack: MusicTrackId | null =
-      phase === 'title' || phase === 'briefing' || phase === 'inspector'
+      phase === 'title' || phase === 'briefing' || phase === 'inspector' || phase === 'victory'
         ? 'menu'
-        : phase === 'space'
+        : phase === 'space' || phase === 'launch' || phase === 'landing' || phase === 'rover'
           ? 'space'
           : null;
     if (this.desiredTrack === nextTrack && this.musicState.activeTrack === nextTrack) {
@@ -188,6 +194,9 @@ class SoundSynth {
     }
     this.desiredTrack = nextTrack;
     this.musicState.activeTrack = nextTrack;
+    if (nextTrack) {
+      this.retunePadToTrack(nextTrack);
+    }
     this.syncMusicPlayback();
     this.emitMusicState();
   }
@@ -231,29 +240,71 @@ class SoundSynth {
     return Math.max(0, Math.min(1, this.musicState.musicVolume * this.settings.masterVolume));
   }
 
+  private retunePadToTrack(track: MusicTrackId) {
+    if (!this.ctx || !this.padGain || this.padOscs.length === 0) return;
+    const chords = track === 'space' ? SPACE_CHORDS : MENU_CHORDS;
+    const chord = chords[this.padChordIndex % chords.length];
+    const now = this.ctx.currentTime;
+    this.padOscs.forEach((osc, idx) => {
+      const freq = chord[idx] ?? chord[idx % chord.length];
+      osc.frequency.setTargetAtTime(freq, now, 0.9);
+    });
+    if (this.padSubOsc) {
+      this.padSubOsc.frequency.setTargetAtTime(chord[0] * 0.5, now, 0.9);
+    }
+  }
+
+  private playAmbientChime(track: MusicTrackId) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    if (this.settings.muted || !this.musicState.musicEnabled) return;
+    const now = this.ctx.currentTime;
+    const chimes = track === 'space' ? CHIME_FREQS_SPACE : CHIME_FREQS_MENU;
+    const chimeFreq = chimes[(this.padChordIndex * 2 + Math.floor(Math.random() * 2)) % chimes.length];
+    const chimeOsc = this.ctx.createOscillator();
+    const chimeGain = this.ctx.createGain();
+    chimeOsc.type = 'sine';
+    chimeOsc.frequency.setValueAtTime(chimeFreq, now);
+    const chimePeak = Math.max(
+      0.008,
+      Math.min(0.14, this.musicState.musicVolume * this.settings.masterVolume * 0.24)
+    );
+    chimeGain.gain.setValueAtTime(0.0001, now);
+    chimeGain.gain.linearRampToValueAtTime(chimePeak, now + 0.28);
+    chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
+    chimeOsc.connect(chimeGain);
+    if (this.padFilter) {
+      chimeGain.connect(this.padFilter);
+    } else {
+      chimeGain.connect(this.ctx.destination);
+    }
+    chimeOsc.start(now);
+    chimeOsc.stop(now + 3.3);
+  }
+
   private ensureFallbackPad(): boolean {
     if (!this.ctx || this.ctx.state !== 'running') return false;
     if (this.padGain) return true;
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 520;
-    filter.Q.value = 0.85;
+    filter.frequency.value = this.desiredTrack === 'space' ? 1550 : 1250;
+    filter.Q.value = 0.7;
 
     // Gentle LFO sweeping the filter cutoff for an organic breathing cosmic synth
     const lfo = this.ctx.createOscillator();
     const lfoDepth = this.ctx.createGain();
     lfo.type = 'sine';
-    lfo.frequency.value = 0.08;
-    lfoDepth.gain.value = 180;
+    lfo.frequency.value = 0.09;
+    lfoDepth.gain.value = 340;
     lfo.connect(lfoDepth);
     lfoDepth.connect(filter.frequency);
     lfo.start();
     this.padLfo = lfo;
 
     const comp = this.ctx.createDynamicsCompressor();
-    comp.threshold.value = -16;
-    comp.ratio.value = 3;
+    comp.threshold.value = -14;
+    comp.knee.value = 12;
+    comp.ratio.value = 2.5;
 
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
@@ -264,14 +315,25 @@ class SoundSynth {
       const osc = this.ctx!.createOscillator();
       osc.type = idx < 2 ? 'sine' : idx % 2 === 0 ? 'triangle' : 'sine';
       osc.frequency.value = f;
-      osc.detune.value = (idx - 2.5) * 5.2;
+      osc.detune.value = (idx - 2.5) * 6.0;
       const voiceGain = this.ctx!.createGain();
-      voiceGain.gain.value = idx === 0 ? 0.34 : idx === 1 ? 0.24 : idx < 4 ? 0.16 : 0.09;
+      voiceGain.gain.value = idx === 0 ? 0.24 : idx === 1 ? 0.2 : idx < 4 ? 0.17 : 0.13;
       osc.connect(voiceGain);
       voiceGain.connect(filter);
       osc.start();
       oscs.push(osc);
     });
+
+    // Warm sub-octave foundation voice
+    const subOsc = this.ctx.createOscillator();
+    subOsc.type = 'sine';
+    subOsc.frequency.value = initialChord[0] * 0.5;
+    const subGain = this.ctx.createGain();
+    subGain.gain.value = 0.22;
+    subOsc.connect(subGain);
+    subGain.connect(filter);
+    subOsc.start();
+    this.padSubOsc = subOsc;
 
     filter.connect(comp);
     comp.connect(gain);
@@ -283,7 +345,11 @@ class SoundSynth {
     if (this.padEvolutionTimerId === null && typeof window !== 'undefined') {
       this.padEvolutionTimerId = window.setInterval(() => {
         this.evolveAmbientPadStep();
-      }, 4200);
+      }, 3600);
+    }
+
+    if (this.desiredTrack) {
+      this.playAmbientChime(this.desiredTrack);
     }
     return true;
   }
@@ -295,7 +361,7 @@ class SoundSynth {
       Boolean(track) &&
       this.musicState.musicEnabled &&
       !this.settings.muted &&
-      this.trackAvailable[track!] === false;
+      this.trackAvailable[track!] !== true;
     if (!active) return;
 
     this.padChordIndex = (this.padChordIndex + 1) % MENU_CHORDS.length;
@@ -304,31 +370,14 @@ class SoundSynth {
     const now = this.ctx.currentTime;
     this.padOscs.forEach((osc, idx) => {
       const freq = nextChord[idx] ?? nextChord[idx % nextChord.length];
-      osc.frequency.setTargetAtTime(freq, now, 1.4);
+      osc.frequency.setTargetAtTime(freq, now, 1.1);
     });
+    if (this.padSubOsc) {
+      this.padSubOsc.frequency.setTargetAtTime(nextChord[0] * 0.5, now, 1.1);
+    }
 
     // Subtle crystalline space shimmer note on every harmonic shift
-    const chimes = track === 'space' ? CHIME_FREQS_SPACE : CHIME_FREQS_MENU;
-    const chimeFreq = chimes[(this.padChordIndex * 2 + Math.floor(Math.random() * 2)) % chimes.length];
-    const chimeOsc = this.ctx.createOscillator();
-    const chimeGain = this.ctx.createGain();
-    chimeOsc.type = 'sine';
-    chimeOsc.frequency.setValueAtTime(chimeFreq, now);
-    const chimePeak = Math.max(
-      0.004,
-      Math.min(0.08, this.musicState.musicVolume * this.settings.masterVolume * 0.14)
-    );
-    chimeGain.gain.setValueAtTime(0.0001, now);
-    chimeGain.gain.linearRampToValueAtTime(chimePeak, now + 0.35);
-    chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.4);
-    chimeOsc.connect(chimeGain);
-    if (this.padFilter) {
-      chimeGain.connect(this.padFilter);
-    } else {
-      chimeGain.connect(this.ctx.destination);
-    }
-    chimeOsc.start(now);
-    chimeOsc.stop(now + 3.5);
+    this.playAmbientChime(track!);
   }
 
   private syncFallbackPadGain() {
@@ -338,16 +387,16 @@ class SoundSynth {
       Boolean(track) &&
       this.musicState.musicEnabled &&
       !this.settings.muted &&
-      this.trackAvailable[track!] === false;
+      this.trackAvailable[track!] !== true;
 
     if (this.padFilter && track) {
-      const targetFreq = track === 'space' ? 640 : 520;
+      const targetFreq = track === 'space' ? 1550 : 1250;
       this.padFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.7);
     }
     const targetVol = usePad
-      ? Math.max(0, Math.min(0.45, this.musicState.musicVolume * this.settings.masterVolume * 0.55))
+      ? Math.max(0, Math.min(0.65, this.musicState.musicVolume * this.settings.masterVolume * 0.78))
       : 0;
-    this.padGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.5);
+    this.padGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.35);
     void this.padLfo;
   }
 
@@ -362,15 +411,9 @@ class SoundSynth {
         const ctype = (res.headers.get('content-type') || '').toLowerCase();
         const valid = res.ok && (ctype.startsWith('audio/') || ctype === 'application/octet-stream');
         this.trackAvailable[track] = valid;
-        if (!valid) {
-          this.musicState.usingFallbackPad = true;
-          this.syncMusicPlayback();
-          this.emitMusicState();
-        } else {
-          this.musicState.usingFallbackPad = false;
-          this.syncMusicPlayback();
-          this.emitMusicState();
-        }
+        this.musicState.usingFallbackPad = !valid;
+        this.syncMusicPlayback();
+        this.emitMusicState();
       })
       .catch(() => {
         this.trackAvailable[track] = false;
@@ -462,13 +505,17 @@ class SoundSynth {
               }
             });
         }
-      } else if (this.trackAvailable[track] === false) {
+      } else {
+        // Immediately use procedural Web Audio synth while MP3 is absent or being verified
         this.musicState.usingFallbackPad = true;
         if (this.ctx && this.ctx.state === 'running') {
-          this.musicState.audioBlocked = false;
+          if (this.musicState.audioBlocked) {
+            this.musicState.audioBlocked = false;
+            this.emitMusicState();
+          }
           this.ensureFallbackPad();
         } else {
-          // Prompt user with ENABLE AUDIO button until browser gesture unlocks AudioContext
+          // Prompt user with ENABLE AUDIO button immediately until a user gesture unlocks AudioContext
           if (!this.musicState.audioBlocked) {
             this.musicState.audioBlocked = true;
             this.emitMusicState();
