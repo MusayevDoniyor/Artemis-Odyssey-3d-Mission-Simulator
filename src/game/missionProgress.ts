@@ -95,7 +95,11 @@ export function getSpaceMissionProgress(
 
   const captureRadius =
     space.targetId === 'relay-orbit'
-      ? 5.5
+      ? solarScaleMode === 'scientific'
+        ? 1.1
+        : solarScaleMode === 'local'
+          ? 5.2
+          : 2.8
       : liveTarget.radius + (space.targetId === 'mars' ? 5.2 : 4.8);
 
   const rawDist = Math.hypot(liveTarget.x - space.shipX, liveTarget.z - space.shipZ);

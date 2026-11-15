@@ -17,7 +17,7 @@ import { SpaceFlightHUD } from './components/SpaceFlightHUD';
 import { TitleOverlay } from './components/TitleOverlay';
 import { VehicleInspectorOverlay } from './components/VehicleInspectorOverlay';
 import { WorldTargetPins } from './components/WorldTargetPins';
-import { soundSynth } from './game/audio';
+import { soundSynth, type MusicState } from './game/audio';
 import {
   CAMPAIGN_ANOMALIES,
   CAMPAIGN_MISSIONS,
@@ -88,7 +88,14 @@ import {
   stepMarsEdlSequence,
   stepUnstowSequence,
 } from './game/sequences';
-import { SOLAR_SYSTEM_BODIES, type SolarScaleMode } from './game/solarSystemData';
+import type { HorizonsEphemerisResponse } from './game/jplHorizons';
+import type { DataProvenance } from './game/planetaryCatalog';
+import {
+  SOLAR_SYSTEM_BODIES,
+  type SolarScaleMode,
+  reprojectShipBetweenScaleModes,
+  setActiveHorizonsVectors,
+} from './game/solarSystemData';
 import type {
   AudioSettings,
   CameraMode,
@@ -121,6 +128,7 @@ import type {
   RoverDriveMode,
   RoverObjective,
   RoverState,
+  SpaceCameraMode,
   SpaceFlightState,
   SpaceTargetId,
   SurfacePlanet,
@@ -240,6 +248,8 @@ export default function App() {
     solarScaleMode: 'exploration',
     solarEpochYears: 0,
     focusedSolarBodyId: null,
+    spaceCameraMode: 'track',
+    localAnchorId: 'earth',
     quality: 'high',
   });
 
@@ -316,6 +326,8 @@ export default function App() {
   );
 
   const [solarScaleMode, setSolarScaleMode] = useState<SolarScaleMode>('exploration');
+  const [spaceCameraMode, setSpaceCameraMode] = useState<SpaceCameraMode>('track');
+  const [localAnchorId, setLocalAnchorId] = useState<'earth' | 'moon' | 'mars'>('earth');
   const [solarTimeSpeed, setSolarTimeSpeed] = useState<number>(0.8);
   const [solarEpochYearsUi, setSolarEpochYearsUi] = useState<number>(0);
   const [focusedSolarBodyId, setFocusedSolarBodyId] = useState<string | null>(null);
@@ -325,6 +337,17 @@ export default function App() {
     yPct: number;
     visible: boolean;
   } | null>(null);
+  const [horizonsProvenance, setHorizonsProvenance] = useState<{
+    source: string;
+    provenance: DataProvenance;
+    isLive: boolean;
+  }>({
+    source: 'JPL J2000 Analytical Keplerian Ephemeris',
+    provenance: 'SCIENTIFIC MODEL',
+    isLive: false,
+  });
+  const [musicState, setMusicState] = useState<MusicState>(() => soundSynth.getMusicState());
+  const titleIdleTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     modalOpenRef.current =
@@ -509,7 +532,7 @@ export default function App() {
     document.body.dataset.state = bodyState;
   }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
 
-  // Fetch live NASA DONKI + OSDR telemetry
+  // Fetch live NASA DONKI + OSDR + JPL Horizons state vectors
   useEffect(() => {
     fetch('/api/donki')
       .then((r) => r.json())
@@ -526,7 +549,42 @@ export default function App() {
         setOsdr(data);
       })
       .catch(() => {});
+
+    fetch('/api/jpl-horizons')
+      .then((r) => r.json())
+      .then((data: HorizonsEphemerisResponse) => {
+        if (data?.bodies) {
+          setActiveHorizonsVectors(data.bodies);
+          setHorizonsProvenance({
+            source: data.source || 'JPL J2000 Analytical Keplerian Ephemeris',
+            provenance: data.provenance || 'SCIENTIFIC MODEL',
+            isLive: Boolean(data.isLive),
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // Ambient music lifecycle + user-gesture unlock
+  useEffect(() => {
+    const unsub = soundSynth.subscribeMusicState(setMusicState);
+    const unlock = () => soundSynth.unlockMusicOnGesture();
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock, { passive: true });
+    return () => {
+      unsub();
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    soundSynth.setMusicModeForPhase(phase);
+    if (phase !== 'title' && titleIdleTimerRef.current !== null) {
+      window.clearTimeout(titleIdleTimerRef.current);
+      titleIdleTimerRef.current = null;
+    }
+  }, [phase]);
 
   const applyPayloadBonus = useCallback((id: PayloadId): ResourceState => {
     return getMissionStartingResources(
@@ -715,29 +773,40 @@ export default function App() {
     s.userOrbitActive = false;
     setFocusedSolarBodyId(bodyId);
     if (bodyId) {
+      if (s.spaceCameraMode === 'overview' || s.spaceCameraMode === 'track') {
+        s.spaceCameraMode = 'focus';
+        setSpaceCameraMode('focus');
+      }
       const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
       const isSci = s.solarScaleMode === 'scientific';
+      const isLocal = s.solarScaleMode === 'local';
       const baseSize =
-        (bodyId === 'sun' ? 11.4 : bodyId === 'earth' ? 4.8 : spec?.explorationBodySize ?? 2.5) *
-        (isSci ? 0.5 : 1);
-      s.orbitYaw = bodyId === 'earth' ? 0.35 : 0.52;
-      s.orbitPitch = bodyId === 'earth' ? 0.34 : 0.32;
-      s.orbitDistance =
         bodyId === 'sun'
           ? isSci
-            ? 24
-            : 44
-          : bodyId === 'earth'
-            ? isSci
-              ? 16
-              : 30
-            : Math.max(isSci ? 7.5 : 11, baseSize * 4.6);
+            ? 3.494
+            : 11.4
+          : isSci
+            ? spec?.scientificBodyRadius ?? 0.032
+            : spec?.explorationBodySize ?? 2.5;
+      s.orbitYaw = bodyId === 'earth' ? 0.35 : 0.52;
+      s.orbitPitch = bodyId === 'earth' ? 0.34 : 0.32;
+      s.orbitDistance = isSci
+        ? Math.max(0.18, baseSize * 5.2)
+        : isLocal
+          ? Math.max(12, (spec?.explorationBodySize ?? 2.0) * 8.5)
+          : bodyId === 'sun'
+            ? 44
+            : bodyId === 'earth'
+              ? 30
+              : Math.max(11, baseSize * 4.6);
       setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
     } else {
       setSelectedBodyPin(null);
+      s.spaceCameraMode = 'track';
+      setSpaceCameraMode('track');
       s.orbitYaw = 0.55;
       s.orbitPitch = 0.48;
-      s.orbitDistance = 22;
+      s.orbitDistance = s.solarScaleMode === 'scientific' ? 0.8 : 22;
     }
     soundSynth.init();
     soundSynth.playClick();
@@ -756,13 +825,24 @@ export default function App() {
       }
       const s = simRef.current;
       const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
-      const baseSize = bodyId === 'sun' ? 11.4 : spec?.explorationBodySize ?? 2.5;
+      const isSci = s.solarScaleMode === 'scientific';
+      const baseSize = isSci
+        ? spec?.scientificBodyRadius ?? 0.032
+        : bodyId === 'sun'
+          ? 11.4
+          : spec?.explorationBodySize ?? 2.5;
       s.focusedSolarBodyId = bodyId;
+      s.spaceCameraMode = 'focus';
       s.userOrbitActive = false;
       setFocusedSolarBodyId(bodyId);
+      setSpaceCameraMode('focus');
       s.orbitYaw = 0.42;
       s.orbitPitch = 0.22;
-      s.orbitDistance = bodyId === 'sun' ? 28 : Math.max(8.5, baseSize * 2.9);
+      s.orbitDistance = isSci
+        ? Math.max(0.15, baseSize * 3.8)
+        : bodyId === 'sun'
+          ? 28
+          : Math.max(8.5, baseSize * 2.9);
       soundSynth.init();
       soundSynth.playClick();
     },
@@ -775,13 +855,107 @@ export default function App() {
       s.space.navBodyId = bodyId;
       s.space.autoPilot = true;
       s.focusedSolarBodyId = null;
+      s.spaceCameraMode = 'track';
       s.userOrbitActive = false;
       setFocusedSolarBodyId(null);
+      setSpaceCameraMode('track');
       setSelectedBodyPin(null);
       s.orbitYaw = 0.55;
       s.orbitPitch = 0.48;
-      s.orbitDistance = 22;
+      s.orbitDistance = s.solarScaleMode === 'scientific' ? 0.8 : 22;
       setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
+      soundSynth.init();
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleChangeSolarScaleMode = useCallback(
+    (toMode: SolarScaleMode) => {
+      const s = simRef.current;
+      const fromMode: SolarScaleMode = s.solarScaleMode ?? 'exploration';
+      if (fromMode === toMode) return;
+      const anchor = s.localAnchorId ?? 'earth';
+      const nextPos = reprojectShipBetweenScaleModes(
+        s.space.shipX,
+        s.space.shipZ,
+        fromMode,
+        toMode,
+        s.solarEpochYears ?? 0,
+        s.space.targetId,
+        s.space.navBodyId,
+        anchor
+      );
+      s.space.shipX = nextPos.x;
+      s.space.shipZ = nextPos.z;
+      s.space.vx = 0;
+      s.space.vz = 0;
+      s.solarScaleMode = toMode;
+      s.userOrbitActive = false;
+
+      if (toMode === 'scientific') {
+        s.orbitDistance = s.focusedSolarBodyId ? 12 : 420;
+        if (!s.focusedSolarBodyId) {
+          s.spaceCameraMode = 'overview';
+          setSpaceCameraMode('overview');
+        }
+      } else if (toMode === 'local') {
+        const focusId = s.localAnchorId ?? 'earth';
+        s.focusedSolarBodyId = focusId;
+        setFocusedSolarBodyId(focusId);
+        s.spaceCameraMode = 'focus';
+        setSpaceCameraMode('focus');
+        s.orbitDistance = 42;
+      } else {
+        s.orbitDistance = 30;
+        if (s.spaceCameraMode === 'overview' && s.focusedSolarBodyId) {
+          s.spaceCameraMode = 'focus';
+          setSpaceCameraMode('focus');
+        }
+      }
+
+      setSolarScaleMode(toMode);
+      soundSynth.init();
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleChangeSpaceCameraMode = useCallback(
+    (mode: SpaceCameraMode) => {
+      const s = simRef.current;
+      s.spaceCameraMode = mode;
+      s.userOrbitActive = mode === 'free';
+      if (mode === 'overview') {
+        s.orbitPitch = Math.max(0.42, s.orbitPitch);
+        s.orbitDistance = s.solarScaleMode === 'scientific' ? 140 : s.solarScaleMode === 'local' ? 140 : 62;
+      } else if (mode === 'track') {
+        s.focusedSolarBodyId = null;
+        setFocusedSolarBodyId(null);
+        setSelectedBodyPin(null);
+      }
+      setSpaceCameraMode(mode);
+      soundSynth.init();
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleChangeLocalAnchorId = useCallback(
+    (anchor: 'earth' | 'moon' | 'mars') => {
+      const s = simRef.current;
+      s.localAnchorId = anchor;
+      setLocalAnchorId(anchor);
+      if (s.solarScaleMode === 'local') {
+        s.focusedSolarBodyId = anchor;
+        setFocusedSolarBodyId(anchor);
+        s.spaceCameraMode = 'focus';
+        setSpaceCameraMode('focus');
+        s.orbitDistance = 32;
+      }
       soundSynth.init();
       soundSynth.playClick();
       syncUiNow();
@@ -893,7 +1067,9 @@ export default function App() {
         if (s.launch.orbitReached) {
           const leo = s.leoTransfer || createInitialLeoTransferState();
           const wasInOrbit = leo.inParkingOrbit;
-          const nextLeo = stepLeoTransfer(leo, dt, true);
+          const achievedSpeedKmS =
+            Math.hypot(s.launch.verticalSpeedMs, s.launch.horizontalSpeedMs) / 1000;
+          const nextLeo = stepLeoTransfer(leo, dt, true, achievedSpeedKmS);
           s.leoTransfer = nextLeo;
 
           if (!wasInOrbit) {
@@ -910,6 +1086,8 @@ export default function App() {
             scoreRef.current += 500;
             s.phase = 'space';
             s.userOrbitActive = false;
+            s.spaceCameraMode = 'track';
+            setSpaceCameraMode('track');
             s.orbitYaw = 0.55;
             s.orbitPitch = 0.48;
             s.orbitDistance = 22;
@@ -938,6 +1116,7 @@ export default function App() {
           {
             satDeployBoost: spaceEq.satDeployBoost,
             fuelFactor: spaceEq.spaceFuelFactor,
+            localAnchorId: s.localAnchorId ?? 'earth',
           }
         );
         s.space = result.space;
@@ -1735,6 +1914,14 @@ export default function App() {
       s.userOrbitActive = true;
       s.orbitYaw -= dx * 0.0085;
       s.orbitPitch = clamp(s.orbitPitch + dy * 0.0068, -1.35, 1.42);
+      if (s.phase === 'title') {
+        if (titleIdleTimerRef.current !== null) window.clearTimeout(titleIdleTimerRef.current);
+        titleIdleTimerRef.current = window.setTimeout(() => {
+          if (simRef.current.phase === 'title') {
+            simRef.current.userOrbitActive = false;
+          }
+        }, 5000);
+      }
     };
 
     const onWindowPointerUp = () => {
@@ -1879,10 +2066,38 @@ export default function App() {
       return;
     }
     const s = simRef.current;
-    const minD = s.phase === 'launch' ? 9 : s.phase === 'space' ? 4.5 : s.phase === 'landing' ? 5.5 : 3.2;
-    const maxD = s.phase === 'launch' ? 88 : s.phase === 'space' ? 240 : s.phase === 'landing' ? 80 : 65;
+    const isSci = s.solarScaleMode === 'scientific';
+    const minD =
+      s.phase === 'launch'
+        ? 9
+        : s.phase === 'space'
+          ? isSci
+            ? 0.05
+            : 4.5
+          : s.phase === 'landing'
+            ? 5.5
+            : 3.2;
+    const maxD =
+      s.phase === 'launch'
+        ? 88
+        : s.phase === 'space'
+          ? isSci
+            ? 2400
+            : 280
+          : s.phase === 'landing'
+            ? 80
+            : 65;
     s.userOrbitActive = true;
-    s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.022, minD, maxD);
+    const stepScale = isSci && s.phase === 'space' ? Math.max(0.002, s.orbitDistance * 0.0012) : 0.022;
+    s.orbitDistance = clamp(s.orbitDistance + e.deltaY * stepScale, minD, maxD);
+    if (s.phase === 'title') {
+      if (titleIdleTimerRef.current !== null) window.clearTimeout(titleIdleTimerRef.current);
+      titleIdleTimerRef.current = window.setTimeout(() => {
+        if (simRef.current.phase === 'title') {
+          simRef.current.userOrbitActive = false;
+        }
+      }, 5000);
+    }
   };
 
   const handleSetCameraPreset = useCallback(
@@ -2120,8 +2335,18 @@ export default function App() {
           donki={donki}
           osdr={osdr}
           audioSettings={audioSettings}
+          musicState={musicState}
           qualityPreset={qualityPreset}
           onUpdateAudio={handleUpdateAudio}
+          onToggleMusic={() => {
+            soundSynth.unlockMusicOnGesture();
+            soundSynth.setMusicEnabled(!musicState.musicEnabled);
+          }}
+          onChangeMusicVolume={(v) => {
+            soundSynth.unlockMusicOnGesture();
+            soundSynth.setMusicVolume(v);
+          }}
+          onUnlockAudio={() => soundSynth.unlockMusicOnGesture()}
           onChangeQuality={handleChangeQuality}
           onSelectShowcase={(v) => {
             simRef.current.showcase = v;
@@ -2379,10 +2604,17 @@ export default function App() {
           exploredSolarBodyIds={exploredSolarBodyIds}
           selectedBodyPin={selectedBodyPin}
           solarScaleMode={solarScaleMode}
+          spaceCameraMode={spaceCameraMode}
+          localAnchorId={localAnchorId}
+          horizonsProvenance={horizonsProvenance}
           solarEpochYears={solarEpochYearsUi}
           onFocusSolarBody={handleFocusSolarBody}
           onExploreSolarBody={handleExploreSolarBody}
           onFlyToSolarBody={handleFlyToSolarBody}
+          onChangeSolarScaleMode={handleChangeSolarScaleMode}
+          onChangeSpaceCameraMode={handleChangeSpaceCameraMode}
+          onChangeLocalAnchorId={handleChangeLocalAnchorId}
+          onResetCamera={handleResetCamera}
           onOpenMenuTab={openMenuWithTab}
           onOpenBriefing={() => jumpToPhase('briefing')}
           onOpenHardwareBay={() => jumpToPhase('inspector')}
@@ -2586,6 +2818,7 @@ export default function App() {
         space={spaceUi}
         landing={landingUi}
         audioSettings={audioSettings}
+        musicState={musicState}
         qualityPreset={qualityPreset}
         speedScale={speedScale}
         solarScaleMode={solarScaleMode}
@@ -2618,6 +2851,14 @@ export default function App() {
           setSpeedScale((prev) => (prev === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X'));
         }}
         onUpdateAudio={handleUpdateAudio}
+        onToggleMusic={() => {
+          soundSynth.unlockMusicOnGesture();
+          soundSynth.setMusicEnabled(!musicState.musicEnabled);
+        }}
+        onChangeMusicVolume={(v) => {
+          soundSynth.unlockMusicOnGesture();
+          soundSynth.setMusicVolume(v);
+        }}
         onChangeQuality={handleChangeQuality}
         onResetCamera={handleResetCamera}
         onQueueMarsPoint={(wx, wz, label, objectiveId) => {
@@ -2645,11 +2886,7 @@ export default function App() {
           simRef.current.space.targetId = id;
           syncUiNow();
         }}
-        onChangeSolarScaleMode={(mode) => {
-          simRef.current.solarScaleMode = mode;
-          setSolarScaleMode(mode);
-          soundSynth.playClick();
-        }}
+        onChangeSolarScaleMode={handleChangeSolarScaleMode}
         onChangeSolarTimeSpeed={(speed) => {
           solarTimeSpeedRef.current = speed;
           setSolarTimeSpeed(speed);

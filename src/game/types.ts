@@ -15,6 +15,8 @@ export type SurfacePlanet = 'moon' | 'mars';
 
 export type CameraMode = 'chase' | 'cockpit' | 'overhead' | 'orbit';
 
+export type SpaceCameraMode = 'overview' | 'focus' | 'orbit' | 'track' | 'free';
+
 export type VehicleShowcaseId =
   | 'rocket'
   | 'satellite'
@@ -167,6 +169,14 @@ export interface LaunchState {
   lasJettisoned: boolean;
   orbitReached: boolean;
   stagePrompt: string | null;
+  twr: number;
+  ispS: number;
+  airDensityKgM3: number;
+  deltaVExpendedMs: number;
+  orbitalVelocityTargetMs: number;
+  apoapsisKm: number;
+  periapsisKm: number;
+  orbitalEccentricity: number;
 }
 
 export interface OrbitalSatState {
@@ -179,6 +189,15 @@ export interface OrbitalSatState {
   rotationErrorDeg: number;
   telemetrySignalPct: number;
 }
+
+export type SpacecraftTrajectoryType =
+  | 'Circular Orbit'
+  | 'Elliptical Orbit'
+  | 'Transfer Trajectory'
+  | 'Rendezvous'
+  | 'Flyby'
+  | 'Landing Trajectory'
+  | 'Station-Keeping';
 
 export interface SpaceFlightState {
   shipX: number;
@@ -201,6 +220,10 @@ export interface SpaceFlightState {
   orbitalSat: OrbitalSatState;
   statusText: string;
   navBodyId?: string | null;
+  trajectoryRegime?: SpacecraftTrajectoryType;
+  orbitalSpeedKmS?: number;
+  distanceFromSunAu?: number;
+  distanceToTargetKm?: number;
 }
 
 export interface LandingZone {

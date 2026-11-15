@@ -59,9 +59,9 @@ export function createInitialLeoTransferState(): LeoTransferState {
   return {
     inParkingOrbit: false,
     orbitAltitudeKm: 165,
-    orbitalVelocityKmS: 7.78,
+    orbitalVelocityKmS: 7.81,
     inclinationDeg: 28.5,
-    orbitalPeriodMin: 88,
+    orbitalPeriodMin: 87.8,
     tliBurnActive: false,
     tliBurnProgressPct: 0,
     tliDeltaVAppliedMs: 0,
@@ -73,24 +73,26 @@ export function createInitialLeoTransferState(): LeoTransferState {
 export function stepLeoTransfer(
   state: LeoTransferState,
   dt: number,
-  orbitReached: boolean
+  orbitReached: boolean,
+  achievedSpeedKmS?: number
 ): LeoTransferState {
   if (!orbitReached) return state;
 
+  const baseSpeed = achievedSpeedKmS && achievedSpeedKmS > 1 ? achievedSpeedKmS : 7.81;
   const next: LeoTransferState = {
     ...state,
     inParkingOrbit: true,
     orbitAltitudeKm: 165,
-    orbitalVelocityKmS: 7.78,
+    orbitalVelocityKmS: Number(baseSpeed.toFixed(2)),
   };
 
   if (next.tliBurnActive && !next.readyForSpaceTransition) {
-    // Smooth 4.5-second burn in trainer time for kids (3150 m/s Δv)
+    // 4.2-second trainer TLI burn (3150 m/s delta-v)
     const ratePctPerSec = 24;
     const progress = Math.min(100, next.tliBurnProgressPct + ratePctPerSec * dt);
     next.tliBurnProgressPct = progress;
     next.tliDeltaVAppliedMs = Math.round((progress / 100) * next.tliTargetDeltaVMs);
-    next.orbitalVelocityKmS = Number((7.78 + (progress / 100) * 3.15).toFixed(2));
+    next.orbitalVelocityKmS = Number((baseSpeed + (progress / 100) * 3.15).toFixed(2));
     if (progress >= 100) {
       next.tliBurnActive = false;
       next.readyForSpaceTransition = true;

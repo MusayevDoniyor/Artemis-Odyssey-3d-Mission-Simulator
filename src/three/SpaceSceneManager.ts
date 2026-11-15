@@ -10,6 +10,14 @@ import {
   computeKeplerBodyPosition,
   getLiveSolarTargetPosition,
 } from '../game/solarSystemData';
+import {
+  EXPLORATION_VISUAL_LAYOUT,
+  LOCAL_UNITS_PER_METER,
+  SCIENTIFIC_UNITS_PER_AU,
+  getBodyVisualRadiusUnits,
+  projectHeliocentricSIToScene,
+} from '../game/orbitalMechanics';
+import { PLANETARY_CATALOG_SI } from '../game/planetaryCatalog';
 import { HARDWARE_CATALOG } from '../game/hardwareCatalog';
 import type {
   CameraMode,
@@ -30,6 +38,7 @@ import type {
   RoverCollider,
   RoverObjective,
   RoverState,
+  SpaceCameraMode,
   SpaceFlightState,
   SurfacePlanet,
   SurfaceWorldPrompt,
@@ -93,10 +102,170 @@ export interface SceneSimulationBridge {
   solarScaleMode?: SolarScaleMode;
   solarEpochYears?: number;
   focusedSolarBodyId?: string | null;
+  spaceCameraMode?: SpaceCameraMode;
+  localAnchorId?: string;
   quality?: QualityPreset;
 }
 
 const PARTICLE_COUNT = 260;
+
+/**
+ * Custom VertexShader + FragmentShader for Earth's physically-based Rayleigh + Mie atmospheric scattering shell.
+ */
+function createEarthAtmosphericScatteringMaterial(intensity = 1.18): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSunDir: { value: new THREE.Vector3(0.7, 0.35, 0.6).normalize() },
+      uCameraDistance: { value: 10.0 },
+      uPlanetRadius: { value: 2.35 },
+      uAltitudeFade: { value: 1.0 },
+      uIntensity: { value: intensity },
+    },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      varying float vViewAngleCos;
+
+      void main() {
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vec3 viewDir = normalize(cameraPosition - worldPos.xyz);
+        vViewAngleCos = dot(vWorldNormal, viewDir);
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uSunDir;
+      uniform float uCameraDistance;
+      uniform float uPlanetRadius;
+      uniform float uAltitudeFade;
+      uniform float uIntensity;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      varying float vViewAngleCos;
+
+      void main() {
+        vec3 n = normalize(vWorldNormal);
+        vec3 viewDir = normalize(cameraPosition - vWorldPos);
+        vec3 sunDir = normalize(uSunDir);
+
+        // Normalize camera altitude in planetary radii so scattering responds consistently across scale modes
+        float altRadii = max(0.0, (uCameraDistance - uPlanetRadius) / max(0.001, uPlanetRadius));
+        float distResponse = smoothstep(0.015, 0.24, altRadii) *
+          clamp(1.0 / (1.0 + pow(max(0.0, altRadii - 6.0) / 26.0, 1.3)), 0.22, 1.0);
+
+        // BackSide atmospheric shell: Chapman scale-height optical depth toward outer exosphere boundary
+        float ndotv = dot(n, viewDir);
+        float shellDepth = clamp(-ndotv * 2.45, 0.0, 1.0);
+        float chapmanDensity = exp(-pow(1.0 - shellDepth, 1.75) * 2.85);
+        float outerFade = smoothstep(0.0, 0.26, -ndotv);
+
+        // Rayleigh wavelength coefficients normalized to RGB (beta ~ lambda^-4)
+        vec3 betaRayleigh = vec3(0.24, 0.56, 1.00);
+        float sunDot = dot(n, sunDir);
+        float rayleighPhase = 0.75 * (1.0 + pow(dot(-viewDir, sunDir), 2.0));
+        float dayWeight = smoothstep(-0.28, 0.44, sunDot);
+
+        // Sunset/twilight atmospheric dispersion along the day-night terminator
+        float terminatorBand = exp(-pow((sunDot + 0.03) * 4.6, 2.0));
+        vec3 twilightTint = vec3(0.98, 0.54, 0.24);
+
+        // Henyey-Greenstein Mie forward scattering (g = 0.74)
+        float cosTheta = clamp(dot(-viewDir, sunDir), -1.0, 1.0);
+        float g = 0.74;
+        float g2 = g * g;
+        float miePhase = clamp((1.0 - g2) / (4.0 * 3.14159265 * pow(max(0.04, 1.0 + g2 - 2.0 * g * cosTheta), 1.5)), 0.0, 2.6);
+
+        vec3 scatterCol = mix(betaRayleigh * (0.72 + 0.28 * rayleighPhase), twilightTint, terminatorBand * 0.52);
+        scatterCol += vec3(0.58, 0.80, 1.0) * (miePhase * 0.22 * dayWeight);
+
+        float alpha = clamp(chapmanDensity * outerFade * uIntensity * distResponse * uAltitudeFade * mix(0.08, 1.0, dayWeight), 0.0, 1.0);
+        gl_FragColor = vec4(scatterCol * alpha, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+}
+
+/**
+ * Separate Three.js mesh layer VertexShader + FragmentShader calculating Earth's blue rim
+ * via a physically-grounded Schlick Fresnel equation driven by camera distance & viewing angle.
+ */
+function createEarthFresnelRimMaterial(intensity = 0.92): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSunDir: { value: new THREE.Vector3(0.7, 0.35, 0.6).normalize() },
+      uCameraDistance: { value: 10.0 },
+      uPlanetRadius: { value: 2.35 },
+      uAltitudeFade: { value: 1.0 },
+      uIntensity: { value: intensity },
+    },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      varying vec3 vViewVector;
+
+      void main() {
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPos.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vViewVector = cameraPosition - worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uSunDir;
+      uniform float uCameraDistance;
+      uniform float uPlanetRadius;
+      uniform float uAltitudeFade;
+      uniform float uIntensity;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPos;
+      varying vec3 vViewVector;
+
+      void main() {
+        vec3 n = normalize(vWorldNormal);
+        vec3 viewDir = normalize(vViewVector);
+        vec3 sunDir = normalize(uSunDir);
+
+        // Viewing angle cosine between surface normal and camera ray
+        float cosTheta = clamp(dot(n, viewDir), 0.0, 1.0);
+
+        // Camera distance in planetary radii modulates rim sharpness and altitude attenuation
+        float altRadii = max(0.0, (uCameraDistance - uPlanetRadius) / max(0.001, uPlanetRadius));
+        float distanceFade = smoothstep(0.015, 0.22, altRadii) *
+          clamp(1.0 / (1.0 + pow(max(0.0, altRadii - 6.0) / 14.0, 1.45)), 0.0, 1.0);
+
+        // Schlick Fresnel equation: F = F0 + (1.0 - F0) * (1.0 - cosTheta)^p
+        float F0 = 0.028;
+        float fresnelExponent = mix(3.9, 2.35, clamp(1.0 - altRadii * 0.12, 0.0, 1.0));
+        float fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, fresnelExponent);
+
+        float sunDot = dot(n, sunDir);
+        float dayWeight = smoothstep(-0.24, 0.46, sunDot);
+        float twilightBand = exp(-pow((sunDot + 0.02) * 4.4, 2.0));
+
+        vec3 rayleighZenithBlue = vec3(0.18, 0.56, 1.00);
+        vec3 rayleighElectricRim = vec3(0.42, 0.82, 1.00);
+        vec3 terminatorAmber = vec3(0.95, 0.52, 0.26);
+
+        vec3 rimColor = mix(rayleighZenithBlue, rayleighElectricRim, fresnel);
+        rimColor = mix(rimColor, terminatorAmber, twilightBand * (0.45 * fresnel + 0.12));
+
+        float rimAlpha = clamp(fresnel * uIntensity * distanceFade * uAltitudeFade * mix(0.05, 1.0, dayWeight), 0.0, 0.94);
+        gl_FragColor = vec4(rimColor * rimAlpha, rimAlpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.FrontSide,
+    depthWrite: false,
+  });
+}
 
 export class SpaceSceneManager {
   private container: HTMLElement;
@@ -127,11 +296,23 @@ export class SpaceSceneManager {
   private lastTrackX = 9999;
   private lastTrackZ = 9999;
   private appliedQuality: QualityPreset = 'high';
-  private lastSolarScaleMode: SolarScaleMode = 'exploration';
+  private lastSolarScaleMode: SolarScaleMode | null = null;
+  private lastLocalAnchorId = 'earth';
+  private lastPhase: GamePhase | null = null;
+  private lastTitleShowcase: VehicleShowcaseId = 'outpost';
+  private titleOrbitAngle = 0.58;
+  private prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
   private sunLight: THREE.DirectionalLight;
   private ambientLight: THREE.HemisphereLight;
   private starField: THREE.Points;
+
+  // Separate Three.js Fresnel blue-rim mesh layers for Earth across scenes
+  private solarEarthFresnelRimMesh: THREE.Mesh;
+  private launchEarthFresnelRimMesh: THREE.Mesh;
+  private lunarEarthFresnelRimMesh: THREE.Mesh;
 
   // Landing guidance helpers
   private guideLine: THREE.Line;
@@ -157,11 +338,13 @@ export class SpaceSceneManager {
   private camLookCurrent = new THREE.Vector3(0, 2, 0);
   private camLookTarget = new THREE.Vector3(0, 2, 0);
   private scratchVec = new THREE.Vector3();
+  private scratchAtmoVec = new THREE.Vector3();
   private scratchFocusVec = new THREE.Vector3();
   private scratchShipAnchor = new THREE.Vector3();
   private sunOriginVec = new THREE.Vector3(SOLAR_SUN_ORIGIN_X, 0, SOLAR_SUN_ORIGIN_Z);
   private scratchColor = new THREE.Color();
   private crashDummy = new THREE.Object3D();
+  private scratchBeltDummy = new THREE.Object3D();
 
   // Original emissive storage for part inspector highlight
   private emissiveOriginal = new WeakMap<THREE.MeshStandardMaterial, { hex: number; intensity: number }>();
@@ -209,7 +392,7 @@ export class SpaceSceneManager {
     this.scene.background = new THREE.Color(0x020617);
 
     const aspect = (container.clientWidth || window.innerWidth) / Math.max(1, container.clientHeight || window.innerHeight);
-    this.camera = new THREE.PerspectiveCamera(54, aspect, 0.2, 1600);
+    this.camera = new THREE.PerspectiveCamera(54, aspect, 0.2, 42000);
     this.camera.position.set(14, 10, 24);
 
     // RoomEnvironment PBR reflections
@@ -249,6 +432,15 @@ export class SpaceSceneManager {
     this.planetMaps = createRealPlanetMaps(maxAniso);
 
     this.lunarEnv = createLunarEnvironment(this.textures, this.planetMaps);
+    this.lunarEnv.earthScatter.visible = false;
+    (this.lunarEnv.earthAtmo.material as THREE.Material).dispose();
+    this.lunarEnv.earthAtmo.material = createEarthAtmosphericScatteringMaterial(1.1);
+    this.lunarEarthFresnelRimMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(28.58, 48, 36),
+      createEarthFresnelRimMaterial(0.86)
+    );
+    this.lunarEarthFresnelRimMesh.renderOrder = 4;
+    this.lunarEnv.earthGroup.add(this.lunarEarthFresnelRimMesh);
     this.scene.add(this.lunarEnv.group);
 
     this.lander = createLunarLander(this.textures);
@@ -260,9 +452,27 @@ export class SpaceSceneManager {
     this.scene.add(this.roverModel.group);
 
     this.launchComplex = createLaunchComplexAndSLS(this.textures, this.planetMaps);
+    this.launchComplex.earthLimbScatter.visible = false;
+    (this.launchComplex.earthLimbAtmo.material as THREE.Material).dispose();
+    this.launchComplex.earthLimbAtmo.material = createEarthAtmosphericScatteringMaterial(1.18);
+    this.launchEarthFresnelRimMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(95.65, 56, 36),
+      createEarthFresnelRimMaterial(0.92)
+    );
+    this.launchEarthFresnelRimMesh.renderOrder = 4;
+    this.launchComplex.earthLimb.add(this.launchEarthFresnelRimMesh);
     this.scene.add(this.launchComplex.group);
 
     this.solarSystem = createSolarSystemScene(this.textures, this.planetMaps);
+    this.solarSystem.earthScatter.visible = false;
+    (this.solarSystem.earthAtmo.material as THREE.Material).dispose();
+    this.solarSystem.earthAtmo.material = createEarthAtmosphericScatteringMaterial(1.22);
+    this.solarEarthFresnelRimMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.022, 48, 36),
+      createEarthFresnelRimMaterial(0.92)
+    );
+    this.solarEarthFresnelRimMesh.renderOrder = 4;
+    this.solarSystem.earthBodyGroup.add(this.solarEarthFresnelRimMesh);
     this.scene.add(this.solarSystem.group);
 
     this.showcaseSatellite = createOrbitalSatellite(this.textures);
@@ -570,13 +780,7 @@ export class SpaceSceneManager {
   }
 
   private getSolarVisualRadius(bodyId: string): number {
-    const isSci = this.lastSolarScaleMode === 'scientific';
-    if (bodyId === 'sun') return isSci ? 4.4 : 9.8;
-    if (bodyId === 'earth') return isSci ? 1.85 : 3.6;
-    if (bodyId === 'moon') return isSci ? 0.85 : 1.65;
-    if (bodyId === 'mars') return isSci ? 1.45 : 2.5;
-    const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
-    return (spec ? spec.explorationBodySize : 4.2) * (isSci ? 0.58 : 1.0);
+    return getBodyVisualRadiusUnits(bodyId, this.lastSolarScaleMode ?? 'exploration');
   }
 
   getSelectedSolarBodyScreenPos(
@@ -584,20 +788,27 @@ export class SpaceSceneManager {
   ): { xPct: number; yPct: number; visible: boolean } | null {
     if (!bodyId) return null;
     const radius = this.getSolarVisualRadius(bodyId);
-    const yOffset = bodyId === 'sun' ? 3.2 : 1.75;
+    const yOffset =
+      (this.lastSolarScaleMode ?? 'exploration') === 'scientific'
+        ? Math.max(0.015, radius * 0.65)
+        : bodyId === 'sun'
+          ? 3.2
+          : 1.75;
+
+    let targetObj: THREE.Object3D | undefined;
     if (bodyId === 'sun') {
-      this.scratchVec.set(SOLAR_SUN_ORIGIN_X, radius + yOffset, SOLAR_SUN_ORIGIN_Z);
+      targetObj = this.solarSystem.bodyScaleGroups.sun ?? this.solarSystem.sun;
     } else if (bodyId === 'moon') {
-      const m = this.solarSystem.planets.moon.position;
-      this.scratchVec.set(m.x, m.y + radius + yOffset, m.z);
+      targetObj = this.solarSystem.extraBodies.moon;
     } else if (bodyId === 'mars') {
-      const m = this.solarSystem.planets.mars.position;
-      this.scratchVec.set(m.x, m.y + radius + yOffset, m.z);
+      targetObj = this.solarSystem.extraBodies.mars;
     } else {
-      const obj = this.solarSystem.extraBodies[bodyId];
-      if (!obj) return null;
-      this.scratchVec.set(obj.position.x, obj.position.y + radius + yOffset, obj.position.z);
+      targetObj = this.solarSystem.extraBodies[bodyId];
     }
+    if (!targetObj) return null;
+
+    targetObj.getWorldPosition(this.scratchVec);
+    this.scratchVec.y += radius + yOffset;
     this.scratchVec.project(this.camera);
     const visible =
       this.scratchVec.z >= -1 &&
@@ -915,6 +1126,18 @@ export class SpaceSceneManager {
       this.launchPitchVisualRad = 0;
     }
 
+    // Track cinematic 360-degree main menu orbit angle (62s calm period)
+    if (phase === 'title') {
+      if (this.lastPhase !== 'title' || s.showcase !== this.lastTitleShowcase) {
+        this.titleOrbitAngle = 0.58;
+        this.lastTitleShowcase = s.showcase;
+      }
+      if (!s.userOrbitActive && !this.prefersReducedMotion) {
+        this.titleOrbitAngle = (this.titleOrbitAngle + dt * ((Math.PI * 2) / 62)) % (Math.PI * 2);
+      }
+    }
+    this.lastPhase = phase;
+
     // Auto-rotate showcase in inspector if enabled
     if (phase === 'inspector' && s.inspector?.autoRotate && !s.userOrbitActive) {
       s.orbitYaw += dt * 0.32;
@@ -971,14 +1194,29 @@ export class SpaceSceneManager {
       (phase === 'title' && (s.showcase === 'rover' || s.showcase === 'outpost')) ||
       (phase === 'inspector' && (s.showcase === 'rover' || s.showcase === 'outpost'));
 
-    // Rotate Earth gently in Lunar Sky & keep atmospheric scattering aligned to sunlight
+    // Rotate Earth gently in Lunar Sky & update custom atmospheric scattering + separate Fresnel blue rim mesh
     this.lunarEnv.earthGlobe.rotation.y += dt * 0.025;
     this.lunarEnv.earthClouds.rotation.y += dt * 0.033;
-    updateAtmosphereSunDirection(
+    const lunarEarthDist = Math.hypot(
+      this.camera.position.x - this.lunarEnv.earthGroup.position.x,
+      this.camera.position.y - this.lunarEnv.earthGroup.position.y,
+      this.camera.position.z - this.lunarEnv.earthGroup.position.z
+    );
+    this.updateEarthShaderLayerUniforms(
       this.lunarEnv.earthAtmo,
       this.lunarEnv.earthGroup.position,
       this.sunLight.position,
-      this.scratchVec
+      lunarEarthDist,
+      28,
+      1.0
+    );
+    this.updateEarthShaderLayerUniforms(
+      this.lunarEarthFresnelRimMesh,
+      this.lunarEnv.earthGroup.position,
+      this.sunLight.position,
+      lunarEarthDist,
+      28,
+      1.0
     );
 
     // Highlight parts during Vehicle Inspector
@@ -996,13 +1234,25 @@ export class SpaceSceneManager {
     });
 
     if (showLaunch) {
+      this.solarSystem.group.position.set(0, 0, 0);
+      this.starField.position.set(0, 0, 0);
       this.syncLaunchScene(s, dt, elapsedSec);
     } else if (showSatelliteShowcase || showJwstShowcase || showVoyagerShowcase) {
-      this.syncSpacecraftShowcaseScene(s, elapsedSec, showJwstShowcase ? 'jwst' : showVoyagerShowcase ? 'voyager' : 'satellite');
+      this.solarSystem.group.position.set(0, 0, 0);
+      this.starField.position.set(0, 0, 0);
+      this.syncSpacecraftShowcaseScene(s, dt, showJwstShowcase ? 'jwst' : showVoyagerShowcase ? 'voyager' : 'satellite');
     } else if (showSpace) {
       this.syncSpaceScene(s, dt, elapsedSec);
     } else {
+      this.solarSystem.group.position.set(0, 0, 0);
+      this.starField.position.set(0, 0, 0);
       this.syncLunarScene(s, dt, elapsedSec);
+    }
+
+    if (!showSpace && Math.abs(this.camera.near - 0.2) > 0.005) {
+      this.camera.near = 0.2;
+      this.camera.far = 2500;
+      this.camera.updateProjectionMatrix();
     }
 
     this.syncCrashFxVisuals(s, dt, elapsedSec);
@@ -1018,7 +1268,7 @@ export class SpaceSceneManager {
 
   private syncSpacecraftShowcaseScene(
     s: SceneSimulationBridge,
-    elapsedSec: number,
+    dt: number,
     kind: 'satellite' | 'jwst' | 'voyager'
   ) {
     (this.scene.background as THREE.Color).setHex(0x020617);
@@ -1028,14 +1278,12 @@ export class SpaceSceneManager {
     this.sunLight.color.setHex(0xfffbeb);
     this.sunLight.position.set(90, 72, 60);
     this.sunLight.intensity = 2.75;
+
+    // Stationary 3D showcase spacecraft — the camera orbits smoothly around them
     if (kind === 'satellite') {
       const sat = this.showcaseSatellite;
       sat.group.position.set(0, 0, 0);
-      sat.group.rotation.set(
-        0.18,
-        s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.25 : 0.35,
-        0
-      );
+      sat.group.rotation.set(0.18, 0.35, 0);
       sat.solarLeftPivot.scale.x = 1;
       sat.solarRightPivot.scale.x = 1;
       sat.umbrellaLeft.scale.setScalar(1);
@@ -1043,25 +1291,41 @@ export class SpaceSceneManager {
       sat.linkBeam.visible = false;
     } else if (kind === 'jwst') {
       this.jwstModel.group.position.set(0, 0.2, 0);
-      this.jwstModel.group.rotation.set(0.12, s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.2 : 0.45, 0);
+      this.jwstModel.group.rotation.set(0.12, 0.45, 0);
     } else {
       this.voyagerModel.group.position.set(0, 0.2, 0);
-      this.voyagerModel.group.rotation.set(0.16, s.phase === 'title' && !s.userOrbitActive ? elapsedSec * 0.2 : -0.4, 0);
+      this.voyagerModel.group.rotation.set(0.16, -0.4, 0);
     }
 
     const focusY = kind === 'satellite' ? 0 : 0.2;
     if (s.phase === 'title' && !s.userOrbitActive) {
-      const dist = kind === 'satellite' ? 8.2 : 10.6;
-      this.camera.position.set(dist * 0.6, 3.2, dist * 0.85);
-      this.camera.lookAt(-1.4, focusY, 0);
+      const dist = kind === 'satellite' ? 8.8 : kind === 'jwst' ? 10.8 : 11.2;
+      const a = this.titleOrbitAngle;
+      const camX = Math.sin(a) * dist;
+      const camY = focusY + 2.6 + Math.sin(a * 0.5) * 0.45;
+      const camZ = Math.cos(a) * dist;
+      const len = Math.max(0.01, Math.hypot(camX, camZ));
+      const rightX = camZ / len;
+      const rightZ = -camX / len;
+      const leftShift = kind === 'satellite' ? 1.8 : 2.1;
+      this.camPosTarget.set(camX, camY, camZ);
+      this.camLookTarget.set(-rightX * leftShift, focusY, -rightZ * leftShift);
+      const rate = 1 - Math.exp(-4.2 * dt);
+      this.camera.position.lerp(this.camPosTarget, rate);
+      this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-4.8 * dt));
+      this.camera.lookAt(this.camLookCurrent);
     } else {
       const dist = Math.min(34, Math.max(3.2, s.orbitDistance));
-      this.camera.position.set(
+      this.camPosTarget.set(
         Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
         focusY + Math.sin(s.orbitPitch) * dist,
         Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camera.lookAt(0, focusY, 0);
+      this.camLookTarget.set(0, focusY, 0);
+      const rate = s.phase === 'title' ? 1 - Math.exp(-12 * dt) : 1;
+      this.camera.position.lerp(this.camPosTarget, rate);
+      this.camLookCurrent.lerp(this.camLookTarget, rate);
+      this.camera.lookAt(this.camLookCurrent);
     }
   }
 
@@ -1115,18 +1379,33 @@ export class SpaceSceneManager {
       (this.scene.background as THREE.Color).setHex(0x0b132b);
 
       if (s.phase === 'title' && !s.userOrbitActive) {
-        // Frame rocket nicely on the right half so left title scrim never overlaps
-        this.camera.position.set(22, 16, 30);
-        this.camera.lookAt(-6.5, 13.0, 0);
+        // Cinematic 360-degree camera orbit framing stationary SLS on the right/center stage
+        const a = this.titleOrbitAngle;
+        const dist = 32;
+        const camX = Math.sin(a) * dist;
+        const camY = 15.8 + Math.sin(a * 0.5) * 1.4;
+        const camZ = Math.cos(a) * dist;
+        const len = Math.max(0.01, Math.hypot(camX, camZ));
+        const rightX = camZ / len;
+        const rightZ = -camX / len;
+        this.camPosTarget.set(camX, Math.max(2.4, camY), camZ);
+        this.camLookTarget.set(-rightX * 5.8, 13.0, -rightZ * 5.8);
+        this.camera.position.lerp(this.camPosTarget, 1 - Math.exp(-4.2 * dt));
+        this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-4.8 * dt));
+        this.camera.lookAt(this.camLookCurrent);
       } else {
         const dist = Math.min(85, Math.max(8, s.orbitDistance));
         const camY = Math.max(1.2, 12.0 + Math.sin(s.orbitPitch) * dist);
-        this.camera.position.set(
+        this.camPosTarget.set(
           Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
           camY,
           Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
         );
-        this.camera.lookAt(0, 12.0, 0);
+        this.camLookTarget.set(0, 12.0, 0);
+        const rate = s.phase === 'title' ? 1 - Math.exp(-12 * dt) : 1;
+        this.camera.position.lerp(this.camPosTarget, rate);
+        this.camLookCurrent.lerp(this.camLookTarget, rate);
+        this.camera.lookAt(this.camLookCurrent);
       }
       return;
     }
@@ -1234,22 +1513,51 @@ export class SpaceSceneManager {
     lc.groundGroup.visible = alt < 52;
     lc.groundGroup.position.y = -groundDrop;
 
-    // Smooth atmospheric & cloud fade instead of abrupt horizon pop-off
-    const skyFade = Math.min(1, Math.max(0, (alt - 16) / 38));
-    lc.skyDomeMat.opacity = 1 - skyFade;
-    const cloudFade = Math.min(1, Math.max(0, (alt - 14) / 20));
-    lc.cloudMat.opacity = 0.44 * (1 - cloudFade);
-    lc.coolCloudMat.opacity = 0.36 * (1 - cloudFade);
-    lc.cloudLayer.visible = alt < 36;
+    // Continuous SI atmospheric density fade (1.225 kg/m^3 at sea level -> exponential vacuum)
+    const atmoDensityRatio = Math.min(1, Math.max(0, (L.airDensityKgM3 ?? 1.225) / 1.225));
+    const skyScatter = Math.pow(atmoDensityRatio, 0.34);
+    lc.skyDomeMat.opacity = Math.min(1, skyScatter * 1.12);
+    lc.cloudMat.opacity = 0.44 * Math.min(1, skyScatter * 1.15);
+    lc.coolCloudMat.opacity = 0.36 * Math.min(1, skyScatter * 1.15);
+    lc.cloudLayer.visible = atmoDensityRatio > 0.015;
     lc.padSpotlight.intensity = alt < 8 ? 5.8 * (1 - alt / 8) : 0;
 
-    lc.earthLimb.visible = alt > 20;
-    lc.earthLimb.position.y = -102 - Math.min(20, (alt - 20) * 0.12);
+    const limbAppear = Math.min(1, Math.max(0, (alt - 16) / 34));
+    const limbFade = limbAppear * limbAppear * (3 - 2 * limbAppear);
+    lc.earthLimb.visible = limbFade > 0.01;
+    lc.earthLimb.position.y = -102 - Math.min(20, Math.max(0, alt - 16) * 0.12);
+    lc.earthLimbGlobeMat.opacity = limbFade;
+    lc.earthLimbGlobeMat.transparent = limbFade < 0.99;
+    lc.earthLimbGlobeMat.depthWrite = limbFade >= 0.95;
+    if (lc.earthLimb.visible) {
+      const limbDist = Math.hypot(
+        this.camera.position.x - lc.earthLimb.position.x,
+        this.camera.position.y - lc.earthLimb.position.y,
+        this.camera.position.z - lc.earthLimb.position.z
+      );
+      const orbitalRimBoost = limbFade * (0.72 + 0.28 * (1 - atmoDensityRatio));
+      this.updateEarthShaderLayerUniforms(
+        lc.earthLimbAtmo,
+        lc.earthLimb.position,
+        this.sunLight.position,
+        limbDist,
+        95,
+        orbitalRimBoost
+      );
+      this.updateEarthShaderLayerUniforms(
+        this.launchEarthFresnelRimMesh,
+        lc.earthLimb.position,
+        this.sunLight.position,
+        limbDist,
+        95,
+        orbitalRimBoost
+      );
+    }
     lc.leoOrbitRing.visible = L.orbitReached;
     lc.leoOrbitRing.position.copy(lc.earthLimb.position);
 
-    // Sky transitions seamlessly from Florida twilight to orbital deep space
-    const spaceFade = Math.min(1, alt / 55);
+    // Sky transitions seamlessly via Rayleigh density decay from Florida twilight to orbital deep space
+    const spaceFade = 1 - skyScatter;
     this.scratchColor.setHex(0x0b132b).lerp(new THREE.Color(0x020617), spaceFade);
     (this.scene.background as THREE.Color).copy(this.scratchColor);
 
@@ -1271,14 +1579,19 @@ export class SpaceSceneManager {
     const exDirX = -sinP;
     const exDirY = -cosP;
 
-    // Flame + trench fire + deluge steam cloud + Transonic Mach Cone
+    // Flame + trench fire + deluge steam cloud + Transonic Mach Cone + Vacuum Plume Expansion
     const tliBurning = Boolean(L.orbitReached && s.leoTransfer?.tliBurnActive);
     const thrusting = (L.ignited && L.throttle > 0.05 && L.fuelPct > 0 && !L.orbitReached) || tliBurning;
+    const vacuumExpand = 1 + (1 - atmoDensityRatio) * 0.72;
     lc.flameGroup.visible = thrusting && !L.coreSeparated;
     lc.icpsFlame.visible = thrusting && L.coreSeparated;
     if (lc.icpsFlame.visible) {
       const flicker = 0.86 + Math.sin(elapsedSec * 38) * 0.16;
-      lc.icpsFlame.scale.set(1, (tliBurning ? 1.32 : Math.max(0.55, L.throttle)) * flicker, 1);
+      lc.icpsFlame.scale.set(
+        1.15,
+        (tliBurning ? 1.32 : Math.max(0.55, L.throttle)) * flicker,
+        1.15
+      );
     }
     lc.rocketEngineGlow.position.set(0, nozzleLocalY - 1.2, 0);
     lc.rocketEngineGlow.color.setHex(L.coreSeparated ? 0x38bdf8 : 0xffb347);
@@ -1293,9 +1606,9 @@ export class SpaceSceneManager {
     if (thrusting) {
       const flicker = 0.88 + Math.sin(elapsedSec * 46) * 0.16;
       lc.flameGroup.scale.set(
-        1,
-        Math.max(0.45, L.throttle) * flicker * (L.srbSeparated ? 0.72 : 1.22),
-        1
+        vacuumExpand,
+        Math.max(0.45, L.throttle) * flicker * (L.srbSeparated ? 0.78 : 1.22),
+        vacuumExpand
       );
       lc.trenchLight.intensity = alt < 4 ? 12 * L.throttle : 0;
 
@@ -1541,46 +1854,167 @@ export class SpaceSceneManager {
     );
 
     const scaleMode: SolarScaleMode = s.solarScaleMode ?? 'exploration';
-    this.lastSolarScaleMode = scaleMode;
+    const localAnchorId = s.localAnchorId ?? 'earth';
     const isSci = scaleMode === 'scientific';
+    const isLocal = scaleMode === 'local';
     const epochYears = s.solarEpochYears ?? 0;
+    const spaceCamMode: SpaceCameraMode = s.spaceCameraMode ?? 'track';
+
+    // Rebuild 3D inclined elliptical orbit lines & asteroid belt matrices only when scaleMode or localAnchorId changes
+    if (scaleMode !== this.lastSolarScaleMode || localAnchorId !== this.lastLocalAnchorId) {
+      this.lastSolarScaleMode = scaleMode;
+      this.lastLocalAnchorId = localAnchorId;
+
+      Object.entries(ss.orbitLines).forEach(([bodyId, line]) => {
+        if (isLocal) {
+          line.visible = false;
+          return;
+        }
+        line.visible = true;
+        const samples = ss.orbitSamplesSI[bodyId];
+        if (!samples || samples.length === 0) return;
+        const attr = line.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < samples.length && i < attr.count; i++) {
+          const pt = projectHeliocentricSIToScene(
+            bodyId,
+            samples[i],
+            scaleMode,
+            SOLAR_SUN_ORIGIN_X,
+            SOLAR_SUN_ORIGIN_Z
+          );
+          attr.setXYZ(i, pt.x, pt.y, pt.z);
+        }
+        attr.needsUpdate = true;
+      });
+
+      const lunarAttr = ss.lunarOrbitLine.geometry.attributes.position as THREE.BufferAttribute;
+      const zeroVec = { xM: 0, yM: 0, zM: 0 };
+      for (let i = 0; i < ss.lunarOrbitSamplesSI.length && i < lunarAttr.count; i++) {
+        const pt = projectHeliocentricSIToScene(
+          'moon',
+          ss.lunarOrbitSamplesSI[i],
+          scaleMode,
+          0,
+          0,
+          zeroVec,
+          zeroVec
+        );
+        lunarAttr.setXYZ(i, pt.x, pt.y, pt.z);
+      }
+      lunarAttr.needsUpdate = true;
+      ss.lunarOrbitLine.visible = !isLocal || localAnchorId === 'earth' || localAnchorId === 'moon';
+
+      // Rebuild instanced Asteroid Belt geometry matrices to match exact AU scale
+      if (isLocal) {
+        ss.asteroidBelt.visible = false;
+      } else {
+        ss.asteroidBelt.visible = true;
+        const seeds = ss.asteroidBeltSeeds;
+        const beltCount = seeds.length / 4;
+        for (let i = 0; i < beltCount; i++) {
+          const aAu = seeds[i * 4];
+          const angle = seeds[i * 4 + 1];
+          const yRatio = seeds[i * 4 + 2];
+          const sc = seeds[i * 4 + 3];
+          const r = isSci
+            ? aAu * SCIENTIFIC_UNITS_PER_AU
+            : 60.5 + ((aAu - 2.1) / 1.2) * 12.0;
+          const scMult = isSci ? 1.85 : 1.0;
+          this.scratchBeltDummy.position.set(
+            Math.cos(angle) * r,
+            yRatio * r * (isSci ? 0.32 : 0.45),
+            Math.sin(angle) * r
+          );
+          this.scratchBeltDummy.rotation.set(i * 0.7, i * 1.1, i * 0.4);
+          this.scratchBeltDummy.scale.set(
+            sc * scMult,
+            sc * 0.75 * scMult,
+            sc * 0.9 * scMult
+          );
+          this.scratchBeltDummy.updateMatrix();
+          ss.asteroidBelt.setMatrixAt(i, this.scratchBeltDummy.matrix);
+        }
+        ss.asteroidBelt.instanceMatrix.needsUpdate = true;
+      }
+    }
 
     const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
-    const moonSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
-    const earthPos = computeKeplerBodyPosition(earthSpec, epochYears, scaleMode);
-    const moonPos = getLiveSolarTargetPosition('moon', epochYears, scaleMode);
-    const relayPos = getLiveSolarTargetPosition('relay-orbit', epochYears, scaleMode);
-    const gatewayPos = getLiveSolarTargetPosition('gateway', epochYears, scaleMode);
-    const marsPos = getLiveSolarTargetPosition('mars', epochYears, scaleMode);
+    const sunSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'sun')!;
+    const sunPos = computeKeplerBodyPosition(
+      sunSpec,
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
+    const earthPos = computeKeplerBodyPosition(
+      earthSpec,
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
+    const moonPos = getLiveSolarTargetPosition(
+      'moon',
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
+    const relayPos = getLiveSolarTargetPosition(
+      'relay-orbit',
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
+    const gatewayPos = getLiveSolarTargetPosition(
+      'gateway',
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
+    const marsPos = getLiveSolarTargetPosition(
+      'mars',
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
 
     if (ss.extraBodies.earth) {
-      ss.extraBodies.earth.position.set(earthPos.x, 0, earthPos.z);
+      ss.extraBodies.earth.position.set(earthPos.x, earthPos.y, earthPos.z);
     }
-    ss.earthBodyGroup.scale.setScalar(isSci ? 0.48 : 1.0);
-    ss.lunarOrbitRing.scale.setScalar(
-      isSci
-        ? moonSpec.scientificScaleRadius / moonSpec.explorationRadiusUnits
-        : 1.0
-    );
-    ss.planets.moon.position.set(moonPos.x, 0, moonPos.z);
-    ss.planets.moon.scale.setScalar(isSci ? 0.45 : 1.0);
-    ss.planets.mars.position.set(marsPos.x, 0, marsPos.z);
-    ss.planets.mars.scale.setScalar(isSci ? 0.55 : 1.0);
+    if (ss.extraBodies.moon) {
+      ss.extraBodies.moon.position.set(moonPos.x, moonPos.y, moonPos.z);
+    }
     if (ss.extraBodies.mars) {
-      ss.extraBodies.mars.position.set(marsPos.x, 0, marsPos.z);
+      ss.extraBodies.mars.position.set(marsPos.x, marsPos.y, marsPos.z);
     }
-    ss.relayStageRing.position.set(relayPos.x, 0, relayPos.z);
-    ss.gatewayGroup.position.set(gatewayPos.x, 0, gatewayPos.z);
+    ss.relayStageRing.position.set(relayPos.x, relayPos.y, relayPos.z);
+    ss.relayStageRing.scale.setScalar(isSci ? 0.14 : isLocal ? 0.85 : 1.0);
+    ss.gatewayGroup.position.set(gatewayPos.x, gatewayPos.y, gatewayPos.z);
+    ss.gatewayGroup.scale.setScalar(isSci ? 0.06 : isLocal ? 0.42 : 0.45);
+    ss.shipGroup.scale.setScalar(isSci ? 0.045 : isLocal ? 0.24 : 0.62);
 
     // Sync transfer arc curves without per-frame allocations
     const updateArcLine = (
       line: THREE.Line,
       x0: number,
+      y0: number,
       z0: number,
       cx: number,
       cy: number,
       cz: number,
       x1: number,
+      y1: number,
       z1: number
     ) => {
       const attr = line.geometry.attributes.position as THREE.BufferAttribute;
@@ -1591,157 +2025,224 @@ export class SpaceSceneManager {
         attr.setXYZ(
           i,
           omt * omt * x0 + 2 * omt * t * cx + t * t * x1,
-          2 * omt * t * cy,
+          omt * omt * y0 + 2 * omt * t * cy + t * t * y1,
           omt * omt * z0 + 2 * omt * t * cz + t * t * z1
         );
       }
       attr.needsUpdate = true;
     };
+    const arcLift = isSci ? 0.18 : 0.25;
+    ss.transferArcs.earthMoon.visible = !isLocal || localAnchorId !== 'mars';
+    ss.transferArcs.moonGateway.visible = !isLocal || localAnchorId !== 'mars';
+    ss.transferArcs.gatewayMars.visible = !isLocal;
     updateArcLine(
       ss.transferArcs.earthMoon,
       earthPos.x,
+      earthPos.y,
       earthPos.z,
       (earthPos.x + moonPos.x) * 0.5,
-      0.25,
-      (earthPos.z + moonPos.z) * 0.5 + 1.5,
+      (earthPos.y + moonPos.y) * 0.5 + arcLift,
+      (earthPos.z + moonPos.z) * 0.5 + (isSci ? 0.3 : 1.5),
       moonPos.x,
+      moonPos.y,
       moonPos.z
     );
     updateArcLine(
       ss.transferArcs.moonGateway,
       moonPos.x,
+      moonPos.y,
       moonPos.z,
       (moonPos.x + gatewayPos.x) * 0.5,
-      0.2,
+      (moonPos.y + gatewayPos.y) * 0.5 + arcLift * 0.8,
       (moonPos.z + gatewayPos.z) * 0.5,
       gatewayPos.x,
+      gatewayPos.y,
       gatewayPos.z
     );
     updateArcLine(
       ss.transferArcs.gatewayMars,
       gatewayPos.x,
+      gatewayPos.y,
       gatewayPos.z,
       (gatewayPos.x + marsPos.x) * 0.5,
-      0.6,
+      (gatewayPos.y + marsPos.y) * 0.5 + (isSci ? 4.2 : 0.6),
       (gatewayPos.z + marsPos.z) * 0.5,
       marsPos.x,
+      marsPos.y,
       marsPos.z
     );
 
-    const phobosDist = isSci ? 2.4 : 4.2;
+    // Phobos sits inside Mars bodyScaleGroup at 2.76 Mars radii
     ss.marsPhobos.position.set(
-      marsPos.x + Math.cos(elapsedSec * 0.7) * phobosDist,
-      0.55,
-      marsPos.z + Math.sin(elapsedSec * 0.7) * phobosDist
+      Math.cos(elapsedSec * 0.7) * 2.76,
+      0.14,
+      Math.sin(elapsedSec * 0.7) * 2.76
     );
     ss.gatewayGroup.rotation.y += dt * 0.15;
-    if (ss.earthBodyGroup.children[0]) {
-      ss.earthBodyGroup.children[0].rotation.y += dt * 0.028;
+
+    // Position Sun & heliocentric lighting / belts
+    this.sunOriginVec.set(sunPos.x, sunPos.y, sunPos.z);
+    if (ss.bodyScaleGroups.sun) {
+      ss.bodyScaleGroups.sun.position.copy(this.sunOriginVec);
+      ss.bodyScaleGroups.sun.scale.setScalar(getBodyVisualRadiusUnits('sun', scaleMode));
     }
-    ss.earthClouds.rotation.y += dt * 0.04;
-    if (ss.extraBodies.earth) {
-      updateAtmosphereSunDirection(
-        ss.earthAtmo,
-        ss.extraBodies.earth.position,
-        this.sunOriginVec,
-        this.scratchVec
-      );
+    ss.sunLight.position.copy(this.sunOriginVec);
+    ss.sunLight.decay = isSci || isLocal ? 0.0 : 0.04;
+    ss.sunOuterGlow.position.copy(this.sunOriginVec);
+    const sunVisR = getBodyVisualRadiusUnits('sun', scaleMode);
+    ss.sunCorona.scale.setScalar(1 + Math.sin(elapsedSec * 2.2) * 0.025);
+    ss.sunOuterGlow.scale.set(sunVisR * 4.2, sunVisR * 4.2, 1);
+
+    ss.asteroidBelt.position.copy(this.sunOriginVec);
+    ss.asteroidBelt.rotation.y += dt * 0.015;
+    ss.kuiperBelt.visible = !isLocal;
+    ss.oortCloud.visible = !isLocal;
+    ss.stormRing.visible = !isLocal;
+    if (!isLocal) {
+      ss.kuiperBelt.scale.setScalar(isSci ? (38.0 * SCIENTIFIC_UNITS_PER_AU) / 160.0 : 1.0);
+      ss.oortCloud.scale.setScalar(isSci ? (52.0 * SCIENTIFIC_UNITS_PER_AU) / 245.0 : 1.0);
+      const stormScale = (isSci ? (0.42 * SCIENTIFIC_UNITS_PER_AU) / 21.0 : 1.0) * (s.donkiFlareActive ? 1.42 : 1.0);
+      ss.stormRing.scale.setScalar(stormScale + Math.sin(elapsedSec * 2.5) * 0.025);
+      (ss.stormRing.material as THREE.MeshBasicMaterial).opacity = s.donkiFlareActive ? 0.36 : 0.11;
     }
+
+    // Atmosphere Sun alignment
+    this.scratchAtmoVec.set(earthPos.x, earthPos.y, earthPos.z);
     updateAtmosphereSunDirection(
-      ss.marsAtmo,
-      ss.planets.mars.position,
+      ss.earthAtmo,
+      this.scratchAtmoVec,
       this.sunOriginVec,
       this.scratchVec
     );
-    const sunScale = isSci ? 0.38 : 1.0;
-    ss.sun.scale.setScalar(sunScale);
-    ss.sunCorona.scale.setScalar(sunScale * (1 + Math.sin(elapsedSec * 2.2) * 0.025));
-    ss.sunOuterGlow.scale.set(isSci ? 18 : 42, isSci ? 18 : 42, 1);
-    ss.asteroidBelt.scale.setScalar(isSci ? 37.0 / 67.0 : 1.0);
-    ss.kuiperBelt.scale.setScalar(isSci ? 180.0 / 160.0 : 1.0);
-    ss.asteroidBelt.rotation.y += dt * 0.015;
-
-    // Pulse solar storm ring gently; intensify only during active solar flare
-    const stormScale = (scaleMode === 'scientific' ? 0.55 : 1.0) * (s.donkiFlareActive ? 1.42 : 1.0);
-    ss.stormRing.scale.setScalar(stormScale + Math.sin(elapsedSec * 2.5) * 0.025);
-    (ss.stormRing.material as THREE.MeshBasicMaterial).opacity = s.donkiFlareActive ? 0.36 : 0.11;
-
-    // Rotate planets gently & lock beacon onto active target
-    (Object.keys(SOLAR_TARGETS) as Array<keyof typeof SOLAR_TARGETS>).forEach((id) => {
-      ss.planets[id].rotation.y += dt * 0.18;
-    });
+    this.scratchAtmoVec.set(marsPos.x, marsPos.y, marsPos.z);
+    updateAtmosphereSunDirection(
+      ss.marsAtmo,
+      this.scratchAtmoVec,
+      this.sunOriginVec,
+      this.scratchVec
+    );
 
     const navSpec = sp.navBodyId ? SOLAR_SYSTEM_BODIES.find((b) => b.id === sp.navBodyId) : undefined;
-    const navPos = navSpec ? computeKeplerBodyPosition(navSpec, epochYears, scaleMode) : null;
-    const liveTarget = getLiveSolarTargetPosition(sp.targetId, epochYears, scaleMode);
+    const navPos = navSpec
+      ? computeKeplerBodyPosition(
+          navSpec,
+          epochYears,
+          scaleMode,
+          SOLAR_SUN_ORIGIN_X,
+          SOLAR_SUN_ORIGIN_Z,
+          localAnchorId
+        )
+      : null;
+    const liveTarget = getLiveSolarTargetPosition(
+      sp.targetId,
+      epochYears,
+      scaleMode,
+      SOLAR_SUN_ORIGIN_X,
+      SOLAR_SUN_ORIGIN_Z,
+      localAnchorId
+    );
     const beaconX = navPos ? navPos.x : liveTarget.x;
+    const beaconY = navPos ? navPos.y : liveTarget.y;
     const beaconZ = navPos ? navPos.z : liveTarget.z;
-    const beaconRadius = navSpec ? navSpec.explorationBodySize : liveTarget.radius;
+    const beaconRadius = getBodyVisualRadiusUnits(
+      navSpec ? navSpec.id : sp.targetId === 'mars' ? 'mars' : 'moon',
+      scaleMode
+    );
 
-    ss.targetBeacon.position.set(beaconX, 0, beaconZ);
-    ss.targetBeacon.scale.setScalar((beaconRadius / 3.2) * (1 + Math.sin(elapsedSec * 4) * 0.06));
+    ss.targetBeacon.position.set(beaconX, beaconY, beaconZ);
+    ss.targetBeacon.scale.setScalar(
+      Math.max(0.03, beaconRadius / 3.2) * (1 + Math.sin(elapsedSec * 4) * 0.06)
+    );
     const showNavLine = !s.freeExploreMode || Boolean(navSpec);
     ss.targetBeacon.visible = showNavLine;
     ss.courseLine.visible = showNavLine;
 
-    // Update live course line
+    // Position Orion & live course line
+    const shipY = 0;
+    ss.shipGroup.position.set(sp.shipX, shipY, sp.shipZ);
     const posAttr = ss.courseLine.geometry.attributes.position as THREE.BufferAttribute;
-    posAttr.setXYZ(0, sp.shipX, 0, sp.shipZ);
-    posAttr.setXYZ(1, beaconX, 0, beaconZ);
+    posAttr.setXYZ(0, sp.shipX, shipY, sp.shipZ);
+    posAttr.setXYZ(1, beaconX, beaconY, beaconZ);
     posAttr.needsUpdate = true;
 
-    // Complete Solar System Keplerian Positioning & Scale Mode (zero per-frame allocations)
+    // Update all Solar System bodies: 3D Keplerian coordinates + physical radius scale + sidereal rotation
     let hasFocus = false;
     let focusRadius = 4.5;
     SOLAR_SYSTEM_BODIES.forEach((b) => {
+      const siEntry = PLANETARY_CATALOG_SI[b.id];
+      const scaleGrp = ss.bodyScaleGroups[b.id];
+      const visRadius = getBodyVisualRadiusUnits(b.id, scaleMode);
+      if (scaleGrp) {
+        scaleGrp.scale.setScalar(visRadius);
+      }
+
+      // Spin along tilted polar axis (prograde vs retrograde via signed siderealRotationPeriodS)
+      const spinMesh = ss.planetSpinMeshes[b.id];
+      if (spinMesh && siEntry && siEntry.siderealRotationPeriodS !== 0) {
+        const periodDays = siEntry.siderealRotationPeriodS / 86400;
+        const spinRate = Math.sign(periodDays) * Math.min(2.4, Math.max(0.04, 1.8 / Math.abs(periodDays)));
+        spinMesh.rotation.y += dt * spinRate * 0.32;
+        if (b.id === 'earth') {
+          ss.earthClouds.rotation.y += dt * spinRate * 0.44;
+        }
+      }
+
       if (b.id === 'sun') {
         if (s.focusedSolarBodyId === 'sun') {
-          this.scratchFocusVec.set(SOLAR_SUN_ORIGIN_X, 0, SOLAR_SUN_ORIGIN_Z);
+          this.scratchFocusVec.set(sunPos.x, sunPos.y, sunPos.z);
           hasFocus = true;
-          focusRadius = this.getSolarVisualRadius('sun');
+          focusRadius = visRadius;
         }
         return;
+      }
+
+      const orbitLine = ss.orbitLines[b.id];
+      if (orbitLine && !isLocal) {
+        const rMat = orbitLine.material as THREE.LineBasicMaterial;
+        const baseOp = typeof orbitLine.userData.baseOpacity === 'number' ? orbitLine.userData.baseOpacity : 0.28;
+        rMat.opacity = s.focusedSolarBodyId === b.id ? Math.min(0.82, baseOp + 0.36) : baseOp;
       }
       if (b.id === 'moon') {
-        if (s.focusedSolarBodyId === 'moon') {
-          this.scratchFocusVec.copy(ss.planets.moon.position);
-          hasFocus = true;
-          focusRadius = this.getSolarVisualRadius('moon');
-        }
-        return;
+        (ss.lunarOrbitLine.material as THREE.LineBasicMaterial).opacity =
+          s.focusedSolarBodyId === 'moon' || s.focusedSolarBodyId === 'earth' ? 0.72 : 0.42;
       }
-      const pos = computeKeplerBodyPosition(b, epochYears, scaleMode);
-      const ring = ss.orbitRings[b.id];
-      if (ring) {
-        const refRad = Math.max(2, b.explorationRadiusUnits);
-        ring.scale.setScalar((scaleMode === 'scientific' ? b.scientificScaleRadius : b.explorationRadiusUnits) / refRad);
-        const rMat = ring.material as THREE.MeshBasicMaterial;
-        const baseOp = typeof ring.userData.baseOpacity === 'number' ? ring.userData.baseOpacity : 0.28;
-        rMat.opacity = s.focusedSolarBodyId === b.id ? Math.min(0.72, baseOp + 0.32) : baseOp;
-      }
-      (ss.lunarOrbitRing.material as THREE.MeshBasicMaterial).opacity =
-        s.focusedSolarBodyId === 'moon' || s.focusedSolarBodyId === 'earth' ? 0.68 : 0.4;
+
       const bodyObj = ss.extraBodies[b.id];
-      if (bodyObj) {
-        if (b.id !== 'earth' && b.id !== 'mars') {
-          bodyObj.position.set(pos.x, 0, pos.z);
-          bodyObj.scale.setScalar(isSci ? 0.55 : 1.0);
-          bodyObj.rotation.y += dt * 0.25;
-        }
-        if (b.id === 'halley') {
-          const dx = pos.x - SOLAR_SUN_ORIGIN_X;
-          const dz = pos.z - SOLAR_SUN_ORIGIN_Z;
-          bodyObj.rotation.y = Math.atan2(dx, dz);
-        }
-        if (s.focusedSolarBodyId === b.id) {
-          this.scratchFocusVec.copy(bodyObj.position);
-          hasFocus = true;
-          focusRadius = this.getSolarVisualRadius(b.id);
-        }
+      if (!bodyObj) return;
+
+      const pos = computeKeplerBodyPosition(
+        b,
+        epochYears,
+        scaleMode,
+        SOLAR_SUN_ORIGIN_X,
+        SOLAR_SUN_ORIGIN_Z,
+        localAnchorId
+      );
+      bodyObj.position.set(pos.x, pos.y, pos.z);
+
+      if (isLocal) {
+        const distFromAnchorLocal = Math.hypot(pos.x, pos.y, pos.z);
+        bodyObj.visible = distFromAnchorLocal < 12000;
+      } else {
+        bodyObj.visible = true;
+      }
+
+      if (b.id === 'halley') {
+        const dxS = pos.x - sunPos.x;
+        const dyS = pos.y - sunPos.y;
+        const dzS = pos.z - sunPos.z;
+        bodyObj.rotation.y = Math.atan2(dxS, dzS);
+        bodyObj.rotation.x = Math.atan2(-dyS, Math.max(0.01, Math.hypot(dxS, dzS)));
+      }
+
+      if (s.focusedSolarBodyId === b.id) {
+        this.scratchFocusVec.set(pos.x, pos.y, pos.z);
+        hasFocus = true;
+        focusRadius = visRadius;
       }
     });
 
-    // Sync glowing cyan selection ring around the focused Solar System body
+    // Selection Halo Ring around focused body
     if (hasFocus && s.focusedSolarBodyId) {
       ss.selectionRing.visible = true;
       ss.selectionRing.position.copy(this.scratchFocusVec);
@@ -1751,42 +2252,155 @@ export class SpaceSceneManager {
       ss.selectionRing.visible = false;
     }
 
-    // Camera: focused Solar System body OR elevated chase OR full 360° orbit + wheel zoom
-    if (hasFocus && !s.userOrbitActive) {
-      const dist = Math.min(200, Math.max(6.2, s.orbitDistance));
+    // Floating-Origin Camera-Relative Scene Shifting (prevents float32 jitter at 10^9+ km Scientific / Local scales)
+    let originX = 0;
+    let originY = 0;
+    let originZ = 0;
+    if (isSci || isLocal) {
+      if (spaceCamMode === 'overview') {
+        originX = isLocal ? 0 : SOLAR_SUN_ORIGIN_X;
+        originY = 0;
+        originZ = isLocal ? 0 : SOLAR_SUN_ORIGIN_Z;
+      } else if (hasFocus) {
+        originX = this.scratchFocusVec.x;
+        originY = this.scratchFocusVec.y;
+        originZ = this.scratchFocusVec.z;
+      } else {
+        originX = sp.shipX;
+        originY = shipY;
+        originZ = sp.shipZ;
+      }
+    }
+    ss.group.position.set(-originX, -originY, -originZ);
+
+    const focusCamSpaceX = this.scratchFocusVec.x - originX;
+    const focusCamSpaceY = this.scratchFocusVec.y - originY;
+    const focusCamSpaceZ = this.scratchFocusVec.z - originZ;
+    const shipCamSpaceX = sp.shipX - originX;
+    const shipCamSpaceY = shipY - originY;
+    const shipCamSpaceZ = sp.shipZ - originZ;
+
+    let activeDistForNear = 12;
+    if (spaceCamMode === 'overview') {
+      const ovDist = isSci
+        ? Math.min(2800, Math.max(120, s.orbitDistance * 4.2))
+        : isLocal
+          ? Math.min(950, Math.max(40, s.orbitDistance * 2.2))
+          : Math.min(340, Math.max(60, s.orbitDistance * 2.4));
+      const ovTargetX = isSci || isLocal ? 0 : SOLAR_SUN_ORIGIN_X;
+      const ovTargetZ = isSci || isLocal ? 0 : SOLAR_SUN_ORIGIN_Z;
       this.camPosTarget.set(
-        this.scratchFocusVec.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        Math.max(2.2, this.scratchFocusVec.y + Math.sin(s.orbitPitch) * dist + 1.5),
-        this.scratchFocusVec.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        ovTargetX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * ovDist,
+        Math.max(18, Math.sin(Math.max(0.38, s.orbitPitch)) * ovDist),
+        ovTargetZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * ovDist
       );
-      this.camLookTarget.copy(this.scratchFocusVec);
-    } else if (s.userOrbitActive) {
-      const anchor = hasFocus
-        ? this.scratchFocusVec
-        : this.scratchShipAnchor.set(sp.shipX, 0, sp.shipZ);
-      const dist = Math.min(240, Math.max(4.5, s.orbitDistance));
+      this.camLookTarget.set(ovTargetX, 0, ovTargetZ);
+      activeDistForNear = ovDist;
+    } else if ((spaceCamMode === 'focus' || (hasFocus && !s.userOrbitActive)) && hasFocus) {
+      const minSafeDist = Math.max(isSci ? 0.025 : 2.6, focusRadius * 2.35);
+      const maxSafeDist = isSci ? Math.max(24, focusRadius * 48) : 220;
+      const rawDist = isSci && s.orbitDistance > focusRadius * 65 ? focusRadius * 5.2 : s.orbitDistance;
+      const dist = Math.min(maxSafeDist, Math.max(minSafeDist, rawDist));
       this.camPosTarget.set(
-        anchor.x + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
-        anchor.y + Math.sin(s.orbitPitch) * dist,
-        anchor.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
+        focusCamSpaceX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist,
+        focusCamSpaceY + Math.sin(s.orbitPitch) * dist + focusRadius * 0.25,
+        focusCamSpaceZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camLookTarget.copy(anchor);
+      this.camLookTarget.set(focusCamSpaceX, focusCamSpaceY, focusCamSpaceZ);
+      activeDistForNear = dist;
+    } else if (spaceCamMode === 'orbit' || spaceCamMode === 'free' || s.userOrbitActive) {
+      const anchorX = hasFocus ? focusCamSpaceX : shipCamSpaceX;
+      const anchorY = hasFocus ? focusCamSpaceY : shipCamSpaceY;
+      const anchorZ = hasFocus ? focusCamSpaceZ : shipCamSpaceZ;
+      const minSafeDist = hasFocus
+        ? Math.max(isSci ? 0.022 : 2.2, focusRadius * 2.2)
+        : isSci
+          ? 0.25
+          : 3.5;
+      const maxSafeDist = isSci ? 900 : 280;
+      const rawDist =
+        isSci && !hasFocus && s.orbitDistance > 6
+          ? 0.65
+          : isSci && hasFocus && s.orbitDistance > focusRadius * 65
+            ? focusRadius * 5.2
+            : s.orbitDistance;
+      const dist = Math.min(maxSafeDist, Math.max(minSafeDist, rawDist));
+      const yaw =
+        spaceCamMode === 'orbit' && !s.userOrbitActive ? s.orbitYaw + elapsedSec * 0.14 : s.orbitYaw;
+      this.camPosTarget.set(
+        anchorX + Math.sin(yaw) * Math.cos(s.orbitPitch) * dist,
+        anchorY + Math.sin(s.orbitPitch) * dist,
+        anchorZ + Math.cos(yaw) * Math.cos(s.orbitPitch) * dist
+      );
+      this.camLookTarget.set(anchorX, anchorY, anchorZ);
+      activeDistForNear = dist;
     } else {
-      // Closer hero 3/4 aft-quarter Orion chase camera with crisp forward orbital framing
+      // Hero 3/4 aft-quarter Orion chase camera scaled naturally for Exploration, Scientific & Local
       const fwdX = Math.sin(sp.headingRad);
       const fwdZ = Math.cos(sp.headingRad);
       const rightX = Math.cos(sp.headingRad);
       const rightZ = -Math.sin(sp.headingRad);
+      const chBack = isSci ? 0.56 : isLocal ? 3.4 : 7.6;
+      const chSide = isSci ? 0.1 : isLocal ? 0.6 : 1.35;
+      const chUp = isSci ? 0.2 : isLocal ? 1.2 : 2.75;
+      const chLook = isSci ? 0.28 : isLocal ? 1.7 : 3.8;
       this.camPosTarget.set(
-        sp.shipX - fwdX * 7.6 + rightX * 1.35,
-        2.75,
-        sp.shipZ - fwdZ * 7.6 + rightZ * 1.35
+        shipCamSpaceX - fwdX * chBack + rightX * chSide,
+        shipCamSpaceY + chUp,
+        shipCamSpaceZ - fwdZ * chBack + rightZ * chSide
       );
-      this.camLookTarget.set(sp.shipX + fwdX * 3.8, 0.25, sp.shipZ + fwdZ * 3.8);
+      this.camLookTarget.set(
+        shipCamSpaceX + fwdX * chLook,
+        shipCamSpaceY + (isSci ? 0.02 : 0.25),
+        shipCamSpaceZ + fwdZ * chLook
+      );
+      activeDistForNear = chBack;
     }
+
+    const desiredNear = Math.min(0.4, Math.max(0.002, activeDistForNear * 0.015));
+    const desiredFar = 42000;
+    if (Math.abs(desiredNear - this.camera.near) > 0.002 || Math.abs(desiredFar - this.camera.far) > 1) {
+      this.camera.near = desiredNear;
+      this.camera.far = desiredFar;
+      this.camera.updateProjectionMatrix();
+    }
+
     this.camera.position.lerp(this.camPosTarget, Math.min(1, 9.5 * dt));
     this.camLookCurrent.lerp(this.camLookTarget, Math.min(1, 10.5 * dt));
     this.camera.lookAt(this.camLookCurrent);
+
+    // Update Earth's custom atmospheric scattering shader & separate Fresnel blue rim mesh layer
+    const earthCamDist = Math.hypot(
+      this.camera.position.x - (earthPos.x - originX),
+      this.camera.position.y - (earthPos.y - originY),
+      this.camera.position.z - (earthPos.z - originZ)
+    );
+    const earthVisR = getBodyVisualRadiusUnits('earth', scaleMode);
+    this.scratchAtmoVec.set(earthPos.x, earthPos.y, earthPos.z);
+    this.updateEarthShaderLayerUniforms(
+      ss.earthAtmo,
+      this.scratchAtmoVec,
+      this.sunOriginVec,
+      earthCamDist,
+      earthVisR,
+      1.0
+    );
+    this.updateEarthShaderLayerUniforms(
+      this.solarEarthFresnelRimMesh,
+      this.scratchAtmoVec,
+      this.sunOriginVec,
+      earthCamDist,
+      earthVisR,
+      1.0
+    );
+
+    // Keep starfield & deep-space nebula sky centered on active camera so sky never clips
+    this.starField.position.copy(this.camera.position);
+    ss.nebulaDome.position.set(
+      this.camera.position.x + originX,
+      this.camera.position.y + originY,
+      this.camera.position.z + originZ
+    );
   }
 
   private syncLunarScene(s: SceneSimulationBridge, dt: number, elapsedSec: number) {
@@ -1880,31 +2494,39 @@ export class SpaceSceneManager {
 
       if (s.phase === 'title' && !s.userOrbitActive) {
         const isOutpost = s.showcase === 'outpost';
-        const angle = isOutpost ? 0.42 + Math.sin(elapsedSec * 0.14) * 0.12 : elapsedSec * 0.16;
+        const angle = this.titleOrbitAngle;
         const rad = isOutpost ? 24.5 : s.showcase === 'rover' ? 7.5 : 11;
         const camX = focusX + Math.sin(angle) * rad;
-        const camY = focusY + (isOutpost ? 3.2 : 3.2);
         const camZ = focusZ + Math.cos(angle) * rad;
-        this.camera.position.set(camX, camY, camZ);
+        const terrainFloor = getSurfaceTerrainHeight('moon', camX, camZ) + 1.4;
+        const camY = Math.max(terrainFloor, focusY + 3.2 + Math.sin(angle * 0.5) * 0.45);
         const toCamX = camX - focusX;
         const toCamZ = camZ - focusZ;
         const len = Math.max(0.01, Math.hypot(toCamX, toCamZ));
         const rightX = toCamZ / len;
         const rightZ = -toCamX / len;
         const leftShift = isOutpost ? 5.2 : s.showcase === 'rover' ? 1.8 : 2.8;
-        this.camera.lookAt(
+        this.camPosTarget.set(camX, camY, camZ);
+        this.camLookTarget.set(
           focusX - rightX * leftShift,
           focusY + (isOutpost ? 0.65 : 0),
           focusZ - rightZ * leftShift
         );
+        this.camera.position.lerp(this.camPosTarget, 1 - Math.exp(-4.2 * dt));
+        this.camLookCurrent.lerp(this.camLookTarget, 1 - Math.exp(-4.8 * dt));
+        this.camera.lookAt(this.camLookCurrent);
       } else {
         const dist = Math.min(68, Math.max(3.2, s.orbitDistance));
         const camX = focusX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
         const camZ = focusZ + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;
         const floorY = getSurfaceTerrainHeight(activePlanet, camX, camZ) + 0.65;
         const camY = Math.max(floorY, focusY + Math.sin(s.orbitPitch) * dist);
-        this.camera.position.set(camX, camY, camZ);
-        this.camera.lookAt(focusX, focusY, focusZ);
+        this.camPosTarget.set(camX, camY, camZ);
+        this.camLookTarget.set(focusX, focusY, focusZ);
+        const rate = s.phase === 'title' ? 1 - Math.exp(-12 * dt) : 1;
+        this.camera.position.lerp(this.camPosTarget, rate);
+        this.camLookCurrent.lerp(this.camLookTarget, rate);
+        this.camera.lookAt(this.camLookCurrent);
       }
       return;
     }
@@ -2437,6 +3059,31 @@ export class SpaceSceneManager {
       const amp = (1.15 - t) * 0.42;
       this.camera.position.x += Math.sin(elapsedSec * 72) * amp;
       this.camera.position.y += Math.cos(elapsedSec * 84) * amp * 0.7;
+    }
+  }
+
+  private updateEarthShaderLayerUniforms(
+    mesh: THREE.Mesh,
+    bodyPos: THREE.Vector3,
+    sunPos: THREE.Vector3,
+    cameraDistance: number,
+    planetRadius: number,
+    altitudeFade: number
+  ) {
+    const mat = mesh.material;
+    if (!(mat instanceof THREE.ShaderMaterial)) return;
+    if (mat.uniforms?.uSunDir) {
+      this.scratchVec.subVectors(sunPos, bodyPos).normalize();
+      mat.uniforms.uSunDir.value.copy(this.scratchVec);
+    }
+    if (mat.uniforms?.uCameraDistance) {
+      mat.uniforms.uCameraDistance.value = cameraDistance;
+    }
+    if (mat.uniforms?.uPlanetRadius) {
+      mat.uniforms.uPlanetRadius.value = planetRadius;
+    }
+    if (mat.uniforms?.uAltitudeFade) {
+      mat.uniforms.uAltitudeFade.value = altitudeFade;
     }
   }
 

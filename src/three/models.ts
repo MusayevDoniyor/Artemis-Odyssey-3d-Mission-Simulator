@@ -12,9 +12,20 @@ import {
   SOLAR_SYSTEM_BODIES,
   computeKeplerBodyPosition,
 } from '../game/solarSystemData';
+import { PLANETARY_CATALOG_SI } from '../game/planetaryCatalog';
+import {
+  EXPLORATION_VISUAL_LAYOUT,
+  getBodyVisualRadiusUnits,
+  projectHeliocentricSIToScene,
+  sampleKeplerOrbitPointsSI,
+} from '../game/orbitalMechanics';
 import { getLunarTerrainHeight, getSurfaceTerrainHeight } from '../game/physics';
 import type { RoverCollider, SpaceTargetId, SurfacePlanet } from '../game/types';
-import { createPlanetAtmosphereMaterial, type RealPlanetMaps } from './planetMaps';
+import {
+  createEarthSurfaceScatteringMaterial,
+  createPlanetAtmosphereMaterial,
+  type RealPlanetMaps,
+} from './planetMaps';
 import type { ProceduralTextureSet } from './textures';
 
 export function tagPart(obj: THREE.Object3D, partId: string) {
@@ -55,6 +66,7 @@ export interface LunarEnvironmentHandles {
   earthGroup: THREE.Group;
   earthGlobe: THREE.Mesh;
   earthClouds: THREE.Mesh;
+  earthScatter: THREE.Mesh;
   earthAtmo: THREE.Mesh;
   marsDecorGroup: THREE.Group;
   padLight: THREE.PointLight;
@@ -119,12 +131,18 @@ export function createLunarEnvironment(
   );
   earthGroup.add(earthClouds);
 
+  const earthScatter = new THREE.Mesh(
+    new THREE.SphereGeometry(28.45, 44, 32),
+    createEarthSurfaceScatteringMaterial(0.76)
+  );
+  earthGroup.add(earthScatter);
+
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(29.9, 40, 32),
+    new THREE.SphereGeometry(29.85, 40, 32),
     createPlanetAtmosphereMaterial({
-      dayColor: 0x38bdf8,
-      twilightColor: 0x93c5fd,
-      intensity: 1.05,
+      dayColor: 0x3b9eff,
+      twilightColor: 0xfb923c,
+      intensity: 1.08,
       power: 2.35,
       nightFloor: 0.14,
     })
@@ -957,6 +975,7 @@ export function createLunarEnvironment(
     earthGroup,
     earthGlobe,
     earthClouds,
+    earthScatter,
     earthAtmo,
     marsDecorGroup,
     padLight,
@@ -1804,6 +1823,9 @@ export interface LaunchComplexHandles {
   cloudMat: THREE.SpriteMaterial;
   coolCloudMat: THREE.SpriteMaterial;
   earthLimb: THREE.Group;
+  earthLimbGlobeMat: THREE.MeshStandardMaterial;
+  earthLimbScatter: THREE.Mesh;
+  earthLimbAtmo: THREE.Mesh;
   moonMesh: THREE.Mesh;
   cloudLayer: THREE.Group;
   crewAccessArm: THREE.Group;
@@ -2384,35 +2406,42 @@ export function createLaunchComplexAndSLS(
   groundGroup.add(padSpotlight, padSpotlight.target);
   group.add(groundGroup);
 
-  // Curved Earth Horizon with Real Surface Map & Atmospheric Cyan Limb Halo for > 18 km
+  // Curved Earth Horizon with Real Surface Map + Rayleigh Surface Scatter + Blue Rim Halo for > 16 km
   const earthLimb = new THREE.Group();
   earthLimb.position.set(0, -104, 0);
+  const earthLimbGlobeMat = new THREE.MeshStandardMaterial({
+    map: planetMaps.earthMap,
+    color: 0xffffff,
+    roughness: 0.56,
+    metalness: 0.08,
+    envMapIntensity: 0.24,
+    emissive: 0x051b2c,
+    emissiveIntensity: 0.08,
+    transparent: true,
+    opacity: 0,
+  });
   earthLimb.add(
     new THREE.Mesh(
       new THREE.SphereGeometry(95, 56, 36),
-      new THREE.MeshStandardMaterial({
-        map: planetMaps.earthMap,
-        color: 0xffffff,
-        roughness: 0.56,
-        metalness: 0.08,
-        envMapIntensity: 0.24,
-        emissive: 0x051b2c,
-        emissiveIntensity: 0.08,
-      })
+      earthLimbGlobeMat
     )
   );
-  earthLimb.add(
-    new THREE.Mesh(
-      new THREE.SphereGeometry(97.8, 48, 32),
-      createPlanetAtmosphereMaterial({
-        dayColor: 0x38bdf8,
-        twilightColor: 0xbae6fd,
-        intensity: 1.0,
-        power: 2.2,
-        nightFloor: 0.25,
-      })
-    )
+  const earthLimbScatter = new THREE.Mesh(
+    new THREE.SphereGeometry(95.35, 56, 36),
+    createEarthSurfaceScatteringMaterial(0.84)
   );
+  earthLimb.add(earthLimbScatter);
+  const earthLimbAtmo = new THREE.Mesh(
+    new THREE.SphereGeometry(98.2, 48, 32),
+    createPlanetAtmosphereMaterial({
+      dayColor: 0x3b9eff,
+      twilightColor: 0xfb923c,
+      intensity: 1.16,
+      power: 2.2,
+      nightFloor: 0.24,
+    })
+  );
+  earthLimb.add(earthLimbAtmo);
   earthLimb.visible = false;
   group.add(earthLimb);
 
@@ -2426,35 +2455,35 @@ export function createLaunchComplexAndSLS(
   leoOrbitRing.visible = false;
   group.add(leoOrbitRing);
 
-  // SLS Block 1 Stack (Single Rocket Instance shared across Title, Inspector, and Launch)
+  // SLS Block 1 Stack — Calibrated to NASA 98.3m height x 8.4m core (11.7:1 fineness at 1 unit = 4 m)
   const rocketFull = new THREE.Group();
   const coreGroup = new THREE.Group();
   const coreStage = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.08, 1.08, 15.8, 32),
+    new THREE.CylinderGeometry(1.05, 1.05, 16.15, 32),
     new THREE.MeshStandardMaterial({ map: tex.slsCore, color: 0xffffff, roughness: 0.5, metalness: 0.16 })
   );
-  coreStage.position.y = 8.9;
+  coreStage.position.y = 8.98;
   coreStage.castShadow = true;
   coreGroup.add(coreStage);
 
   // External LOX Feedlines & Avionics System Tunnel along Core Stage
   const feedMat = new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.48, metalness: 0.25 });
   const racewayMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.42, metalness: 0.28 });
-  [-1.1, 1.1].forEach((fx) => {
-    const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 13.8, 10), feedMat);
-    conduit.position.set(fx, 8.6, 0.25);
+  [-1.07, 1.07].forEach((fx) => {
+    const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 14.0, 10), feedMat);
+    conduit.position.set(fx, 8.75, 0.22);
     coreGroup.add(conduit);
   });
-  const sysTunnel = new THREE.Mesh(new THREE.BoxGeometry(0.18, 14.2, 0.18), racewayMat);
-  sysTunnel.position.set(0, 8.8, 1.1);
+  const sysTunnel = new THREE.Mesh(new THREE.BoxGeometry(0.16, 14.4, 0.16), racewayMat);
+  sysTunnel.position.set(0, 8.95, 1.07);
   coreGroup.add(sysTunnel);
 
   // 4 Detailed RS-25 Engine Bells + Turbopump Gimbal Collars + Glowing Throats
   const rs25Positions: Array<[number, number, number]> = [
-    [-0.44, 0.9, -0.44],
-    [0.44, 0.9, -0.44],
-    [-0.44, 0.9, 0.44],
-    [0.44, 0.9, 0.44],
+    [-0.42, 0.9, -0.42],
+    [0.42, 0.9, -0.42],
+    [-0.42, 0.9, 0.42],
+    [0.42, 0.9, 0.42],
   ];
   const bellMat = new THREE.MeshStandardMaterial({
     color: 0x94a3b8,
@@ -2465,68 +2494,68 @@ export function createLaunchComplexAndSLS(
   const collarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
   const throatMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
   rs25Positions.forEach(([px, py, pz]) => {
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.28, 14), collarMat);
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.26, 14), collarMat);
     collar.position.set(px, py + 0.16, pz);
     coreGroup.add(collar);
-    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.44, 0.95, 22, 1, true), bellMat);
-    bell.position.set(px, py - 0.34, pz);
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.42, 0.9, 22, 1, true), bellMat);
+    bell.position.set(px, py - 0.32, pz);
     coreGroup.add(bell);
-    const throat = new THREE.Mesh(new THREE.CircleGeometry(0.16, 14), throatMat);
+    const throat = new THREE.Mesh(new THREE.CircleGeometry(0.15, 14), throatMat);
     throat.rotation.x = Math.PI / 2;
-    throat.position.set(px, py - 0.05, pz);
+    throat.position.set(px, py - 0.04, pz);
     coreGroup.add(throat);
   });
   tagPart(coreGroup, 'sls-core');
 
-  // Twin 5-Segment Solid Rocket Boosters (54.9m proportion)
+  // Twin 5-Segment Solid Rocket Boosters (54.9m = 13.73u height x 3.71m = 0.464u radius)
   const makeSrb = (xOffset: number) => {
     const g = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.47, 0.47, 11.4, 24),
+      new THREE.CylinderGeometry(0.464, 0.464, 10.9, 24),
       new THREE.MeshStandardMaterial({ map: tex.slsSrb, color: 0xffffff, roughness: 0.34, metalness: 0.18 })
     );
-    body.position.set(xOffset, 7.2, 0);
+    body.position.set(xOffset, 6.85, 0);
     body.castShadow = true;
     g.add(body);
 
     const cone = new THREE.Mesh(
-      new THREE.ConeGeometry(0.47, 1.95, 24),
+      new THREE.ConeGeometry(0.464, 1.95, 24),
       new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.18 })
     );
-    cone.position.set(xOffset, 13.88, 0);
+    cone.position.set(xOffset, 13.28, 0);
     g.add(cone);
 
     // 5-Segment Field Joint Stiffener Rings
-    [3.0, 5.4, 7.8, 10.2].forEach((ry) => {
-      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.49, 0.1, 20), collarMat);
+    [2.8, 5.1, 7.4, 9.7].forEach((ry) => {
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.484, 0.484, 0.1, 20), collarMat);
       ring.position.set(xOffset, ry, 0);
       g.add(ring);
     });
 
     // Upper & Lower Heavy Attach Struts to Core Stage
-    [3.2, 11.6].forEach((sy) => {
-      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.24, 0.32), collarMat);
+    [3.0, 11.2].forEach((sy) => {
+      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.22, 0.3), collarMat);
       strut.position.set(xOffset * 0.76, sy, 0);
       g.add(strut);
     });
 
     const skirt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.47, 0.66, 1.15, 20),
+      new THREE.CylinderGeometry(0.464, 0.64, 1.05, 20),
       new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.38, metalness: 0.2 })
     );
-    skirt.position.set(xOffset, 1.05, 0);
+    skirt.position.set(xOffset, 0.98, 0);
     g.add(skirt);
 
-    const srbNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.44, 0.65, 18, 1, true), bellMat);
-    srbNozzle.position.set(xOffset, 0.35, 0);
+    const srbNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.42, 0.62, 18, 1, true), bellMat);
+    srbNozzle.position.set(xOffset, 0.32, 0);
     g.add(srbNozzle);
 
     // Booster Separation Motor (BSM) radial plume puff
     const bsm = new THREE.Mesh(
-      new THREE.ConeGeometry(0.32, 2.2, 10),
+      new THREE.ConeGeometry(0.3, 2.0, 10),
       new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.92 })
     );
-    bsm.position.set(xOffset - Math.sign(xOffset) * 0.45, 13.2, 0);
+    bsm.position.set(xOffset - Math.sign(xOffset) * 0.42, 12.6, 0);
     bsm.rotation.z = Math.sign(xOffset) * (Math.PI / 2);
     bsm.visible = false;
     g.add(bsm);
@@ -2534,40 +2563,40 @@ export function createLaunchComplexAndSLS(
     tagPart(g, 'sls-boosters');
     return { g, bsm };
   };
-  const srbLeftBuilt = makeSrb(-1.62);
-  const srbRightBuilt = makeSrb(1.62);
+  const srbLeftBuilt = makeSrb(-1.55);
+  const srbRightBuilt = makeSrb(1.55);
   const srbLeft = srbLeftBuilt.g;
   const srbRight = srbRightBuilt.g;
   const srbLeftBsm = srbLeftBuilt.bsm;
   const srbRightBsm = srbRightBuilt.bsm;
 
-  // Upper Stage Stack (LVSA + ICPS + Stage Adapter + ESM + Orion + Seamless LAS Ogive Tower)
+  // Upper Stage Stack (LVSA + ICPS 5.1m dia + Stage Adapter + ESM + Orion + LAS Ogive Tower -> 24.58u = 98.3m)
   const upperGroup = new THREE.Group();
   const icpsGroup = new THREE.Group();
 
   const lvsa = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.68, 1.08, 2.2, 28),
+    new THREE.CylinderGeometry(0.64, 1.05, 1.45, 28),
     new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.46, metalness: 0.22 })
   );
-  lvsa.position.y = 17.9;
+  lvsa.position.y = 17.78;
   icpsGroup.add(lvsa);
 
   const icps = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.68, 0.68, 2.08, 24),
+    new THREE.CylinderGeometry(0.64, 0.64, 2.05, 24),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.42 })
   );
-  icps.position.y = 20.02;
+  icps.position.y = 19.52;
   icpsGroup.add(icps);
 
-  // ICPS RL10 Vacuum Cryogenic Engine Bell & Plume
-  const icpsNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 0.68, 16, 1, true), bellMat);
-  icpsNozzle.position.y = 18.6;
+  // ICPS RL10B-2 Vacuum Cryogenic Engine Bell & Plume
+  const icpsNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.32, 0.66, 16, 1, true), bellMat);
+  icpsNozzle.position.y = 18.2;
   icpsGroup.add(icpsNozzle);
 
   const icpsFlame = new THREE.Group();
-  icpsFlame.position.y = 18.2;
+  icpsFlame.position.y = 17.85;
   const icpsOuter = new THREE.Mesh(
-    new THREE.ConeGeometry(0.62, 4.8, 16),
+    new THREE.ConeGeometry(0.6, 4.6, 16),
     new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -2577,9 +2606,9 @@ export function createLaunchComplexAndSLS(
     })
   );
   icpsOuter.rotation.x = Math.PI;
-  icpsOuter.position.y = -2.4;
+  icpsOuter.position.y = -2.3;
   const icpsCore = new THREE.Mesh(
-    new THREE.ConeGeometry(0.28, 2.8, 12),
+    new THREE.ConeGeometry(0.26, 2.6, 12),
     new THREE.MeshBasicMaterial({
       color: 0xe0f2fe,
       transparent: true,
@@ -2589,69 +2618,69 @@ export function createLaunchComplexAndSLS(
     })
   );
   icpsCore.rotation.x = Math.PI;
-  icpsCore.position.y = -1.4;
+  icpsCore.position.y = -1.3;
   icpsFlame.add(icpsOuter, icpsCore);
   icpsFlame.visible = false;
   icpsGroup.add(icpsFlame);
 
   // NASA Meatball decal cleanly mounted on ICPS fairing
   const orionDecal = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.46, 0.46),
+    new THREE.PlaneGeometry(0.44, 0.44),
     new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
   );
-  orionDecal.position.set(0, 20.05, 0.7);
+  orionDecal.position.set(0, 19.55, 0.66);
   icpsGroup.add(orionDecal);
   tagPart(icpsGroup, 'sls-icps');
   upperGroup.add(icpsGroup);
 
   const orionStack = new THREE.Group();
   const stageAdapter = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.67, 0.68, 0.44, 28),
+    new THREE.CylinderGeometry(0.63, 0.64, 0.42, 28),
     new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.38 })
   );
-  stageAdapter.position.y = 21.26;
+  stageAdapter.position.y = 20.75;
   orionStack.add(stageAdapter);
 
   // European Service Module (ESM) cylindrical bus + folded solar bay ribs & RCS quads
   const esmBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.67, 0.67, 0.72, 24),
+    new THREE.CylinderGeometry(0.63, 0.63, 0.72, 24),
     new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.32, metalness: 0.65 })
   );
-  esmBody.position.y = 21.82;
+  esmBody.position.y = 21.32;
   orionStack.add(esmBody);
 
   [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((ea) => {
     const solarRib = new THREE.Mesh(
-      new THREE.BoxGeometry(0.18, 0.56, 0.08),
+      new THREE.BoxGeometry(0.17, 0.54, 0.07),
       new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xbfdbfe, metalness: 0.55, roughness: 0.2 })
     );
-    solarRib.position.set(Math.sin(ea) * 0.68, 21.82, Math.cos(ea) * 0.68);
+    solarRib.position.set(Math.sin(ea) * 0.64, 21.32, Math.cos(ea) * 0.64);
     solarRib.rotation.y = ea;
     orionStack.add(solarRib);
 
-    const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.1), collarMat);
-    rcsPod.position.set(Math.sin(ea + Math.PI / 4) * 0.7, 21.95, Math.cos(ea + Math.PI / 4) * 0.7);
+    const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.09), collarMat);
+    rcsPod.position.set(Math.sin(ea + Math.PI / 4) * 0.66, 21.44, Math.cos(ea + Math.PI / 4) * 0.66);
     orionStack.add(rcsPod);
   });
 
   const heatshieldRing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.68, 0.67, 0.14, 28),
+    new THREE.CylinderGeometry(0.64, 0.63, 0.14, 28),
     new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.45, metalness: 0.5 })
   );
-  heatshieldRing.position.y = 22.22;
+  heatshieldRing.position.y = 21.74;
   orionStack.add(heatshieldRing);
 
-  // Orion Crew Module frustum seated flush atop ESM (22.24..23.12)
+  // Orion Crew Module frustum seated flush atop ESM (5.02m dia = 0.628u max radius)
   const orion = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.34, 0.68, 0.88, 28),
+    new THREE.CylinderGeometry(0.32, 0.63, 0.84, 28),
     new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
   );
-  orion.position.y = 22.68;
+  orion.position.y = 22.22;
   orionStack.add(orion);
 
   // Transonic Mach-1 Condensation Vapor Cone
   const machCone = new THREE.Mesh(
-    new THREE.ConeGeometry(3.2, 3.8, 28, 1, true),
+    new THREE.ConeGeometry(3.0, 3.6, 28, 1, true),
     new THREE.MeshBasicMaterial({
       color: 0xf8fafc,
       transparent: true,
@@ -2660,44 +2689,44 @@ export function createLaunchComplexAndSLS(
       depthWrite: false,
     })
   );
-  machCone.position.y = 18.8;
+  machCone.position.y = 18.4;
   machCone.visible = false;
   orionStack.add(machCone);
 
-  // Launch Abort System (LAS) Ogive Fairing & Escape Tower seated flush on Orion forward ring
+  // Launch Abort System (LAS) Ogive Fairing & Escape Tower -> Tip reaches y = 25.47 (height = 24.57u = 98.3m)
   const abortTower = new THREE.Group();
-  abortTower.position.y = 23.02;
+  abortTower.position.y = 22.58;
   const lasBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15, 0.38, 1.45, 24),
+    new THREE.CylinderGeometry(0.14, 0.35, 1.38, 24),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
   );
   lasBody.position.y = 0.62;
   abortTower.add(lasBody);
   const lasCollar = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.19, 0.19, 0.14, 16),
+    new THREE.CylinderGeometry(0.18, 0.18, 0.13, 16),
     collarMat
   );
-  lasCollar.position.y = 1.32;
+  lasCollar.position.y = 1.28;
   abortTower.add(lasCollar);
   [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((na) => {
-    const abortNoz = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 8), bellMat);
-    abortNoz.position.set(Math.sin(na) * 0.18, 1.24, Math.cos(na) * 0.18);
+    const abortNoz = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.17, 8), bellMat);
+    abortNoz.position.set(Math.sin(na) * 0.17, 1.2, Math.cos(na) * 0.17);
     abortNoz.rotation.x = Math.cos(na) * 0.45;
     abortNoz.rotation.z = -Math.sin(na) * 0.45;
     abortTower.add(abortNoz);
   });
   const lasTip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.15, 1.25, 18),
+    new THREE.ConeGeometry(0.14, 1.22, 18),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.22 })
   );
-  lasTip.position.y = 1.95;
+  lasTip.position.y = 1.92;
   abortTower.add(lasTip);
   const lasFlame = new THREE.Mesh(
-    new THREE.ConeGeometry(0.36, 2.5, 12),
+    new THREE.ConeGeometry(0.34, 2.4, 12),
     new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.9 })
   );
   lasFlame.rotation.x = Math.PI;
-  lasFlame.position.y = -0.4;
+  lasFlame.position.y = -0.38;
   lasFlame.visible = false;
   abortTower.add(lasFlame);
   orionStack.add(abortTower);
@@ -2736,7 +2765,7 @@ export function createLaunchComplexAndSLS(
     core.position.set(px, -0.3, pz);
     flameGroup.add(core);
   });
-  [-1.62, 1.62].forEach((bx) => {
+  [-1.55, 1.55].forEach((bx) => {
     const srbHalo = new THREE.Mesh(
       new THREE.ConeGeometry(1.15, 6.8, 16),
       new THREE.MeshBasicMaterial({
@@ -2797,6 +2826,9 @@ export function createLaunchComplexAndSLS(
     cloudMat,
     coolCloudMat,
     earthLimb,
+    earthLimbGlobeMat,
+    earthLimbScatter,
+    earthLimbAtmo,
     moonMesh,
     cloudLayer,
     crewAccessArm,
@@ -3065,7 +3097,9 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
 
 export interface SolarSystemHandles {
   group: THREE.Group;
+  nebulaDome: THREE.Mesh;
   sun: THREE.Mesh;
+  sunLight: THREE.PointLight;
   sunOuterGlow: THREE.Sprite;
   shipGroup: THREE.Group;
   shipFlame: THREE.Mesh;
@@ -3075,10 +3109,12 @@ export interface SolarSystemHandles {
   shipWingsGroup: THREE.Group;
   earthBodyGroup: THREE.Group;
   earthClouds: THREE.Mesh;
+  earthScatter: THREE.Mesh;
   earthAtmo: THREE.Mesh;
   marsAtmo: THREE.Mesh;
   sunCorona: THREE.Mesh;
   asteroidBelt: THREE.InstancedMesh;
+  asteroidBeltSeeds: Float32Array;
   stormRing: THREE.Mesh;
   satellite: OrbitalSatelliteHandles;
   relayStageRing: THREE.Group;
@@ -3086,8 +3122,13 @@ export interface SolarSystemHandles {
   marsPhobos: THREE.Mesh;
   planets: Record<SpaceTargetId, THREE.Mesh>;
   extraBodies: Record<string, THREE.Group>;
-  orbitRings: Record<string, THREE.Mesh>;
-  lunarOrbitRing: THREE.Mesh;
+  bodyScaleGroups: Record<string, THREE.Group>;
+  planetTiltGroups: Record<string, THREE.Group>;
+  planetSpinMeshes: Record<string, THREE.Object3D>;
+  orbitLines: Record<string, THREE.LineLoop>;
+  orbitSamplesSI: Record<string, Array<{ xM: number; yM: number; zM: number }>>;
+  lunarOrbitLine: THREE.LineLoop;
+  lunarOrbitSamplesSI: Array<{ xM: number; yM: number; zM: number }>;
   transferArcs: {
     earthMoon: THREE.Line;
     moonGateway: THREE.Line;
@@ -3291,31 +3332,50 @@ export function createSolarSystemScene(
     });
   };
 
-  // Deep-Space Milky Way Nebula Sky Dome
+  // Deep-Space Milky Way Nebula Sky Dome (18,000u outer shell surrounds even Scientific outer Kuiper worlds)
   const nebulaDome = new THREE.Mesh(
-    new THREE.SphereGeometry(560, 32, 24),
+    new THREE.SphereGeometry(18000, 32, 24),
     new THREE.MeshBasicMaterial({
       map: tex.nebulaSky,
       side: THREE.BackSide,
       depthWrite: false,
       transparent: true,
       opacity: 0.9,
+      fog: false,
     })
   );
+  nebulaDome.frustumCulled = false;
   group.add(nebulaDome);
 
-  // Sun at (-48, 0, -36) with Granulation Plasma + Volumetric Corona + Additive Glow Sprite
-  const sunPos = new THREE.Vector3(-48, 0, -36);
+  const bodyScaleGroups: Record<string, THREE.Group> = {};
+  const planetTiltGroups: Record<string, THREE.Group> = {};
+  const planetSpinMeshes: Record<string, THREE.Object3D> = {};
+  const extraBodies: Record<string, THREE.Group> = {};
+  const orbitLines: Record<string, THREE.LineLoop> = {};
+  const orbitSamplesSI: Record<string, Array<{ xM: number; yM: number; zM: number }>> = {};
+
+  const sunOrigin = new THREE.Vector3(SOLAR_SUN_ORIGIN_X, 0, SOLAR_SUN_ORIGIN_Z);
+
+  // Sun (normalized r = 1.0 scaled by bodyScaleGroups.sun -> EXPLORATION_VISUAL_LAYOUT.sun.bodyRadiusUnits)
+  const sunScaleGroup = new THREE.Group();
+  sunScaleGroup.position.copy(sunOrigin);
+  sunScaleGroup.scale.setScalar(EXPLORATION_VISUAL_LAYOUT.sun.bodyRadiusUnits);
+  const sunTiltGroup = new THREE.Group();
+  sunTiltGroup.rotation.z = PLANETARY_CATALOG_SI.sun.axialTiltRad;
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(11.4, 36, 28),
+    new THREE.SphereGeometry(1.0, 36, 28),
     new THREE.MeshBasicMaterial({ map: tex.sunAlbedo, color: 0xffffff })
   );
-  sun.position.copy(sunPos);
   markSolarBody(sun, 'sun');
-  group.add(sun);
+  sunTiltGroup.add(sun);
+  sunScaleGroup.add(sunTiltGroup);
+  group.add(sunScaleGroup);
+  bodyScaleGroups.sun = sunScaleGroup;
+  planetTiltGroups.sun = sunTiltGroup;
+  planetSpinMeshes.sun = sun;
 
   const sunCorona = new THREE.Mesh(
-    new THREE.SphereGeometry(13.2, 28, 24),
+    new THREE.SphereGeometry(1.16, 28, 24),
     new THREE.MeshBasicMaterial({
       color: 0xf97316,
       transparent: true,
@@ -3324,42 +3384,41 @@ export function createSolarSystemScene(
       depthWrite: false,
     })
   );
-  sunCorona.position.copy(sunPos);
-  group.add(sunCorona);
+  sunScaleGroup.add(sunCorona);
 
   const sunOuterGlow = new THREE.Sprite(
     new THREE.SpriteMaterial({
       map: tex.sunGlowSprite,
       color: 0xffedd5,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
   );
-  sunOuterGlow.position.copy(sunPos);
-  sunOuterGlow.scale.set(42, 42, 1);
+  sunOuterGlow.position.copy(sunOrigin);
+  sunOuterGlow.scale.set(36, 36, 1);
   group.add(sunOuterGlow);
 
-  // Subtle Solar Coronal Prominence Loops
+  // Subtle Solar Coronal Prominence Loops attached to Sun scale group
   [0.35, -0.55].forEach((rotY, idx) => {
     const prom = new THREE.Mesh(
-      new THREE.TorusGeometry(12.1 + idx * 0.7, 0.14, 8, 42, Math.PI * 0.8),
+      new THREE.TorusGeometry(1.06 + idx * 0.06, 0.012, 8, 42, Math.PI * 0.8),
       new THREE.MeshBasicMaterial({
         color: 0xfb923c,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.4,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       })
     );
-    prom.position.copy(sunPos);
     prom.rotation.set(0.4 + idx * 0.6, rotY, idx * 1.1);
-    group.add(prom);
+    sunScaleGroup.add(prom);
   });
 
-  const sunLight = new THREE.PointLight(0xfff3d6, 3.45, 560, 0.28);
-  sunLight.position.copy(sunPos);
+  // Infinite-range heliocentric PointLight (distance = 0, gentle physical falloff) so outer planets get sharp day/night terminators
+  const sunLight = new THREE.PointLight(0xfff3d6, 3.6, 0, 0.04);
+  sunLight.position.copy(sunOrigin);
   group.add(sunLight);
 
   // Subtle Solar Radiation Boundary Ring (glows brighter only during active solar flare)
@@ -3374,32 +3433,33 @@ export function createSolarSystemScene(
     })
   );
   stormRing.rotation.x = -Math.PI / 2;
-  stormRing.position.set(sunPos.x, -0.05, sunPos.z);
+  stormRing.position.set(sunOrigin.x, -0.05, sunOrigin.z);
   group.add(stormRing);
 
   const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
-  const moonSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
   const earth0 = computeKeplerBodyPosition(earthSpec, 0, 'exploration', SOLAR_SUN_ORIGIN_X, SOLAR_SUN_ORIGIN_Z);
 
-  // Earth Departure World anchored dynamically onto Earth's true 38.5u Kepler orbit
+  // Earth: normalized r = 1.0 mesh hierarchy (scaleGroup -> tiltGroup -> spinMesh(earthBodyGroup))
   const earthGroup = new THREE.Group();
-  earthGroup.position.set(earth0.x, 0, earth0.z);
+  earthGroup.position.set(earth0.x, earth0.y, earth0.z);
+  const earthScaleGroup = new THREE.Group();
+  earthScaleGroup.scale.setScalar(getBodyVisualRadiusUnits('earth', 'exploration'));
+  const earthTiltGroup = new THREE.Group();
+  earthTiltGroup.rotation.z = PLANETARY_CATALOG_SI.earth.axialTiltRad;
   const earthBodyGroup = new THREE.Group();
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize, 48, 36),
+    new THREE.SphereGeometry(1.0, 48, 36),
     new THREE.MeshStandardMaterial({
       map: planetMaps.earthMap,
       color: 0xffffff,
       roughness: 0.58,
       metalness: 0.06,
-      envMapIntensity: 0.22,
-      emissive: 0x041423,
-      emissiveIntensity: 0.04,
+      envMapIntensity: 0.18,
     })
   );
   earthBodyGroup.add(earth);
   const earthClouds = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize * 1.014, 44, 32),
+    new THREE.SphereGeometry(1.014, 44, 32),
     new THREE.MeshStandardMaterial({
       map: tex.earthClouds,
       transparent: true,
@@ -3410,35 +3470,55 @@ export function createSolarSystemScene(
     })
   );
   earthBodyGroup.add(earthClouds);
+  const earthScatter = new THREE.Mesh(
+    new THREE.SphereGeometry(1.018, 44, 32),
+    createEarthSurfaceScatteringMaterial(0.78)
+  );
+  earthBodyGroup.add(earthScatter);
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize * 1.068, 40, 32),
+    new THREE.SphereGeometry(1.06, 40, 32),
     createPlanetAtmosphereMaterial({
-      dayColor: 0x38bdf8,
-      twilightColor: 0xbae6fd,
-      intensity: 1.12,
-      power: 2.3,
-      nightFloor: 0.09,
+      dayColor: 0x3b9eff,
+      twilightColor: 0xfb923c,
+      intensity: 1.18,
+      power: 2.32,
+      nightFloor: 0.08,
     })
   );
   earthBodyGroup.add(earthAtmo);
-  earthGroup.add(earthBodyGroup);
-
-  // Lunar Orbit Ring centered on Earth so Moon always visibly orbits Earth!
-  const lunarOrbitRing = new THREE.Mesh(
-    new THREE.RingGeometry(moonSpec.explorationRadiusUnits - 0.08, moonSpec.explorationRadiusUnits + 0.08, 72),
-    new THREE.MeshBasicMaterial({
-      color: 0x94a3b8,
-      transparent: true,
-      opacity: 0.42,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    })
-  );
-  lunarOrbitRing.rotation.x = -Math.PI / 2;
-  earthGroup.add(lunarOrbitRing);
-
+  earthTiltGroup.add(earthBodyGroup);
+  earthScaleGroup.add(earthTiltGroup);
+  earthGroup.add(earthScaleGroup);
   markSolarBody(earthGroup, 'earth');
   group.add(earthGroup);
+  bodyScaleGroups.earth = earthScaleGroup;
+  planetTiltGroups.earth = earthTiltGroup;
+  planetSpinMeshes.earth = earth;
+  extraBodies.earth = earthGroup;
+
+  // 3D Inclined Geocentric Lunar Orbit LineLoop anchored cleanly at Earth
+  const lunarOrbitSamplesSI = sampleKeplerOrbitPointsSI('moon', 128);
+  const lunarPositions = new Float32Array(lunarOrbitSamplesSI.length * 3);
+  for (let i = 0; i < lunarOrbitSamplesSI.length; i++) {
+    const pt = projectHeliocentricSIToScene(
+      'moon',
+      lunarOrbitSamplesSI[i],
+      'exploration',
+      0,
+      0,
+      { xM: 0, yM: 0, zM: 0 }
+    );
+    lunarPositions[i * 3] = pt.x;
+    lunarPositions[i * 3 + 1] = pt.y;
+    lunarPositions[i * 3 + 2] = pt.z;
+  }
+  const lunarOrbitGeo = new THREE.BufferGeometry();
+  lunarOrbitGeo.setAttribute('position', new THREE.BufferAttribute(lunarPositions, 3));
+  const lunarOrbitLine = new THREE.LineLoop(
+    lunarOrbitGeo,
+    new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.45 })
+  );
+  earthGroup.add(lunarOrbitLine);
 
   // Dashed TLI & Mars Hohmann Transfer Trajectory Arcs (dynamically synced by SpaceSceneManager)
   const buildTransferArc = (
@@ -3482,108 +3562,128 @@ export function createSolarSystemScene(
     gatewayMars: arcGatewayMars,
   };
 
-  // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars
-  const marsSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
+  // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars (using normalized r=1.0 hierarchy for planets/Moon)
   const planets = {} as Record<SpaceTargetId, THREE.Mesh>;
   let marsPhobos = new THREE.Mesh();
   let marsAtmo = new THREE.Mesh();
+
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
     const spec = SOLAR_TARGETS[id];
-    const mat =
-      id === 'moon'
-        ? new THREE.MeshStandardMaterial({
-            map: planetMaps.moonMap,
-            color: 0xffffff,
-            roughness: 0.92,
-            metalness: 0.0,
-            envMapIntensity: 0.12,
-          })
-        : id === 'mars'
+    if (id === 'moon' || id === 'mars') {
+      const parentGroup = new THREE.Group();
+      parentGroup.position.set(spec.x, 0, spec.z);
+      const scaleGroup = new THREE.Group();
+      scaleGroup.scale.setScalar(getBodyVisualRadiusUnits(id, 'exploration'));
+      const tiltGroup = new THREE.Group();
+      tiltGroup.rotation.z = PLANETARY_CATALOG_SI[id].axialTiltRad;
+
+      const mat =
+        id === 'moon'
           ? new THREE.MeshStandardMaterial({
+              map: planetMaps.moonMap,
+              color: 0xffffff,
+              roughness: 0.92,
+              metalness: 0.0,
+              envMapIntensity: 0.08,
+            })
+          : new THREE.MeshStandardMaterial({
               map: planetMaps.marsMap,
               color: 0xffffff,
               roughness: 0.86,
               metalness: 0.0,
-              envMapIntensity: 0.16,
-            })
-          : new THREE.MeshStandardMaterial({
-              color: spec.color,
-              emissive: spec.color,
-              emissiveIntensity: 0.3,
-              roughness: 0.35,
-              metalness: 0.65,
-              wireframe: id === 'relay-orbit',
+              envMapIntensity: 0.1,
             });
-    const visualBodyRadius =
-      id === 'moon'
-        ? moonSpec.explorationBodySize
-        : id === 'mars'
-          ? marsSpec.explorationBodySize
-          : spec.radius;
-    const geom =
-      id === 'relay-orbit'
-        ? new THREE.SphereGeometry(0.45, 12, 10)
-        : new THREE.SphereGeometry(visualBodyRadius, 44, 32);
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(spec.x, 0, spec.z);
-    if (id === 'gateway' || id === 'relay-orbit') mesh.visible = false;
-    if (id === 'mars') markSolarBody(mesh, 'mars');
-    else if (id === 'moon') markSolarBody(mesh, 'moon');
-    group.add(mesh);
-    planets[id] = mesh;
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.0, 44, 32), mat);
+      tiltGroup.add(mesh);
 
-    if (id === 'mars') {
-      // Thin CO2/dust atmospheric Fresnel rim attached directly to Mars mesh
-      marsAtmo = new THREE.Mesh(
-        new THREE.SphereGeometry(visualBodyRadius * 1.055, 36, 28),
-        createPlanetAtmosphereMaterial({
-          dayColor: 0xea7a47,
-          twilightColor: 0xfdba74,
-          intensity: 0.72,
-          power: 2.6,
-          nightFloor: 0.06,
-        })
-      );
-      mesh.add(marsAtmo);
+      if (id === 'mars') {
+        marsAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.045, 36, 28),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0xea7a47,
+            twilightColor: 0xfdba74,
+            intensity: 0.65,
+            power: 2.6,
+            nightFloor: 0.04,
+          })
+        );
+        tiltGroup.add(marsAtmo);
 
-      marsPhobos = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(0.45, 1),
-        new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.88 })
+        // Phobos at realistic ~2.76 Mars radii & subtle rocky radius (0.045 * R_mars visually visible cleanly)
+        marsPhobos = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.055, 1),
+          new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.92 })
+        );
+        marsPhobos.position.set(2.76, 0.14, 0);
+        scaleGroup.add(marsPhobos);
+      }
+
+      scaleGroup.add(tiltGroup);
+      parentGroup.add(scaleGroup);
+      markSolarBody(parentGroup, id);
+      group.add(parentGroup);
+
+      planets[id] = mesh;
+      extraBodies[id] = parentGroup;
+      bodyScaleGroups[id] = scaleGroup;
+      planetTiltGroups[id] = tiltGroup;
+      planetSpinMeshes[id] = mesh;
+    } else {
+      const mat = new THREE.MeshStandardMaterial({
+        color: spec.color,
+        emissive: spec.color,
+        emissiveIntensity: 0.28,
+        roughness: 0.35,
+        metalness: 0.65,
+        wireframe: id === 'relay-orbit',
+      });
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(id === 'relay-orbit' ? 0.45 : spec.radius, 14, 10),
+        mat
       );
-      marsPhobos.position.set(spec.x + 4.2, 0.55, spec.z);
-      group.add(marsPhobos);
+      mesh.position.set(spec.x, 0, spec.z);
+      mesh.visible = false;
+      group.add(mesh);
+      planets[id] = mesh;
     }
   });
 
-  // Main Asteroid Belt Ring (240 natural stony asteroids cleanly between Mars 54u and Jupiter 84u)
-  const beltCount = 240;
+  // Main Asteroid Belt (260 stony C/S/M-type asteroids dynamically scaled across a = 2.1..3.3 AU)
+  const beltCount = 260;
+  const asteroidBeltSeeds = new Float32Array(beltCount * 4);
   const asteroidBelt = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.22, 0),
+    new THREE.DodecahedronGeometry(0.18, 0),
     new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.94,
+      roughness: 0.95,
       metalness: 0.04,
-      envMapIntensity: 0.16,
+      envMapIntensity: 0.1,
     }),
     beltCount
   );
-  asteroidBelt.position.copy(sunPos);
+  asteroidBelt.position.copy(sunOrigin);
+  asteroidBelt.frustumCulled = false;
   const dummy = new THREE.Object3D();
   const astTint = new THREE.Color();
   for (let i = 0; i < beltCount; i++) {
-    const angle = (i / beltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.16;
-    const rad = 60.5 + Math.random() * 11.5;
-    dummy.position.set(
-      Math.cos(angle) * rad,
-      (Math.random() - 0.5) * 2.2,
-      Math.sin(angle) * rad
-    );
-    dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    dummy.scale.set(0.5 + Math.random() * 0.95, 0.38 + Math.random() * 0.62, 0.5 + Math.random() * 0.9);
+    const aAu = 2.1 + Math.random() * 1.2;
+    const angle = (i / beltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.22;
+    const yRatio = (Math.random() - 0.5) * 0.08;
+    const sc = 0.45 + Math.random() * 0.9;
+    asteroidBeltSeeds[i * 4] = aAu;
+    asteroidBeltSeeds[i * 4 + 1] = angle;
+    asteroidBeltSeeds[i * 4 + 2] = yRatio;
+    asteroidBeltSeeds[i * 4 + 3] = sc;
+
+    const expR = 60.5 + ((aAu - 2.1) / 1.2) * 12.0;
+    dummy.position.set(Math.cos(angle) * expR, yRatio * expR * 0.45, Math.sin(angle) * expR);
+    dummy.rotation.set(i * 0.7, i * 1.1, i * 0.4);
+    dummy.scale.set(sc, sc * 0.75, sc * 0.9);
     dummy.updateMatrix();
     asteroidBelt.setMatrixAt(i, dummy.matrix);
-    const shade = 0.22 + (i % 5) * 0.045;
-    astTint.setRGB(shade * 1.12, shade * 0.98, shade * 0.84);
+    // Low stony albedos (0.07..0.22)
+    const albedo = 0.08 + (i % 6) * 0.025;
+    astTint.setRGB(albedo * 1.18, albedo * 1.02, albedo * 0.88);
     asteroidBelt.setColorAt(i, astTint);
   }
   asteroidBelt.instanceMatrix.needsUpdate = true;
@@ -3591,10 +3691,11 @@ export function createSolarSystemScene(
   asteroidBelt.computeBoundingSphere();
   group.add(asteroidBelt);
 
-  // Lunar Gateway NRHO Multi-Module Station (PPE + HALO + i-HAB + Twin Radiator/Solar Arrays)
+  // Lunar Gateway NRHO Multi-Module Station
   const gwSpec = SOLAR_TARGETS.gateway;
   const gatewayGroup = new THREE.Group();
   gatewayGroup.position.set(gwSpec.x, 0, gwSpec.z);
+  gatewayGroup.scale.setScalar(0.45);
   const gwHull = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.65, roughness: 0.3 });
   const gwGold = new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.82, roughness: 0.26 });
   const ppe = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.72, 2.2, 12), gwGold);
@@ -3622,31 +3723,30 @@ export function createSolarSystemScene(
   const relayStageRing = new THREE.Group();
   relayStageRing.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
   const stageOuter = new THREE.Mesh(
-    new THREE.TorusGeometry(2.6, 0.09, 10, 36),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 })
+    new THREE.TorusGeometry(2.0, 0.07, 10, 36),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78 })
   );
   stageOuter.rotation.x = Math.PI / 2;
   const stageInner = new THREE.Mesh(
-    new THREE.TorusGeometry(1.4, 0.05, 8, 28),
+    new THREE.TorusGeometry(1.1, 0.04, 8, 28),
     new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 })
   );
   stageInner.rotation.x = Math.PI / 2;
   const stageBeacon = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.42, 0),
+    new THREE.OctahedronGeometry(0.32, 0),
     new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true })
   );
   relayStageRing.add(stageOuter, stageInner, stageBeacon);
   group.add(relayStageRing);
 
-  // Modular Orbital Satellite deployed from Orion bay in HERMES Relay Orbit
   const satellite = createOrbitalSatellite(tex);
   satellite.group.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
+  satellite.group.scale.setScalar(0.55);
   satellite.group.visible = false;
   group.add(satellite.group);
 
-  // Target Selection Beacon Ring
   const targetBeacon = new THREE.Mesh(
-    new THREE.TorusGeometry(4.8, 0.16, 10, 36),
+    new THREE.TorusGeometry(4.2, 0.14, 10, 36),
     new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.72 })
   );
   targetBeacon.rotation.x = Math.PI / 2;
@@ -3654,13 +3754,11 @@ export function createSolarSystemScene(
 
   // 3D NASA Orion MPCV Crew Capsule + European Service Module (ESM)
   const shipGroup = new THREE.Group();
+  shipGroup.scale.setScalar(0.62);
   const silverHull = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.68, roughness: 0.24 });
   const darkTrim = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
 
-  const esmBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.86, 0.84, 1.35, 24),
-    silverHull
-  );
+  const esmBody = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.84, 1.35, 24), silverHull);
   esmBody.rotation.x = Math.PI / 2;
   esmBody.position.z = -0.78;
   shipGroup.add(esmBody);
@@ -3673,10 +3771,7 @@ export function createSolarSystemScene(
   esmFoilBand.position.z = -0.82;
   shipGroup.add(esmFoilBand);
 
-  const aj10Bell = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2, 0.48, 0.66, 18, 1, true),
-    darkTrim
-  );
+  const aj10Bell = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.48, 0.66, 18, 1, true), darkTrim);
   aj10Bell.rotation.x = Math.PI / 2;
   aj10Bell.position.z = -1.78;
   shipGroup.add(aj10Bell);
@@ -3695,10 +3790,7 @@ export function createSolarSystemScene(
   shipGroup.add(crewModule);
 
   [-0.22, 0.22].forEach((wx, idx) => {
-    const cWin = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.22, 0.14),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
-    );
+    const cWin = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.14), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
     cWin.position.set(wx, 0.46, 0.82);
     cWin.rotation.set(-0.56, 0, idx === 0 ? 0.18 : -0.18);
     shipGroup.add(cWin);
@@ -3763,8 +3855,7 @@ export function createSolarSystemScene(
   shipPlumeInner.visible = false;
   shipGroup.add(shipPlumeInner);
 
-  // Subtle local orbital key/rim fill so Orion's white thermal tiles & blue wings gleam in deep space
-  const shipFillLight = new THREE.PointLight(0xe0f2fe, 2.2, 16, 1.2);
+  const shipFillLight = new THREE.PointLight(0xe0f2fe, 1.8, 14, 1.2);
   shipFillLight.position.set(2.4, 3.1, 2.8);
   shipGroup.add(shipFillLight);
 
@@ -3774,7 +3865,6 @@ export function createSolarSystemScene(
   );
   shipShieldShell.visible = false;
   shipGroup.add(shipShieldShell);
-
   group.add(shipGroup);
 
   const lineGeo = new THREE.BufferGeometry();
@@ -3785,11 +3875,8 @@ export function createSolarSystemScene(
   );
   group.add(courseLine);
 
-  // Extended Complete Solar System Bodies (Mercury -> Eris + Halley's Comet)
-  const extraBodies: Record<string, THREE.Group> = {};
-  const orbitRings: Record<string, THREE.Mesh> = {};
+  // Remaining Complete Solar System Bodies (Mercury -> Eris + Halley's Comet)
   let halleyTail = new THREE.Mesh();
-
   const textureForBody = (id: string) => {
     switch (id) {
       case 'mercury':
@@ -3817,57 +3904,33 @@ export function createSolarSystemScene(
 
   SOLAR_SYSTEM_BODIES.forEach((b) => {
     if (b.id === 'sun' || b.id === 'moon') return;
-    const bg = new THREE.Group();
-    if (b.id === 'earth') {
-      extraBodies[b.id] = earthGroup;
-    } else if (b.id === 'mars') {
-      bg.position.copy(planets.mars.position);
-      markSolarBody(bg, 'mars');
-      extraBodies[b.id] = bg;
-    } else {
+    if (b.id !== 'earth' && b.id !== 'mars') {
+      const bg = new THREE.Group();
+      const scaleGroup = new THREE.Group();
+      scaleGroup.scale.setScalar(getBodyVisualRadiusUnits(b.id, 'exploration'));
+      const tiltGroup = new THREE.Group();
+      tiltGroup.rotation.z = PLANETARY_CATALOG_SI[b.id]?.axialTiltRad ?? 0;
+
       const mapTex = textureForBody(b.id);
+      const isComet = b.category === 'comet';
       const sphMat = new THREE.MeshStandardMaterial({
         map: mapTex,
         bumpMap: b.id === 'mercury' || b.id === 'ceres' || b.id === 'eris' ? tex.moonBump : undefined,
-        bumpScale: b.id === 'mercury' ? 0.09 : 0.06,
+        bumpScale: b.id === 'mercury' ? 0.08 : 0.05,
         color: mapTex ? 0xffffff : b.color,
-        emissive: b.category === 'comet' ? b.color : b.id === 'venus' ? 0x451a03 : b.id === 'neptune' ? 0x0f172a : 0x090f1d,
-        emissiveIntensity: b.category === 'comet' ? 0.5 : 0.18,
-        roughness: b.id === 'jupiter' || b.id === 'saturn' || b.id === 'venus' ? 0.52 : b.id === 'uranus' || b.id === 'neptune' ? 0.44 : 0.76,
-        metalness: b.id === 'uranus' || b.id === 'neptune' ? 0.1 : 0.04,
+        emissive: isComet ? b.color : 0x000000,
+        emissiveIntensity: isComet ? 0.38 : 0.0,
+        roughness: b.id === 'jupiter' || b.id === 'saturn' || b.id === 'venus' ? 0.56 : b.id === 'uranus' || b.id === 'neptune' ? 0.46 : 0.84,
+        metalness: b.id === 'uranus' || b.id === 'neptune' ? 0.06 : 0.02,
+        envMapIntensity: 0.14,
       });
-      const sph = new THREE.Mesh(new THREE.SphereGeometry(b.explorationBodySize, 34, 26), sphMat);
-      bg.add(sph);
+      const sph = new THREE.Mesh(new THREE.SphereGeometry(1.0, 36, 28), sphMat);
+      tiltGroup.add(sph);
 
-      // Distinctive planetary atmospheric halos
-      const atmoColor =
-        b.id === 'venus'
-          ? 0xfde047
-          : b.id === 'jupiter'
-            ? 0xfdba74
-            : b.id === 'uranus'
-              ? 0x67e8f9
-              : b.id === 'neptune'
-                ? 0x3b82f6
-                : null;
-      if (atmoColor) {
-        const halo = new THREE.Mesh(
-          new THREE.SphereGeometry(b.explorationBodySize * 1.11, 28, 22),
-          new THREE.MeshBasicMaterial({
-            color: atmoColor,
-            transparent: true,
-            opacity: b.id === 'neptune' || b.id === 'venus' ? 0.22 : 0.15,
-            blending: THREE.AdditiveBlending,
-            side: THREE.BackSide,
-            depthWrite: false,
-          })
-        );
-        bg.add(halo);
-      }
-
+      // Equatorial ring systems inside tiltGroup so Saturn (26.73°) & Uranus (97.77°) align to exact pole tilt
       if (b.id === 'saturn') {
         const rings = new THREE.Mesh(
-          new THREE.RingGeometry(b.explorationBodySize * 1.32, b.explorationBodySize * 2.45, 64),
+          new THREE.RingGeometry(1.24, 2.27, 72),
           new THREE.MeshBasicMaterial({
             map: tex.saturnRingAlbedo,
             color: 0xffffff,
@@ -3877,86 +3940,108 @@ export function createSolarSystemScene(
             depthWrite: false,
           })
         );
-        rings.rotation.x = Math.PI / 2.35;
-        rings.rotation.y = 0.18;
-        bg.add(rings);
+        rings.rotation.x = -Math.PI / 2;
+        tiltGroup.add(rings);
       } else if (b.id === 'uranus') {
         const uRing = new THREE.Mesh(
-          new THREE.RingGeometry(b.explorationBodySize * 1.38, b.explorationBodySize * 1.72, 48),
+          new THREE.RingGeometry(1.38, 1.72, 56),
           new THREE.MeshBasicMaterial({
             color: 0xa5f3fc,
             transparent: true,
-            opacity: 0.52,
+            opacity: 0.46,
             side: THREE.DoubleSide,
             depthWrite: false,
           })
         );
-        uRing.rotation.z = 1.42;
-        uRing.rotation.y = 0.25;
-        bg.add(uRing);
+        uRing.rotation.x = -Math.PI / 2;
+        tiltGroup.add(uRing);
       } else if (b.id === 'jupiter') {
         for (let m = 0; m < 4; m++) {
           const jMoon = new THREE.Mesh(
-            new THREE.SphereGeometry(0.28, 10, 8),
-            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 })
+            new THREE.SphereGeometry(0.055, 10, 8),
+            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.82 })
           );
           const ang = (m / 4) * Math.PI * 2;
-          jMoon.position.set(
-            Math.cos(ang) * (b.explorationBodySize + 1.4 + m * 0.6),
-            0,
-            Math.sin(ang) * (b.explorationBodySize + 1.4 + m * 0.6)
-          );
-          bg.add(jMoon);
+          const distR = 1.45 + m * 0.25;
+          jMoon.position.set(Math.cos(ang) * distR, 0, Math.sin(ang) * distR);
+          tiltGroup.add(jMoon);
         }
       } else if (b.id === 'pluto') {
         const charon = new THREE.Mesh(
-          new THREE.SphereGeometry(0.46, 12, 10),
-          new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85 })
+          new THREE.SphereGeometry(0.51, 14, 10),
+          new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.88 })
         );
-        charon.position.set(2.1, 0, 0.8);
-        bg.add(charon);
+        charon.position.set(2.4, 0, 0.9);
+        tiltGroup.add(charon);
       } else if (b.id === 'halley') {
         halleyTail = new THREE.Mesh(
-          new THREE.ConeGeometry(1.1, 9.5, 14),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, depthWrite: false })
+          new THREE.ConeGeometry(1.4, 12.0, 14),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.36, depthWrite: false })
         );
         halleyTail.rotation.x = Math.PI / 2;
-        halleyTail.position.z = 4.9;
-        bg.add(halleyTail);
+        halleyTail.position.z = 6.2;
+        scaleGroup.add(halleyTail);
       }
 
+      scaleGroup.add(tiltGroup);
+      bg.add(scaleGroup);
       markSolarBody(bg, b.id);
       group.add(bg);
       extraBodies[b.id] = bg;
+      bodyScaleGroups[b.id] = scaleGroup;
+      planetTiltGroups[b.id] = tiltGroup;
+      planetSpinMeshes[b.id] = sph;
     }
 
-    const rRing = new THREE.Mesh(
-      new THREE.RingGeometry(Math.max(2, b.explorationRadiusUnits - 0.1), b.explorationRadiusUnits + 0.1, 144),
-      new THREE.MeshBasicMaterial({
-        color:
-          b.id === 'earth'
+    // True 3D inclined elliptical LineLoop sampled from SI Keplerian elements
+    const samples = sampleKeplerOrbitPointsSI(b.id, 192);
+    orbitSamplesSI[b.id] = samples;
+    const ptsAttr = new Float32Array(samples.length * 3);
+    for (let i = 0; i < samples.length; i++) {
+      const pt = projectHeliocentricSIToScene(
+        b.id,
+        samples[i],
+        'exploration',
+        SOLAR_SUN_ORIGIN_X,
+        SOLAR_SUN_ORIGIN_Z
+      );
+      ptsAttr[i * 3] = pt.x;
+      ptsAttr[i * 3 + 1] = pt.y;
+      ptsAttr[i * 3 + 2] = pt.z;
+    }
+    const lineGeoOrbit = new THREE.BufferGeometry();
+    lineGeoOrbit.setAttribute('position', new THREE.BufferAttribute(ptsAttr, 3));
+    const baseOp =
+      b.id === 'earth' || b.id === 'mars'
+        ? 0.48
+        : b.category === 'planet'
+          ? 0.32
+          : 0.2;
+    const orbitColor =
+      b.id === 'earth'
+        ? 0x38bdf8
+        : b.id === 'mars'
+          ? 0xfb923c
+          : b.category === 'comet'
             ? 0x38bdf8
-            : b.id === 'mars'
-              ? 0xfb923c
-              : b.category === 'comet'
-                ? 0x38bdf8
-                : b.category === 'dwarf'
-                  ? 0x64748b
-                  : 0x7dd3fc,
+            : b.category === 'dwarf'
+              ? 0x64748b
+              : 0x7dd3fc;
+    const orbitLoop = new THREE.LineLoop(
+      lineGeoOrbit,
+      new THREE.LineBasicMaterial({
+        color: orbitColor,
         transparent: true,
-        opacity: b.id === 'earth' || b.id === 'mars' ? 0.44 : b.category === 'planet' ? 0.3 : 0.18,
-        side: THREE.DoubleSide,
-        depthWrite: false,
+        opacity: baseOp,
       })
     );
-    rRing.userData.baseOpacity = b.id === 'earth' || b.id === 'mars' ? 0.44 : b.category === 'planet' ? 0.3 : 0.18;
-    rRing.rotation.x = -Math.PI / 2;
-    rRing.position.set(sunPos.x, -0.04, sunPos.z);
-    group.add(rRing);
-    orbitRings[b.id] = rRing;
+    orbitLoop.userData.baseOpacity = baseOp;
+    orbitLoop.frustumCulled = false;
+    group.add(orbitLoop);
+    orbitLines[b.id] = orbitLoop;
   });
 
-  // Glowing Cyan Selection Halo Ring around focused planet (matches New Solar System Reference)
+  // Glowing Cyan Selection Halo Ring around focused planet
   const selectionRing = new THREE.Group();
   selectionRing.visible = false;
   const selPrimary = new THREE.Mesh(
@@ -3984,7 +4069,7 @@ export function createSolarSystemScene(
   selectionRing.add(selPrimary, selOuter);
   group.add(selectionRing);
 
-  // Kuiper Belt (30-55 AU scaled band) & Outer Oort Cloud Halo Points
+  // Kuiper Belt & Outer Oort Cloud Halo Points
   const makeBeltPoints = (count: number, minR: number, maxR: number, spherical: boolean, colHex: number) => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
@@ -4009,11 +4094,11 @@ export function createSolarSystemScene(
     );
   };
   const kuiperBelt = makeBeltPoints(380, 150, 186, false, 0x93c5fd);
-  kuiperBelt.position.copy(sunPos);
+  kuiperBelt.position.copy(sunOrigin);
   group.add(kuiperBelt);
 
   const oortCloud = makeBeltPoints(450, 225, 295, true, 0x64748b);
-  oortCloud.position.copy(sunPos);
+  oortCloud.position.copy(sunOrigin);
   group.add(oortCloud);
 
   // Subtle close-range space parallax micro-dust around Orion (wrapped seamlessly per frame)
@@ -4049,7 +4134,9 @@ export function createSolarSystemScene(
 
   return {
     group,
+    nebulaDome,
     sun,
+    sunLight,
     sunOuterGlow,
     shipGroup,
     shipFlame,
@@ -4059,10 +4146,12 @@ export function createSolarSystemScene(
     shipWingsGroup,
     earthBodyGroup,
     earthClouds,
+    earthScatter,
     earthAtmo,
     marsAtmo,
     sunCorona,
     asteroidBelt,
+    asteroidBeltSeeds,
     stormRing,
     satellite,
     relayStageRing,
@@ -4070,8 +4159,13 @@ export function createSolarSystemScene(
     marsPhobos,
     planets,
     extraBodies,
-    orbitRings,
-    lunarOrbitRing,
+    bodyScaleGroups,
+    planetTiltGroups,
+    planetSpinMeshes,
+    orbitLines,
+    orbitSamplesSI,
+    lunarOrbitLine,
+    lunarOrbitSamplesSI,
     transferArcs,
     selectionRing,
     halleyTail,

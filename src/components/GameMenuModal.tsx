@@ -16,6 +16,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import type { MusicState } from '../game/audio';
 import { getLandingZones } from '../game/constants';
 import { CONTEXTUAL_FACTS, GLOSSARY_ENTRIES, type FactContextKey } from '../game/factsAndGlossary';
 import {
@@ -51,6 +52,7 @@ interface GameMenuModalProps {
   space: SpaceFlightState;
   landing: LandingState;
   audioSettings: AudioSettings;
+  musicState?: MusicState;
   qualityPreset: QualityPreset;
   speedScale: TelemetrySpeedScale;
   solarScaleMode: SolarScaleMode;
@@ -66,6 +68,8 @@ interface GameMenuModalProps {
   onJumpToInspector: () => void;
   onToggleSpeedScale: () => void;
   onUpdateAudio: (partial: Partial<AudioSettings>) => void;
+  onToggleMusic?: () => void;
+  onChangeMusicVolume?: (vol: number) => void;
   onChangeQuality: (q: QualityPreset) => void;
   onResetCamera: () => void;
   onQueueMarsPoint: (x: number, z: number, label: string, objectiveId?: string) => void;
@@ -91,6 +95,7 @@ export function GameMenuModal({
   space,
   landing,
   audioSettings,
+  musicState,
   qualityPreset,
   speedScale,
   solarScaleMode,
@@ -106,6 +111,8 @@ export function GameMenuModal({
   onJumpToInspector,
   onToggleSpeedScale,
   onUpdateAudio,
+  onToggleMusic,
+  onChangeMusicVolume,
   onChangeQuality,
   onResetCamera,
   onQueueMarsPoint,
@@ -367,6 +374,15 @@ export function GameMenuModal({
                       >
                         Real AU Scale
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => onChangeSolarScaleMode('local')}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-bold ${
+                          solarScaleMode === 'local' ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
+                        }`}
+                      >
+                        Local Mission Scale
+                      </button>
                     </div>
                     <label className="flex items-center gap-2 text-sm text-slate-200">
                       <span>Orbit Speed</span>
@@ -614,13 +630,41 @@ export function GameMenuModal({
                   <Sliders className="h-5 w-5 text-cyan-400" />
                   Audio &amp; Quality
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => onUpdateAudio({ muted: !audioSettings.muted })}
-                  className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
-                >
-                  Sound: {audioSettings.muted ? 'Muted' : 'Active'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateAudio({ muted: !audioSettings.muted })}
+                    className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
+                  >
+                    Sound: {audioSettings.muted ? 'Muted' : 'Active'}
+                  </button>
+                  {onToggleMusic && (
+                    <button
+                      type="button"
+                      onClick={onToggleMusic}
+                      className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
+                    >
+                      Music: {musicState?.musicEnabled !== false ? 'On' : 'Off'}
+                    </button>
+                  )}
+                </div>
+                {onChangeMusicVolume && (
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-sky-400/15 bg-slate-900/55 px-3 py-2 text-sm text-slate-200">
+                    <span>Music Volume</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      value={musicState?.musicVolume ?? 0.28}
+                      onChange={(e) => onChangeMusicVolume(Number(e.target.value))}
+                      className="w-32 accent-cyan-400"
+                    />
+                    <span className="w-9 text-right font-mono-tech text-xs font-bold text-cyan-300 tabular-nums">
+                      {Math.round((musicState?.musicVolume ?? 0.28) * 100)}%
+                    </span>
+                  </label>
+                )}
                 <div className="flex gap-2">
                   {(['low', 'med', 'high'] as const).map((q) => (
                     <button

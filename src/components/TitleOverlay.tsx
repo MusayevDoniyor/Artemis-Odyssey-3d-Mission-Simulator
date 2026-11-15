@@ -7,9 +7,11 @@ import {
   Compass,
   Globe,
   Mouse,
+  Music,
   Orbit,
   Play,
   Rocket,
+  RotateCcw,
   Settings,
   Sliders,
   Thermometer,
@@ -19,7 +21,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
-import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
+import type { MusicState } from '../game/audio';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
 import { SOLAR_SYSTEM_BODIES } from '../game/solarSystemData';
 import type {
@@ -43,8 +45,12 @@ interface TitleOverlayProps {
   donki: DonkiStatus;
   osdr: OsdrStatus;
   audioSettings: AudioSettings;
+  musicState?: MusicState;
   qualityPreset: QualityPreset;
   onUpdateAudio: (partial: Partial<AudioSettings>) => void;
+  onToggleMusic?: () => void;
+  onChangeMusicVolume?: (vol: number) => void;
+  onUnlockAudio?: () => void;
   onChangeQuality: (quality: QualityPreset) => void;
   onSelectShowcase: (v: VehicleShowcaseId) => void;
   onSetCameraPreset: (yaw: number, pitch: number) => void;
@@ -126,10 +132,15 @@ export function TitleOverlay({
   donki,
   osdr,
   audioSettings,
+  musicState,
   qualityPreset,
   onUpdateAudio,
+  onToggleMusic,
+  onChangeMusicVolume,
+  onUnlockAudio,
   onChangeQuality,
   onSelectShowcase,
+  onResetCamera,
   onSelectCampaignMission,
   onStartMission,
   onStartFreeExplore,
@@ -258,8 +269,20 @@ export function TitleOverlay({
             </button>
           </nav>
 
-          {/* Right: Live NASA Data Status + Mute */}
+          {/* Right: Live NASA Data Status + Ambient Music + Mute */}
           <div className="pointer-events-auto flex items-center gap-2">
+            {musicState?.audioBlocked && musicState.musicEnabled && !muted && onUnlockAudio && (
+              <button
+                type="button"
+                data-testid="enable-audio-btn"
+                onClick={onUnlockAudio}
+                className="hud-cta-cyan inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-hud text-[11px] font-bold tracking-wider uppercase shadow-[0_0_16px_rgba(34,211,238,0.4)]"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                ENABLE AUDIO
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onOpenNasaModal}
@@ -276,6 +299,37 @@ export function TitleOverlay({
                 {nasaLive ? 'NASA Data Connected' : 'NASA Data Archived'}
               </span>
             </button>
+
+            {onToggleMusic && (
+              <div className="hud-soft hidden items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-200 xl:flex">
+                <button
+                  type="button"
+                  data-testid="title-music-toggle-btn"
+                  onClick={onToggleMusic}
+                  title={musicState?.musicEnabled ? 'Mute Ambient Music' : 'Enable Ambient Music'}
+                  className="inline-flex items-center gap-1.5 transition hover:text-cyan-300"
+                >
+                  <Music
+                    className={`h-3.5 w-3.5 ${
+                      musicState?.musicEnabled && !muted ? 'text-cyan-300' : 'text-slate-500'
+                    }`}
+                  />
+                  <span>{musicState?.musicEnabled ? 'Music' : 'Off'}</span>
+                </button>
+                {onChangeMusicVolume && musicState?.musicEnabled && (
+                  <input
+                    type="range"
+                    aria-label="Ambient Music Volume"
+                    min={0}
+                    max={1}
+                    step={0.02}
+                    value={musicState.musicVolume}
+                    onChange={(e) => onChangeMusicVolume(Number(e.target.value))}
+                    className="h-1 w-14 cursor-pointer accent-cyan-400"
+                  />
+                )}
+              </div>
+            )}
 
             <button
               type="button"
@@ -365,18 +419,6 @@ export function TitleOverlay({
                 ODYSSEY
               </span>
             </h1>
-          </div>
-
-          <div
-            data-testid="title-mission-patch"
-            className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_24px_rgba(34,211,238,0.28)]"
-          >
-            <img
-              src={missionPatchImg}
-              alt="Artemis Odyssey Official Mission Patch"
-              referrerPolicy="no-referrer"
-              className="h-full w-full scale-[1.18] object-cover"
-            />
           </div>
         </div>
 
@@ -576,8 +618,8 @@ export function TitleOverlay({
 
       {/* BOTTOM STRIP: Controls (Left), Planet Selector Carousel (Center), Selected Planet Card (Right) */}
       <div className="relative z-10 flex items-end justify-between gap-4 px-5 pb-4 lg:px-7">
-        {/* Bottom-Left Controls Hint */}
-        <div className="hud-soft pointer-events-auto flex items-center gap-3.5 rounded-2xl px-4 py-2.5 text-xs text-slate-200">
+        {/* Bottom-Left Controls Hint + Reset Camera Orbit */}
+        <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-xs text-slate-200">
           <span className="inline-flex items-center gap-1">
             {['W', 'A', 'S', 'D'].map((k) => (
               <span key={k} className="keycap">
@@ -588,11 +630,18 @@ export function TitleOverlay({
           </span>
           <span className="inline-flex items-center gap-1.5 text-slate-300">
             <Mouse className="h-3.5 w-3.5 text-cyan-300" />
-            <span className="font-semibold text-white">Click</span> Select
+            <span className="font-semibold text-white">Drag</span> Orbit
           </span>
-          <span className="hidden items-center gap-1.5 text-slate-300 xl:inline-flex">
-            <span className="font-semibold text-white">Scroll</span> Zoom
-          </span>
+          <button
+            type="button"
+            data-testid="title-reset-view-btn"
+            onClick={onResetCamera}
+            title="Reset Cinematic Orbit Camera"
+            className="inline-flex items-center gap-1 rounded-lg border border-sky-400/25 bg-slate-900/75 px-2 py-1 font-hud text-[11px] font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-white"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset View
+          </button>
         </div>
 
         {/* Bottom-Center Interactive Planet Selector Pill */}

@@ -113,7 +113,13 @@ export function LaunchHUD({
               </span>
             </div>
             <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">{objectiveLine}</p>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+            <div className="mt-1.5 flex items-center justify-between font-mono-tech text-[10px] font-semibold text-cyan-200/80">
+              <span>{PHYSICS.LAUNCH_TIME_SCALE}× Time Scale · Real SI Propulsion</span>
+              <span>
+                Target {(launch.orbitalVelocityTargetMs / 1000).toFixed(2)} km/s
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-400 transition-all duration-200"
                 style={{
@@ -247,7 +253,7 @@ export function LaunchHUD({
           </svg>
         </button>
 
-        {/* GROUP 5: Bottom-Center Sequence CTA / Stage Action / Speed & Pressure */}
+        {/* GROUP 5: Bottom-Center Sequence CTA / Stage Action / Speed & SI Diagnostics */}
         <div data-testid="hud-group-speed" className="flex flex-col items-center gap-2">
           {launch.launchSequence === 'PRE_SIM' && (
             <div
@@ -315,7 +321,7 @@ export function LaunchHUD({
             <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5">
               <Orbit className="h-5 w-5 shrink-0 text-cyan-300" />
               <div className="text-sm font-semibold whitespace-nowrap text-white tabular-nums">
-                165 km Orbit ({Math.round(leoTransfer.tliBurnProgressPct)}%)
+                165 km Orbit · {leoTransfer.orbitalVelocityKmS.toFixed(2)} km/s ({Math.round(leoTransfer.tliBurnProgressPct)}%)
               </div>
               <button
                 type="button"
@@ -343,13 +349,29 @@ export function LaunchHUD({
           )}
 
           {isMoving && !launch.orbitReached && (
-            <div className="hud-soft flex items-center gap-3.5 rounded-2xl px-4 py-2 tabular-nums">
-              <span data-testid="launch-speed" className="text-lg font-bold text-white lg:text-xl">
+            <div className="hud-soft flex flex-wrap items-center justify-center gap-3 rounded-2xl px-4 py-2 font-mono-tech tabular-nums">
+              <span data-testid="launch-speed" className="text-base font-bold text-white lg:text-lg">
                 {speedTotal} m/s
               </span>
               <span className="h-4 w-px bg-white/15" />
-              <span className="text-sm font-semibold text-amber-300">
-                {Math.round(launch.dynamicPressureKpa)} kPa
+              <span className="text-xs font-semibold text-amber-300">
+                q {Math.round(launch.dynamicPressureKpa)} kPa
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-cyan-200">
+                TWR {launch.twr.toFixed(2)}
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-slate-200">
+                Isp {launch.ispS}s
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-sky-200">
+                Δv {launch.deltaVExpendedMs} m/s
+              </span>
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-xs font-semibold text-emerald-300">
+                Apo/Peri {launch.apoapsisKm}/{launch.periapsisKm} km
               </span>
             </div>
           )}

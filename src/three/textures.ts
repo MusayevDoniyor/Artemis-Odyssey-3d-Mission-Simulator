@@ -240,40 +240,48 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   scCtx.fillStyle = 'rgba(154, 52, 18, 0.5)';
   scCtx.fillRect(0, 620, 512, 14);
 
-  // White Aft Engine Section + Roll Pattern
-  scCtx.fillStyle = '#f8fafc';
+  // White Aft Engine Section + Tactical Gunmetal Roll Pattern
+  scCtx.fillStyle = '#e2e8f0';
   scCtx.fillRect(0, 868, 512, 156);
-  scCtx.fillStyle = '#0f172a';
+  scCtx.fillStyle = '#090d16';
   for (let x = 16; x < 512; x += 64) {
     scCtx.fillRect(x, 876, 28, 22);
     scCtx.fillRect(x + 20, 965, 18, 38);
   }
-  scCtx.fillStyle = '#ffffff';
-  scCtx.font = 'bold 54px sans-serif';
-  scCtx.textAlign = 'center';
-  scCtx.fillText('U', 256, 465);
-  scCtx.fillText('S', 256, 540);
-  scCtx.fillText('A', 256, 615);
+  // Sleek technical telemetry stencil bands & chevron trim on Core Stage
+  scCtx.fillStyle = '#090d16';
+  scCtx.fillRect(0, 390, 512, 24);
+  scCtx.fillRect(0, 650, 512, 18);
+  scCtx.fillStyle = '#f59e0b';
+  scCtx.fillRect(0, 414, 512, 6);
+  for (let cx = 24; cx < 512; cx += 64) {
+    scCtx.fillStyle = '#0f172a';
+    scCtx.fillRect(cx, 456, 24, 96);
+    scCtx.fillStyle = '#38bdf8';
+    scCtx.fillRect(cx + 6, 468, 12, 72);
+  }
 
-  // 6. 5-Segment Solid Rocket Booster Texture (Blueprint Accurate)
+  // 6. 5-Segment Solid Rocket Booster Texture (Sleek Carbon-Slate Tactical Stripes)
   const srbCanvas = document.createElement('canvas');
   srbCanvas.width = 256;
   srbCanvas.height = 1024;
   const srCtx = srbCanvas.getContext('2d')!;
-  srCtx.fillStyle = '#f8fafc';
+  srCtx.fillStyle = '#e2e8f0';
   srCtx.fillRect(0, 0, 256, 1024);
-  srCtx.fillStyle = '#0f172a';
-  srCtx.fillRect(0, 110, 256, 28);
-  srCtx.fillRect(0, 855, 256, 24);
-  // US Flag & NASA stripe band
-  srCtx.fillStyle = '#1d4ed8';
-  srCtx.fillRect(92, 230, 32, 24);
-  srCtx.fillStyle = '#dc2626';
-  for (let sy = 230; sy < 270; sy += 8) {
-    srCtx.fillRect(124, sy, 42, 4);
+  srCtx.fillStyle = '#090d16';
+  srCtx.fillRect(0, 102, 256, 36);
+  srCtx.fillRect(0, 850, 256, 30);
+  // Dark gunmetal/cyan aerospace telemetry band & chevron hash (no national flags)
+  srCtx.fillStyle = '#1e293b';
+  srCtx.fillRect(0, 218, 256, 52);
+  srCtx.fillStyle = '#020617';
+  for (let sx = 8; sx < 256; sx += 32) {
+    srCtx.fillRect(sx, 224, 16, 40);
   }
-  srCtx.strokeStyle = '#64748b';
-  srCtx.lineWidth = 4;
+  srCtx.fillStyle = '#38bdf8';
+  srCtx.fillRect(0, 270, 256, 6);
+  srCtx.strokeStyle = '#475569';
+  srCtx.lineWidth = 5;
   [290, 435, 580, 725, 855].forEach((y) => {
     srCtx.beginPath();
     srCtx.moveTo(0, y);

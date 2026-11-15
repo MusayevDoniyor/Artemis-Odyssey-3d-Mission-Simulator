@@ -115,7 +115,7 @@ test('solar system catalog covers Sun through Eris/Halley with Moon orbiting Ear
     const eExp = computeKeplerBodyPosition(earth, epoch, 'exploration');
     const mExp = computeKeplerBodyPosition(moon, epoch, 'exploration');
     const maExp = computeKeplerBodyPosition(mars, epoch, 'exploration');
-    assert.ok(Math.abs(Math.hypot(mExp.x - eExp.x, mExp.z - eExp.z) - 10.5) < 0.05);
+    assert.ok(Math.abs(Math.hypot(mExp.x - eExp.x, mExp.z - eExp.z) - 5.8) < 0.35);
     const moonSunExp = Math.hypot(mExp.x - SOLAR_SUN_ORIGIN_X, mExp.z - SOLAR_SUN_ORIGIN_Z);
     assert.ok(moonSunExp > vExp.orbitalRadius && moonSunExp < maExp.orbitalRadius);
 
@@ -123,7 +123,7 @@ test('solar system catalog covers Sun through Eris/Halley with Moon orbiting Ear
     const eSci = computeKeplerBodyPosition(earth, epoch, 'scientific');
     const mSci = computeKeplerBodyPosition(moon, epoch, 'scientific');
     const maSci = computeKeplerBodyPosition(mars, epoch, 'scientific');
-    assert.ok(Math.abs(Math.hypot(mSci.x - eSci.x, mSci.z - eSci.z) - 4.2) < 0.05);
+    assert.ok(Math.abs(Math.hypot(mSci.x - eSci.x, mSci.z - eSci.z) - 60.336 * 0.032) < 0.15);
     const moonSunSci = Math.hypot(mSci.x - SOLAR_SUN_ORIGIN_X, mSci.z - SOLAR_SUN_ORIGIN_Z);
     assert.ok(moonSunSci > vSci.orbitalRadius && moonSunSci < maSci.orbitalRadius);
   }

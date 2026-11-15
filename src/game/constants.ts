@@ -15,26 +15,34 @@ import type {
 } from './types';
 
 export const PHYSICS = {
-  EARTH_GRAVITY: 9.81,
+  EARTH_GRAVITY: 9.80665,
+  EARTH_MU_M3_S2: 3.986004418e14,
   EARTH_RADIUS_M: 6371000,
-  MOON_GRAVITY: 1.625,
+  MOON_GRAVITY: 1.622,
   MARS_GRAVITY: 3.721,
 
-  // SLS Block 1 Rocket Parameters (Compressed trainer burn times for responsive 60s launch)
-  SLS_LIFTOFF_MASS_KG: 2604000,
-  SLS_LIFTOFF_THRUST_N: 39100000,
-  SLS_CORE_THRUST_N: 9200000,
-  SLS_ICPS_THRUST_N: 1650000,
-  SLS_FIRST_STAGE_PROP_KG: 1450000,
-  SLS_CORE_DRY_KG: 170000,
-  SLS_CORE_PROP_KG: 360000,
-  SLS_ICPS_DRY_KG: 35000,
-  SLS_ICPS_PROP_KG: 28000,
+  // SLS Block 1 Rocket Parameters (NASA SI Reference + Launch Time Scale 24x for ~21s interactive ascent)
+  SLS_LIFTOFF_MASS_KG: 2608000,
+  SLS_LIFTOFF_THRUST_N: 39140000, // Sea-level: 2x SRB (~31.7 MN) + 4x RS-25 (~7.44 MN)
+  SLS_STAGE0_VAC_THRUST_N: 41800000,
+  SLS_CORE_THRUST_N: 9116000, // Vacuum: 4x RS-25D/E (2,279 kN each)
+  SLS_ICPS_THRUST_N: 110100, // Real Aerojet Rocketdyne RL10B-2 vacuum thrust (110.1 kN)
+  SLS_STAGE0_ISP_SL_S: 269,
+  SLS_STAGE0_ISP_VAC_S: 305,
+  SLS_CORE_ISP_VAC_S: 452.3,
+  SLS_ICPS_ISP_VAC_S: 462.0,
+  SLS_FIRST_STAGE_PROP_KG: 1560000, // Twin SRB prop (1,252t) + Core prop burned during booster phase (308t)
+  SLS_SRB_DRY_PAIR_KG: 200000, // Jettisoned twin empty 5-segment SRB casings
+  SLS_CORE_DRY_KG: 169000, // Dry Core (85.3t) + LVSA + ICPS wet + Orion until core sep
+  SLS_CORE_PROP_KG: 679000, // Remaining Core LH2/LOX burned after SRB sep
+  SLS_ICPS_DRY_KG: 30000, // ICPS dry (~3.5t) + Orion MPCV (~26.5t)
+  SLS_ICPS_PROP_KG: 29000, // ICPS LH2/LOX usable propellant
+  SLS_DRAG_AREA_M2: 72.0, // Core + Twin SRB frontal reference area
   SLS_SRB_SEP_ALT_KM: 45,
   SLS_LAS_JETTISON_ALT_KM: 80,
   SLS_CORE_SEP_ALT_KM: 110,
   SLS_ORBIT_TARGET_KM: 165,
-  LAUNCH_TIME_SCALE: 11.5,
+  LAUNCH_TIME_SCALE: 30.0,
 
   // Descent Vehicle Parameters (1:1 Apollo LMDE 46.7 kN Moon 0.165g & Mars 112 kN Quad-MLE 0.38g)
   LANDER_FIXED_MASS_KG: 4850,

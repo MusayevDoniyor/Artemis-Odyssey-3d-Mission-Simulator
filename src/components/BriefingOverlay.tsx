@@ -17,9 +17,9 @@ import {
   Wind,
 } from 'lucide-react';
 import artemisHeroImg from '../assets/images/artemis_hero_banner_1794685527117.jpg';
-import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
 import architectureImg from '../assets/images/mission_architecture_diagram_v2_1794685546954.jpg';
 import viperLanderImg from '../assets/images/viper_lander_showcase_1794685527556.jpg';
+import { NASAInsignia } from './NASAInsignia';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
 import {
   MISSION_BRIEFING_META,
@@ -301,17 +301,7 @@ export function BriefingOverlay({
               Command Deck
             </button>
 
-            <div
-              data-testid="briefing-mission-patch"
-              className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_16px_rgba(34,211,238,0.22)]"
-            >
-              <img
-                src={missionPatchImg}
-                alt="Artemis Odyssey Mission Patch"
-                referrerPolicy="no-referrer"
-                className="h-full w-full scale-[1.18] object-cover"
-              />
-            </div>
+            <NASAInsignia size={40} className="shrink-0" />
 
             <div>
               <p

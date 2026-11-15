@@ -3,6 +3,15 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI } from '@google/genai';
+import {
+  HORIZONS_TRACKED_BODIES,
+  type HorizonsBodyStateSI,
+  type HorizonsEphemerisResponse,
+  buildHorizonsUrlForCommand,
+  parseHorizonsVectorCsv,
+} from './src/game/jplHorizons';
+import { PLANETARY_CATALOG_SI, SI } from './src/game/planetaryCatalog';
+import { computeBodyCartesianSI } from './src/game/orbitalMechanics';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,9 +58,10 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// 6-hour in-memory caches for NASA DONKI & OSDR so student/judge sessions stay snappy
+// 6-hour in-memory caches for NASA DONKI & OSDR, 12-hour cache for JPL Horizons vectors
 let donkiCache: { expiresAt: number; payload: unknown } | null = null;
 let osdrCache: { expiresAt: number; payload: unknown } | null = null;
+let horizonsCache: { expiresAt: number; payload: HorizonsEphemerisResponse } | null = null;
 
 const CURATED_OSDR_STUDIES = [
   {
@@ -216,6 +226,79 @@ async function startServer() {
         { name: 'Pluto', au: 39.5, lightTime: '5.5 hrs', gravityG: 0.063 },
       ],
     });
+  });
+
+  // 1a-ii. Live Cached NASA JPL Horizons Cartesian State Vectors (J2000 Ecliptic ICRF -> SI m, m/s)
+  app.get('/api/jpl-horizons', async (_req, res) => {
+    if (horizonsCache && Date.now() < horizonsCache.expiresAt) {
+      return res.json(horizonsCache.payload);
+    }
+
+    const now = new Date();
+    const epochUtc = now.toISOString();
+    const j2000Ms = Date.UTC(2000, 0, 1, 12, 0, 0);
+    const epochYearsFromJ2000 = (now.getTime() - j2000Ms) / (SI.JULIAN_YEAR_S * 1000);
+
+    const results = await Promise.allSettled(
+      HORIZONS_TRACKED_BODIES.map(async (item) => {
+        const url = buildHorizonsUrlForCommand(item.command, item.horizonsCenter, epochUtc);
+        const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
+        if (!response.ok) throw new Error(`Horizons HTTP ${response.status}`);
+        const text = await response.text();
+        const parsed = parseHorizonsVectorCsv(text);
+        if (!parsed) throw new Error(`Failed to parse Horizons CSV for ${item.id}`);
+        return { item, parsed };
+      })
+    );
+
+    const bodies: Record<string, HorizonsBodyStateSI> = {};
+    let liveCount = 0;
+
+    results.forEach((r, idx) => {
+      const meta = HORIZONS_TRACKED_BODIES[idx];
+      const cat = PLANETARY_CATALOG_SI[meta.id];
+      if (r.status === 'fulfilled') {
+        liveCount += 1;
+        bodies[meta.id] = {
+          id: meta.id,
+          jplId: cat.jplId,
+          name: cat.name,
+          center: meta.center,
+          posM: r.value.parsed.posM,
+          velMs: r.value.parsed.velMs,
+          provenance: 'REAL NASA/JPL DATA',
+        };
+      } else {
+        const analytical = computeBodyCartesianSI(meta.id, epochYearsFromJ2000, null);
+        bodies[meta.id] = {
+          id: meta.id,
+          jplId: cat.jplId,
+          name: cat.name,
+          center: meta.center,
+          posM: { x: analytical.state.xM, y: analytical.state.yM, z: analytical.state.zM },
+          velMs: { x: analytical.state.vxMs, y: analytical.state.vyMs, z: analytical.state.vzMs },
+          provenance: 'SCIENTIFIC MODEL',
+        };
+      }
+    });
+
+    const payload: HorizonsEphemerisResponse = {
+      source:
+        liveCount > 0
+          ? 'NASA/JPL Horizons Web API (Ecliptic J2000 ICRF)'
+          : 'JPL J2000 Analytical Keplerian Ephemeris Fallback',
+      isLive: liveCount > 0,
+      provenance: liveCount > 0 ? 'REAL NASA/JPL DATA' : 'SCIENTIFIC MODEL',
+      epochUtc,
+      note:
+        liveCount > 0
+          ? `Fetched ${liveCount}/${HORIZONS_TRACKED_BODIES.length} live JPL Horizons Cartesian state vectors (SI meters & m/s).`
+          : 'Offline/timeout fallback: propagated from JPL J2000 Keplerian elements via Newton-Raphson solver.',
+      bodies,
+    };
+
+    horizonsCache = { expiresAt: Date.now() + 1000 * 60 * 60 * 12, payload };
+    return res.json(payload);
   });
 
   // 1b. NASA Open Science Data Repository (OSDR) Radiation & Space Biology Studies
