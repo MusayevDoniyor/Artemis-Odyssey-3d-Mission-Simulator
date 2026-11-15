@@ -60,13 +60,13 @@
 
 This single authoritative table defines all touchdown and crash evaluations across Cadet Mode and Engineer Mode:
 
-| Parameter | Cadet Mode (Forgiving / Assists) | Engineer Mode (NASA Flight Standard) | Units | Failure Diagnostic Message |
+| Parameter | Cadet Mode (Game Tolerance / Assisted) | Engineer Mode (NASA Structural Limit) | Units | Failure Diagnostic Message |
 | :--- | :---: | :---: | :---: | :--- |
-| **Max Vertical Velocity ($v_y$)** | $\le 3.5$ | $\le 1.8$ | $\text{m/s}$ | `"SINK RATE EXCESS: Impact at {speed} m/s exceeded landing gear limit ({limit} m/s)"` |
-| **Max Horizontal Velocity ($v_{xz}$)** | $\le 1.5$ | $\le 0.6$ | $\text{m/s}$ | `"LATERAL DRIFT: Ground speed at {speed} m/s caused gear shear and tip-over"` |
-| **Max Touchdown Tilt Angle** | $\le 15^\circ$ | $\le 6^\circ$ | degrees | `"ATTITUDE TILT: Touchdown at {tilt}° exceeded vehicle static stability envelope"` |
-| **Max Terrain Slope at Pad** | $\le 12^\circ$ | $\le 7^\circ$ | degrees | `"SLOPE HAZARD: Landing on {slope}° slope caused rollover"` |
-| **Hover Throttle Equilibrium** | Auto-Trimmed ($\sim 45\%$) | Manual Feathering ($40\text{--}55\%$) | $\%$ | `"THRUST MISMATCH: Throttle dropped below 1.0 TWR above surface"` |
+| **Max Vertical Velocity ($v_y$)** | $\le 3.5$ (Game tolerance) | $\le 1.8$ (Gear structural limit) | $\text{m/s}$ | `"SINK RATE EXCESS: Impact at {speed} m/s exceeded landing gear limit ({limit} m/s)"` |
+| **Max Horizontal Velocity ($v_{xz}$)** | $\le 1.5$ (Game tolerance) | $\le 0.6$ (Gear structural limit) | $\text{m/s}$ | `"LATERAL DRIFT: Ground speed at {speed} m/s caused gear shear and tip-over"` |
+| **Max Touchdown Tilt Angle** | $\le 15^\circ$ (Game tolerance) | $\le 6^\circ$ (Gear structural limit) | degrees | `"ATTITUDE TILT: Touchdown at {tilt}° exceeded vehicle static stability envelope"` |
+| **Max Terrain Slope at Pad** | $\le 12^\circ$ (Game tolerance) | $\le 7^\circ$ (Gear structural limit) | degrees | `"SLOPE HAZARD: Landing on {slope}° slope caused rollover"` |
+| **Hover Throttle Equilibrium** | Auto-Trimmed ($\sim 45\% \to 23\%$) | Manual Feathering ($45\% \to 23\%$) | $\%$ | `"THRUST MISMATCH: Throttle dropped below 1.0 TWR above surface"` |
 
 ---
 
@@ -78,7 +78,7 @@ NASA's Moon-to-Mars manifest was significantly updated in 2025–2026 (`Source: 
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Mission 1** | **Artemis II: Crewed Lunar Flyby**<br>*(Flown Mission: April 2026)* | Earth LC-39B $\to$ High Earth Orbit $\to$ Lunar Free-Return Trajectory | 1. Manual SLS liftoff & gravity turn.<br>2. SRB & Core stage separation.<br>3. Translunar Injection (TLI) burn.<br>4. Orion lunar flyby trajectory trim. | - Gravity turn & Earth rotation boost.<br>- Atmospheric drag & Max-Q.<br>- Free-return trajectory geometry.<br>*(Fictional HERMES satellite removed)* | **Cislunar Flight Experience**:<br>Unlocks precise cislunar navigation telemetry and proven Orion thermal margins. |
 | **Mission 2** | **Artemis III: LEO HLS Rendezvous & Docking**<br>*(Target: Mid-2027 Manifest)* | Low Earth Orbit ($185\text{ km}$ LEO) | 1. Orion rendezvous with Commercial HLS lander.<br>2. Precision RCS approach ($< 0.1\text{ m/s}$).<br>3. Docking latch alignment.<br>4. Cryogenic propellant transfer simulation. | - Orbital rendezvous mechanics (prograde vs radial burns).<br>- Relative velocity sensing.<br>- Cryogenic fluid transfer in microgravity. | **Docked System Ready**:<br>Unlocks verified HLS docking protocols and transfers propellant reserves. |
-| **Mission 3** | **Artemis IV: Lunar South Pole Landing & Surface Ops**<br>*(Target: 2028 First Crewed Surface Landing)* | Lunar South Pole (Shackleton Rim / Malapert Mountain) | 1. Powered terminal descent from 450m.<br>2. Precision touchdown on Pad Alpha ($v_y < 1.8\text{ m/s}$).<br>3. VIPER Rover traverse ($5\times$ time compression).<br>4. TRIDENT water ice core drilling. | - 6-DOF descent rocket dynamics in $0.165g$.<br>- Throttle-to-Weight balance ($TWR=1.0$ at 45.2% throttle).<br>- Lunar Permanently Shadowed Regions (PSRs).<br>- ISRU polar ice electrolysis ($H_2O \to LH_2 + O_2$). | **Mined ISRU Fuel & Shield**:<br>Produces 350 kg liquid hydrogen for future deep-space exploration and validates regolith radiation berms. |
+| **Mission 3** | **Artemis IV: Lunar South Pole Landing & Surface Ops**<br>*(Target: 2028 First Crewed Surface Landing)* | Lunar South Pole (Shackleton Rim / Malapert Mountain) | 1. Powered terminal descent from 450m.<br>2. Precision touchdown on Pad Alpha ($v_y < 1.8\text{ m/s}$).<br>3. Autonomous Polar Prospector (VIPER/CLPS analog) surface traverse ($5\times$ time compression).<br>4. TRIDENT water ice core drilling. | - 6-DOF descent rocket dynamics in $0.165g$.<br>- Throttle-to-Weight balance ($TWR=1.0$ at 45.2% full mass down to 22.9% empty mass).<br>- Lunar Permanently Shadowed Regions (PSRs).<br>- ISRU polar ice electrolysis ($H_2O \to LH_2 + O_2$). | **Mined ISRU Fuel & Shield**:<br>Produces 350 kg liquid hydrogen for future deep-space exploration and validates regolith radiation berms. |
 | **Mission 4** | **Human Mars Exploration (Concept Mission)**<br>*(Clearly Labeled 2030s Conceptual Architecture)* | Mars Atmosphere $\to$ Jezero Crater Ancient Paleolake | 1. Atmospheric entry deceleration & supersonic parachute.<br>2. Terminal rocket touchdown in $0.38g$ crosswind.<br>3. Jezero delta geological traverse.<br>4. MOXIE $CO_2 \to O_2$ electrolysis run. | - Martian aerocapture vs vacuum landing.<br>- Atmospheric pressure variations.<br>- Fluvial geomorphology in ancient Jezero. | **Campaign Victory**:<br>NASA Mission Commander Evaluation, STEM Mastery Certification, and crew health dosimeter report. |
 
 ---

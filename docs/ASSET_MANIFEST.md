@@ -58,7 +58,7 @@ The concept lander is calibrated so that a balanced hover ($TWR = 1.0$) is natur
 | **Lunar Weight at Start ($W_{\text{start}}$)** | $14,462.5$ | $\text{N}$ ($14.46\text{ kN}$) | $m \cdot g_{\text{moon}} = 8,900 \times 1.625$. |
 | **Max Descent Engine Thrust ($F_{\text{max}}$)** | $32,000$ | $\text{N}$ ($32.0\text{ kN}$) | Deep-throttling pintle hydrolox engine. |
 | **Maximum TWR at Start** | $2.21$ | ratio | $32.0\text{ kN} / 14.46\text{ kN}$. |
-| **Hover Throttle Equilibrium** | **$45.2\%$** | $\%$ | $14.4625 / 32.0 = 45.2\%$ (perfect mid-throttle control!). |
+| **Hover Throttle Equilibrium (at Start)** | **$45.2\%$** | $\%$ | $14.4625 / 32.0 = 45.2\%$ at start mass ($8,900\text{ kg}$). **Note: As propellant burns, hover throttle dynamically declines to $22.9\%$ at empty dry mass ($4,500\text{ kg}$).** |
 | **Specific Impulse ($I_{sp}$)** | $440$ | $\text{s}$ | High-efficiency vacuum hydrolox performance. |
 | **Propellant Mass Flow at Hover** | $3.35$ | $\text{kg/s}$ | $\dot{m} = F / (I_{sp} \cdot g_0) = 14,462.5 / (440 \times 9.80665)$. |
 | **Hover Time Available (at Start)** | $\sim 21.8$ | minutes | $4,400\text{ kg} / 3.35\text{ kg/s} = 1,313\text{ seconds}$. |
