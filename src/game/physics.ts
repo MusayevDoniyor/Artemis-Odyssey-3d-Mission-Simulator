@@ -5,6 +5,15 @@ import {
   SOLAR_TARGETS,
   getLandingZones,
 } from './constants';
+import {
+  SOLAR_SUN_ORIGIN_X,
+  SOLAR_SUN_ORIGIN_Z,
+  SOLAR_SYSTEM_BODIES,
+  type SolarScaleMode,
+  computeKeplerBodyPosition,
+  getLiveSolarTargetPosition,
+  getShipSpawnForMission,
+} from './solarSystemData';
 import type {
   CampaignCarryoverState,
   CampaignMissionId,
@@ -329,6 +338,9 @@ export function createInitialSpaceFlightState(
           : 'relay-orbit';
 
   const target = SOLAR_TARGETS[defaultTarget];
+  const liveTarget = getLiveSolarTargetPosition(defaultTarget, 0, 'exploration');
+  const spawn = getShipSpawnForMission(missionId, 0, 'exploration');
+  const relay0 = getLiveSolarTargetPosition('relay-orbit', 0, 'exploration');
   const fuelStart = clamp(
     (missionId === 'artemis-4' ? 76 : 92) + (carryover?.isruFuelBonusPct || 0),
     45,
@@ -338,14 +350,11 @@ export function createInitialSpaceFlightState(
   const satAlreadyOnline = Boolean(carryover?.relaySatelliteOnline);
 
   return {
-    shipX: missionId === 'artemis-4' ? 22 : -14,
-    shipZ: missionId === 'artemis-4' ? -14 : 18,
+    shipX: spawn.x,
+    shipZ: spawn.z,
     vx: 0,
     vz: 0,
-    headingRad: Math.atan2(
-      target.x - (missionId === 'artemis-4' ? 22 : -14),
-      target.z - (missionId === 'artemis-4' ? -14 : 18)
-    ),
+    headingRad: Math.atan2(liveTarget.x - spawn.x, liveTarget.z - spawn.z),
     targetId: defaultTarget,
     autoPilot: false,
     boostActive: false,
@@ -360,8 +369,8 @@ export function createInitialSpaceFlightState(
     visitedTargets: [],
     orbitalSat: {
       deployed: satAlreadyOnline,
-      satX: SOLAR_TARGETS['relay-orbit'].x,
-      satZ: SOLAR_TARGETS['relay-orbit'].z,
+      satX: relay0.x,
+      satZ: relay0.z,
       solarDeployedPct: satAlreadyOnline ? 100 : 0,
       dishAlignedPct: satAlreadyOnline ? 100 : 0,
       linkLocked: satAlreadyOnline,
@@ -371,6 +380,7 @@ export function createInitialSpaceFlightState(
     statusText: satAlreadyOnline
       ? `Course ready for ${target.name}. Fly cleanly to orbital capture!`
       : 'Fly to HERMES Relay Orbit and hold [E / SPACE] to deploy & align the Orbital Satellite!',
+    navBodyId: null,
   };
 }
 
@@ -379,7 +389,9 @@ export function stepSpaceFlightPhysics(
   resources: ResourceState,
   input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right' | 'boost' | 'action'>,
   donkiFlareActive: boolean,
-  rawDt: number
+  rawDt: number,
+  solarEpochYears = 0,
+  solarScaleMode: SolarScaleMode = 'exploration'
 ): { space: SpaceFlightState; resources: ResourceState } {
   const dt = Math.min(rawDt, 0.05);
   const s: SpaceFlightState = {
@@ -389,9 +401,19 @@ export function stepSpaceFlightPhysics(
   };
   const res: ResourceState = { ...resources };
 
-  const target = SOLAR_TARGETS[s.targetId];
-  const dx = target.x - s.shipX;
-  const dz = target.z - s.shipZ;
+  const targetMeta = SOLAR_TARGETS[s.targetId];
+  const navSpec = s.navBodyId ? SOLAR_SYSTEM_BODIES.find((b) => b.id === s.navBodyId) : undefined;
+  const liveNavPos = navSpec
+    ? computeKeplerBodyPosition(navSpec, solarEpochYears, solarScaleMode)
+    : null;
+  const liveTarget = getLiveSolarTargetPosition(s.targetId, solarEpochYears, solarScaleMode);
+  const targetX = liveNavPos ? liveNavPos.x : liveTarget.x;
+  const targetZ = liveNavPos ? liveNavPos.z : liveTarget.z;
+  const targetRadius = navSpec ? navSpec.explorationBodySize : liveTarget.radius;
+  const targetLabel = navSpec ? navSpec.name : targetMeta.name;
+
+  const dx = targetX - s.shipX;
+  const dz = targetZ - s.shipZ;
   const distToTarget = Math.hypot(dx, dz);
 
   let thrusting = input.forward;
@@ -402,61 +424,64 @@ export function stepSpaceFlightPhysics(
     let diff = desiredHeading - s.headingRad;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    s.headingRad += clamp(diff, -2.8 * dt, 2.8 * dt);
+    s.headingRad += clamp(diff, -3.2 * dt, 3.2 * dt);
 
     const speed = Math.hypot(s.vx, s.vz);
     const captureRadius =
-      s.targetId === 'relay-orbit'
-        ? 8.5
-        : target.radius + (s.targetId === 'mars' ? 5.2 : 4.8);
+      !navSpec && s.targetId === 'relay-orbit'
+        ? 4.8
+        : targetRadius + (s.targetId === 'mars' ? 5.2 : 4.8);
     if (distToTarget > captureRadius * 0.72) {
-      const approachCap = distToTarget < 18 ? Math.max(4.5, distToTarget * 0.65) : 14;
+      const approachCap = distToTarget < 18 ? Math.max(4.5, distToTarget * 0.65) : 18;
       thrusting = speed < approachCap;
       braking = speed > approachCap + 1.2;
     } else {
       thrusting = false;
       braking = speed > 0.25;
+      if (navSpec && speed <= 0.35) {
+        s.autoPilot = false;
+      }
     }
   } else {
-    if (input.left) s.headingRad += 2.3 * dt;
-    if (input.right) s.headingRad -= 2.3 * dt;
+    if (input.left) s.headingRad += 2.75 * dt;
+    if (input.right) s.headingRad -= 2.75 * dt;
   }
 
   s.boostActive = Boolean(input.boost && thrusting && res.power > 5);
 
   const fwdX = Math.sin(s.headingRad);
   const fwdZ = Math.cos(s.headingRad);
-  const accel = s.boostActive ? 14.5 : 8.2;
+  const accel = s.boostActive ? 17.5 : 10.5;
 
   if (thrusting && s.fuelPct > 0) {
     s.vx += fwdX * accel * dt;
     s.vz += fwdZ * accel * dt;
-    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 2.1 : 0.85) * dt);
+    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 1.8 : 0.65) * dt);
     if (s.boostActive) {
       res.power = Math.max(0, res.power - 2.0 * dt);
     }
   } else if (braking) {
-    s.vx *= Math.max(0, 1 - 3.4 * dt);
-    s.vz *= Math.max(0, 1 - 3.4 * dt);
+    s.vx *= Math.max(0, 1 - 3.6 * dt);
+    s.vz *= Math.max(0, 1 - 3.6 * dt);
   } else {
-    s.vx *= Math.max(0, 1 - 0.35 * dt);
-    s.vz *= Math.max(0, 1 - 0.35 * dt);
+    s.vx *= Math.max(0, 1 - 0.38 * dt);
+    s.vz *= Math.max(0, 1 - 0.38 * dt);
   }
 
-  const maxSpeed = s.boostActive ? 22 : 14;
+  const maxSpeed = s.boostActive ? 28 : 18;
   const spd = Math.hypot(s.vx, s.vz);
   if (spd > maxSpeed) {
     s.vx = (s.vx / spd) * maxSpeed;
     s.vz = (s.vz / spd) * maxSpeed;
   }
 
-  s.shipX = clamp(s.shipX + s.vx * dt, -95, 95);
-  s.shipZ = clamp(s.shipZ + s.vz * dt, -95, 95);
+  s.shipX = clamp(s.shipX + s.vx * dt, -240, 240);
+  s.shipZ = clamp(s.shipZ + s.vz * dt, -240, 240);
   s.elapsedDays += dt * (s.boostActive ? 1.4 : 0.6);
 
-  // Sun located at (-48, -36): solar storm radiation belt extends out when DONKI flare is active
-  const distFromSun = Math.hypot(s.shipX + 48, s.shipZ + 36);
-  const stormRadius = donkiFlareActive ? 48 : 32;
+  // Sun located at (SOLAR_SUN_ORIGIN_X, SOLAR_SUN_ORIGIN_Z): solar storm zone
+  const distFromSun = Math.hypot(s.shipX - SOLAR_SUN_ORIGIN_X, s.shipZ - SOLAR_SUN_ORIGIN_Z);
+  const stormRadius = solarScaleMode === 'scientific' ? (donkiFlareActive ? 18 : 11) : donkiFlareActive ? 30 : 21;
   s.inRadiationZone = distFromSun < stormRadius;
 
   if (s.inRadiationZone) {
@@ -469,10 +494,14 @@ export function stepSpaceFlightPhysics(
   }
 
   // Non-Landing Orbital Satellite Operations at Relay Orbit
-  const relayNode = SOLAR_TARGETS['relay-orbit'];
+  const relayNode = getLiveSolarTargetPosition('relay-orbit', solarEpochYears, solarScaleMode);
+  if (!s.orbitalSat.deployed) {
+    s.orbitalSat.satX = relayNode.x;
+    s.orbitalSat.satZ = relayNode.z;
+  }
   const distToSatZone = Math.hypot(s.shipX - relayNode.x, s.shipZ - relayNode.z);
   const distToSat = Math.hypot(s.shipX - s.orbitalSat.satX, s.shipZ - s.orbitalSat.satZ);
-  s.inSatDeployZone = distToSatZone <= 9.5 || distToSat <= 9.5;
+  s.inSatDeployZone = distToSatZone <= 5.5 || distToSat <= 5.5;
 
   if (input.action && s.inSatDeployZone && !s.orbitalSat.linkLocked) {
     // RCS station-keeping keeps Orion steady beside the satellite during deployment & dish lock
@@ -480,8 +509,8 @@ export function stepSpaceFlightPhysics(
     s.vz *= Math.max(0, 1 - 4.2 * dt);
     if (!s.orbitalSat.deployed) {
       s.orbitalSat.deployed = true;
-      s.orbitalSat.satX = clamp(s.shipX + fwdX * 3.2, -85, 85);
-      s.orbitalSat.satZ = clamp(s.shipZ + fwdZ * 3.2, -85, 85);
+      s.orbitalSat.satX = clamp(s.shipX + fwdX * 3.2, -230, 230);
+      s.orbitalSat.satZ = clamp(s.shipZ + fwdZ * 3.2, -230, 230);
     }
     s.orbitalSat.solarDeployedPct = clamp(s.orbitalSat.solarDeployedPct + 48 * dt, 0, 100);
     if (s.orbitalSat.solarDeployedPct >= 50) {
@@ -510,36 +539,36 @@ export function stepSpaceFlightPhysics(
     }
   }
 
-  // Check arrival at any target
+  // Check arrival at any target dynamically
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
-    const planet = SOLAR_TARGETS[id];
-    const d = Math.hypot(s.shipX - planet.x, s.shipZ - planet.z);
-    if (id !== 'relay-orbit' && d <= planet.radius + 4.8 && !s.visitedTargets.includes(id)) {
+    const pos = getLiveSolarTargetPosition(id, solarEpochYears, solarScaleMode);
+    const d = Math.hypot(s.shipX - pos.x, s.shipZ - pos.z);
+    if (id !== 'relay-orbit' && d <= pos.radius + 4.8 && !s.visitedTargets.includes(id)) {
       s.visitedTargets.push(id);
     }
   });
 
-  const moon = SOLAR_TARGETS.moon;
+  const moon = getLiveSolarTargetPosition('moon', solarEpochYears, solarScaleMode);
   s.arrivedMoon = Math.hypot(s.shipX - moon.x, s.shipZ - moon.z) <= moon.radius + 4.8;
-  const gw = SOLAR_TARGETS.gateway;
+  const gw = getLiveSolarTargetPosition('gateway', solarEpochYears, solarScaleMode);
   s.arrivedGateway = Math.hypot(s.shipX - gw.x, s.shipZ - gw.z) <= gw.radius + 4.8;
-  const mars = SOLAR_TARGETS.mars;
+  const mars = getLiveSolarTargetPosition('mars', solarEpochYears, solarScaleMode);
   s.arrivedMars = Math.hypot(s.shipX - mars.x, s.shipZ - mars.z) <= mars.radius + 5.2;
 
   if (s.orbitalSat.linkLocked && s.arrivedGateway) {
     s.statusText = 'Gateway NRHO Link Online! Ready to transfer ISRU payload.';
-  } else if (s.orbitalSat.linkLocked && s.targetId === 'relay-orbit') {
+  } else if (s.orbitalSat.linkLocked && s.targetId === 'relay-orbit' && !navSpec) {
     s.statusText = 'HERMES Relay Satellite Locked! High-Res Surface Maps Unlocked.';
-  } else if (s.inSatDeployZone && !s.orbitalSat.linkLocked) {
+  } else if (s.inSatDeployZone && !s.orbitalSat.linkLocked && !navSpec) {
     s.statusText = `In Relay Orbit — Hold [E / SPACE] to unfold wings & lock Dish (${Math.round(s.orbitalSat.dishAlignedPct)}%)`;
-  } else if (s.arrivedMoon) {
+  } else if (s.arrivedMoon && !navSpec) {
     s.statusText = 'Lunar Orbit Captured! Ready to begin South Pole Descent.';
-  } else if (s.arrivedMars) {
+  } else if (s.arrivedMars && (!navSpec || navSpec.id === 'mars')) {
     s.statusText = 'Jezero Capture Orbit Reached! Ready for 0.38g Mars Descent.';
   } else if (s.inRadiationZone) {
     s.statusText = 'Solar Radiation Zone! Activate Water-Wall Storm Shield or steer clear of the Sun!';
   } else {
-    s.statusText = `Course set for ${target.name} (${Math.round(distToTarget * 10)}k sim-km remaining)`;
+    s.statusText = `Course set for ${targetLabel} (${Math.round(distToTarget * 10)}k sim-km remaining)`;
   }
 
   return { space: s, resources: res };

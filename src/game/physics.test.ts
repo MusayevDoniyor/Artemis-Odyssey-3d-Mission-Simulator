@@ -358,3 +358,34 @@ test('Space Autopilot enters zero-fuel-drain station-keeping after arriving at t
   }
 });
 
+test('Orion navBodyId autopilot navigates to outer worlds past ±95 bounds cleanly', () => {
+  let space = createInitialSpaceFlightState('artemis-2');
+  space.navBodyId = 'jupiter';
+  space.autoPilot = true;
+  let res = { power: 90, oxygen: 90, shield: 90 };
+
+  for (let i = 0; i < 600; i++) {
+    const out = stepSpaceFlightPhysics(
+      space,
+      res,
+      { forward: false, backward: false, left: false, right: false, boost: true, action: false },
+      false,
+      0.05,
+      0,
+      'exploration'
+    );
+    space = out.space;
+    res = out.resources;
+  }
+
+  assert.ok(
+    Math.abs(space.shipX) > 35 || Math.abs(space.shipZ) > 35,
+    'Orion should travel outward toward Jupiter past inner bounds'
+  );
+  assert.ok(
+    space.statusText.includes('Jupiter'),
+    `Expected Jupiter navigation status, got: ${space.statusText}`
+  );
+});
+
+

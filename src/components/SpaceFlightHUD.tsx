@@ -21,9 +21,12 @@ import {
 import { SOLAR_TARGETS } from '../game/constants';
 import {
   PRIMARY_SOLAR_BAR_IDS,
+  SOLAR_SUN_ORIGIN_X,
+  SOLAR_SUN_ORIGIN_Z,
   SOLAR_SYSTEM_BODIES,
   type SolarScaleMode,
   computeKeplerBodyPosition,
+  getLiveSolarTargetPosition,
 } from '../game/solarSystemData';
 import type {
   CampaignMissionId,
@@ -48,6 +51,7 @@ interface SpaceFlightHUDProps {
   solarEpochYears: number;
   onFocusSolarBody: (bodyId: string | null) => void;
   onExploreSolarBody: (bodyId: string) => void;
+  onFlyToSolarBody?: (bodyId: string) => void;
   onOpenMenuTab: (tab: GameMenuTab) => void;
   onOpenBriefing: () => void;
   onOpenHardwareBay: () => void;
@@ -78,6 +82,10 @@ const PLANET_ART_STYLE: Record<string, { background: string; ring?: boolean; sun
   earth: {
     background:
       'radial-gradient(circle at 36% 34%, #e0f2fe 0%, #38bdf8 30%, #1d4ed8 68%, #0f172a 100%)',
+  },
+  moon: {
+    background:
+      'radial-gradient(circle at 36% 32%, #f1f5f9 0%, #cbd5e1 48%, #64748b 100%)',
   },
   mars: {
     background:
@@ -172,6 +180,7 @@ export function SpaceFlightHUD({
   solarEpochYears,
   onFocusSolarBody,
   onExploreSolarBody,
+  onFlyToSolarBody,
   onOpenMenuTab,
   onOpenBriefing,
   onOpenHardwareBay,
@@ -184,8 +193,13 @@ export function SpaceFlightHUD({
   onEnterLunarOrbit,
   onEnterMarsOrbit,
 }: SpaceFlightHUDProps) {
-  const activeTarget = SOLAR_TARGETS[space.targetId];
-  const distToTarget = Math.hypot(activeTarget.x - space.shipX, activeTarget.z - space.shipZ);
+  const navSpec = space.navBodyId
+    ? SOLAR_SYSTEM_BODIES.find((b) => b.id === space.navBodyId) ?? null
+    : null;
+  const activeLivePos = navSpec
+    ? computeKeplerBodyPosition(navSpec, solarEpochYears, solarScaleMode)
+    : getLiveSolarTargetPosition(space.targetId, solarEpochYears, solarScaleMode);
+  const distToTarget = Math.hypot(activeLivePos.x - space.shipX, activeLivePos.z - space.shipZ);
   const shipSpeed = Math.hypot(space.vx, space.vz);
   const sat = space.orbitalSat;
   const isMoving = shipSpeed > 0.4;
@@ -202,7 +216,9 @@ export function SpaceFlightHUD({
   };
 
   let objectiveText = freeExploreMode
-    ? 'Explore the Solar System and learn about the planets!'
+    ? navSpec && space.autoPilot
+      ? `Flying Orion to ${navSpec.name}.`
+      : 'Explore the Solar System and learn about the planets!'
     : `Fly Orion toward ${targetNames[space.targetId]}.`;
   if (!freeExploreMode) {
     if (space.targetId === 'relay-orbit' && space.inSatDeployZone && !sat.linkLocked) {
@@ -218,22 +234,30 @@ export function SpaceFlightHUD({
     }
   }
 
-  const mapDotPos = (bodyId: string) => {
+  const maxUnits = solarScaleMode === 'scientific' ? 190 : 165;
+  const mapDotPos = (bodyId: string): { rx: number; ry: number; rOrbit: number } => {
     const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
     if (!spec) return { rx: 72, ry: 72, rOrbit: 0 };
     if (spec.id === 'sun') return { rx: 72, ry: 72, rOrbit: 0 };
     const pos = computeKeplerBodyPosition(spec, solarEpochYears, solarScaleMode, 0, 0);
-    const maxUnits = solarScaleMode === 'scientific' ? 190 : 155;
+    if (spec.id === 'moon') {
+      const earthPt = mapDotPos('earth');
+      const localMoonR = 5.4;
+      return {
+        rx: earthPt.rx + Math.cos(pos.angleRad) * localMoonR,
+        ry: earthPt.ry + Math.sin(pos.angleRad) * localMoonR,
+        rOrbit: localMoonR,
+      };
+    }
     const normR = Math.min(54, (pos.orbitalRadius / maxUnits) * 54);
     const rx = 72 + Math.cos(pos.angleRad) * normR;
     const ry = 72 + Math.sin(pos.angleRad) * normR;
     return { rx, ry, rOrbit: normR };
   };
 
-  const shipRelX = space.shipX - -48;
-  const shipRelZ = space.shipZ - -36;
-  const shipMax = solarScaleMode === 'scientific' ? 190 : 155;
-  const shipNormDist = Math.min(54, (Math.hypot(shipRelX, shipRelZ) / shipMax) * 54);
+  const shipRelX = space.shipX - SOLAR_SUN_ORIGIN_X;
+  const shipRelZ = space.shipZ - SOLAR_SUN_ORIGIN_Z;
+  const shipNormDist = Math.min(54, (Math.hypot(shipRelX, shipRelZ) / maxUnits) * 54);
   const shipAngle = Math.atan2(shipRelZ, shipRelX);
   const shipMapX = 72 + Math.cos(shipAngle) * shipNormDist;
   const shipMapY = 72 + Math.sin(shipAngle) * shipNormDist;
@@ -249,9 +273,9 @@ export function SpaceFlightHUD({
   const showMetersGroup = !freeExploreMode || space.inRadiationZone || space.fuelPct < 35;
 
   const exploreButtonLabel =
-    selectedBody?.id === 'mars'
-      ? 'Explore Planet'
-      : selectedBody?.id === 'earth'
+    selectedBody?.id === 'moon'
+      ? 'Explore Moon'
+      : selectedBody?.id === 'mars' || selectedBody?.id === 'earth'
         ? 'Explore Planet'
         : 'Inspect World';
 
@@ -543,15 +567,28 @@ export function SpaceFlightHUD({
             {selectedBody.fact}
           </p>
 
-          <button
-            type="button"
-            data-testid="explore-planet-btn"
-            onClick={() => onExploreSolarBody(selectedBody.id)}
-            className="mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/70 bg-amber-500/20 px-4 py-2.5 text-base font-bold text-amber-300 transition hover:bg-amber-500 hover:text-slate-950"
-          >
-            <span>{exploreButtonLabel}</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="mt-3.5 flex flex-col gap-2">
+            <button
+              type="button"
+              data-testid="explore-planet-btn"
+              onClick={() => onExploreSolarBody(selectedBody.id)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/70 bg-amber-500/20 px-4 py-2.5 text-base font-bold text-amber-300 transition hover:bg-amber-500 hover:text-slate-950"
+            >
+              <span>{exploreButtonLabel}</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            {onFlyToSolarBody && selectedBody.id !== 'sun' && (
+              <button
+                type="button"
+                data-testid="fly-orion-body-btn"
+                onClick={() => onFlyToSolarBody(selectedBody.id)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/45 bg-sky-500/12 px-4 py-2 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/25 hover:text-white"
+              >
+                <Rocket className="h-4 w-4" />
+                <span>Fly Orion Here</span>
+              </button>
+            )}
+          </div>
         </aside>
       )}
 
@@ -579,7 +616,7 @@ export function SpaceFlightHUD({
             </text>
 
             {/* Concentric Orbit Rings */}
-            {['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'].map(
+            {['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'].map(
               (id) => {
                 const pt = mapDotPos(id);
                 return (
@@ -596,6 +633,21 @@ export function SpaceFlightHUD({
               }
             )}
 
+            {/* Local Lunar Orbit Circle around Earth */}
+            {(() => {
+              const earthPt = mapDotPos('earth');
+              return (
+                <circle
+                  cx={earthPt.rx}
+                  cy={earthPt.ry}
+                  r="5.4"
+                  fill="none"
+                  stroke="rgba(148,163,184,0.35)"
+                  strokeWidth="0.65"
+                />
+              );
+            })()}
+
             {/* Sun Core */}
             <circle cx="72" cy="72" r="7.5" fill="#fbbf24" />
 
@@ -611,13 +663,18 @@ export function SpaceFlightHUD({
                     <circle
                       cx={pt.rx}
                       cy={pt.ry}
-                      r="5.5"
+                      r={id === 'moon' ? 3.8 : 5.5}
                       fill="none"
                       stroke="#22d3ee"
                       strokeWidth="1.3"
                     />
                   )}
-                  <circle cx={pt.rx} cy={pt.ry} r={id === 'jupiter' ? 3.1 : 2.3} fill={hex} />
+                  <circle
+                    cx={pt.rx}
+                    cy={pt.ry}
+                    r={id === 'jupiter' ? 3.1 : id === 'moon' ? 1.5 : 2.3}
+                    fill={hex}
+                  />
                 </g>
               );
             })}
@@ -702,10 +759,10 @@ export function SpaceFlightHUD({
             </div>
           )}
 
-          {/* 10-Body Circular Selector Bar matching Reference */}
+          {/* 11-Body Circular Selector Bar matching Reference */}
           <div
             data-testid="solar-planet-strip"
-            className="hud-soft pointer-events-auto flex items-center gap-1 rounded-2xl px-2.5 py-2"
+            className="hud-soft pointer-events-auto flex items-center gap-0.5 rounded-2xl px-2 py-2"
           >
             {PRIMARY_SOLAR_BAR_IDS.map((bodyId) => {
               const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
@@ -718,7 +775,7 @@ export function SpaceFlightHUD({
                   type="button"
                   data-testid={`solar-bar-${bodyId}`}
                   onClick={() => onFocusSolarBody(bodyId)}
-                  className={`flex min-w-[58px] flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition ${
+                  className={`flex min-w-[52px] flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition ${
                     isSelected
                       ? isSun
                         ? 'border border-amber-400/80 bg-amber-500/15 shadow-[0_0_14px_rgba(245,158,11,0.22)]'
@@ -728,7 +785,7 @@ export function SpaceFlightHUD({
                 >
                   <PlanetSphereThumb bodyId={bodyId} size="sm" />
                   <span
-                    className={`text-xs font-semibold ${
+                    className={`text-[11px] font-semibold ${
                       isSelected ? 'text-white' : 'text-slate-300'
                     }`}
                   >

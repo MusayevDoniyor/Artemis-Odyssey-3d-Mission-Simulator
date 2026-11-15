@@ -8,7 +8,9 @@ import {
   SOLAR_SYSTEM_BODIES,
   computeKeplerBodyPosition,
   computeWeightOnBodyKg,
+  getLiveSolarTargetPosition,
 } from './solarSystemData';
+import { getLearnModuleForObjective } from './learningModules';
 import {
   areAllPreLaunchChecksGo,
   computeRoverDisplaySpeed,
@@ -63,8 +65,8 @@ test('hardware catalog includes all 7 vehicles with parts, explode axes, and con
   }
 });
 
-test('solar system catalog covers Sun through Eris/Halley with Kepler motion & weight math', () => {
-  assert.equal(SOLAR_SYSTEM_BODIES.length, 13);
+test('solar system catalog covers Sun through Eris/Halley with Moon orbiting Earth and increasing planetary order', () => {
+  assert.equal(SOLAR_SYSTEM_BODIES.length, 14);
   const saturn = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'saturn');
   assert.ok(saturn);
   const expPos = computeKeplerBodyPosition(saturn, 0, 'exploration');
@@ -74,8 +76,64 @@ test('solar system catalog covers Sun through Eris/Halley with Kepler motion & w
   const laterPos = computeKeplerBodyPosition(saturn, 5, 'exploration');
   assert.notEqual(laterPos.angleRad, expPos.angleRad);
 
+  // Strictly increasing orbital order for planets/dwarfs around Sun
+  const orderedIds = [
+    'mercury',
+    'venus',
+    'earth',
+    'mars',
+    'ceres',
+    'jupiter',
+    'saturn',
+    'uranus',
+    'neptune',
+    'pluto',
+    'eris',
+  ];
+  for (const mode of ['exploration', 'scientific'] as const) {
+    let prevR = 0;
+    for (const id of orderedIds) {
+      const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === id);
+      assert.ok(spec, `Missing solar body ${id}`);
+      const r = mode === 'scientific' ? spec.scientificScaleRadius : spec.explorationRadiusUnits;
+      assert.ok(r > prevR, `${id} radius (${r}) must exceed previous (${prevR}) in ${mode}`);
+      prevR = r;
+    }
+  }
+
+  // Moon stays tightly bound to Earth across arbitrary orbital epochs
+  const earth = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+  const moon = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
+  for (const epoch of [0, 0.25, 0.75, 2.4]) {
+    const eExp = computeKeplerBodyPosition(earth, epoch, 'exploration');
+    const mExp = computeKeplerBodyPosition(moon, epoch, 'exploration');
+    assert.ok(Math.abs(Math.hypot(mExp.x - eExp.x, mExp.z - eExp.z) - 10.5) < 0.05);
+
+    const eSci = computeKeplerBodyPosition(earth, epoch, 'scientific');
+    const mSci = computeKeplerBodyPosition(moon, epoch, 'scientific');
+    assert.ok(Math.abs(Math.hypot(mSci.x - eSci.x, mSci.z - eSci.z) - 4.2) < 0.05);
+  }
+
+  const liveMoon = getLiveSolarTargetPosition('moon', 0, 'exploration');
+  const liveEarth = computeKeplerBodyPosition(earth, 0, 'exploration');
+  assert.ok(Math.hypot(liveMoon.x - liveEarth.x, liveMoon.z - liveEarth.z) < 11.0);
+
   assert.equal(computeWeightOnBodyKg(35, 0.165), 5.8);
   assert.equal(computeWeightOnBodyKg(35, 0.38), 13.3);
+});
+
+test('all Moon and Mars surface objectives provide complete LearnObjectModal modules & quizzes', () => {
+  for (const planet of ['moon', 'mars'] as const) {
+    const objs = getPlanetObjectives(planet);
+    assert.equal(objs.length, 4);
+    for (const obj of objs) {
+      const mod = getLearnModuleForObjective({ ...obj, progress: 0, completed: false });
+      assert.ok(mod.composition.length > 3);
+      assert.equal(mod.researchBullets.length, 2);
+      assert.equal(mod.quiz.options.length, 3);
+      assert.ok(mod.quiz.correctIndex >= 0 && mod.quiz.correctIndex < 3);
+    }
+  }
 });
 
 test('pre-launch checklist gates countdown and LEO parking completes TLI burn cleanly', () => {

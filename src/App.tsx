@@ -7,6 +7,7 @@ import { FieldNotebookModal } from './components/FieldNotebookModal';
 import { GameMenuModal } from './components/GameMenuModal';
 import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
+import { LearnObjectModal } from './components/LearnObjectModal';
 import { MobileAcademyView } from './components/MobileAcademyView';
 import { NasaDataModal } from './components/NasaDataModal';
 import { OutcomeModal } from './components/OutcomeModal';
@@ -34,6 +35,11 @@ import {
 } from './game/drilling';
 import { CONTEXTUAL_FACTS, type ContextualFact, type FactContextKey } from './game/factsAndGlossary';
 import { HARDWARE_CATALOG } from './game/hardwareCatalog';
+import {
+  createInitialLearnModalState,
+  getLearnModuleForObjective,
+  type LearnModalState,
+} from './game/learningModules';
 import {
   clearMarsQueue,
   createInitialMarsQueueState,
@@ -247,6 +253,7 @@ export default function App() {
   const apollo1202TriggeredRef = useRef<boolean>(false);
   const apollo1202ClearedRef = useRef<boolean>(false);
   const drillingConsoleRef = useRef<DrillingConsoleState | null>(null);
+  const learnModalRef = useRef<LearnModalState | null>(null);
   const outpostConsoleRef = useRef<OutpostConsoleState>(createInitialOutpostConsoleState('moon'));
   const marsQueueRef = useRef<MarsQueueState>(createInitialMarsQueueState(14));
   const mastPanDegRef = useRef<number>(0);
@@ -298,6 +305,7 @@ export default function App() {
 
   const [speedScale, setSpeedScale] = useState<TelemetrySpeedScale>('KID_25X');
   const [drillingConsoleUi, setDrillingConsoleUi] = useState<DrillingConsoleState | null>(null);
+  const [learnModalUi, setLearnModalUi] = useState<LearnModalState | null>(null);
   const [outpostConsoleUi, setOutpostConsoleUi] = useState<OutpostConsoleState>(() =>
     createInitialOutpostConsoleState('moon')
   );
@@ -318,8 +326,9 @@ export default function App() {
       nasaModalOpen ||
       fieldNotebookOpen ||
       Boolean(drillingConsoleUi?.open) ||
+      Boolean(learnModalUi?.open) ||
       outpostConsoleUi.open;
-  }, [nasaModalOpen, fieldNotebookOpen, drillingConsoleUi, outpostConsoleUi]);
+  }, [nasaModalOpen, fieldNotebookOpen, drillingConsoleUi, learnModalUi, outpostConsoleUi]);
 
   useEffect(() => {
     menuOpenRef.current = menuOpen;
@@ -391,6 +400,7 @@ export default function App() {
     setActiveAnomalyUi(activeAnomalyRef.current ? { ...activeAnomalyRef.current } : null);
     setDiscoveryObjUi(discoveryObjRef.current ? { ...discoveryObjRef.current } : null);
     setDrillingConsoleUi(drillingConsoleRef.current ? { ...drillingConsoleRef.current } : null);
+    setLearnModalUi(learnModalRef.current ? { ...learnModalRef.current } : null);
     setOutpostConsoleUi({ ...outpostConsoleRef.current });
     setMarsQueueUi({ ...marsQueueRef.current });
     setScoreUi(scoreRef.current);
@@ -488,9 +498,11 @@ export default function App() {
     let bodyState = 'playing';
     if (phase === 'title') bodyState = 'title';
     else if (phase === 'gameover' || phase === 'victory') bodyState = 'gameover';
-    else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi) bodyState = 'paused';
+    else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi || learnModalUi?.open) {
+      bodyState = 'paused';
+    }
     document.body.dataset.state = bodyState;
-  }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi]);
+  }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
 
   // Fetch live NASA DONKI + OSDR telemetry
   useEffect(() => {
@@ -555,6 +567,7 @@ export default function App() {
       discoveryObjRef.current = null;
       activeAnomalyRef.current = null;
       drillingConsoleRef.current = null;
+      learnModalRef.current = null;
       outpostConsoleRef.current = createInitialOutpostConsoleState(targetPlanet);
       s.kilopowerActive = false;
       phaseTimerRef.current = 0;
@@ -723,7 +736,7 @@ export default function App() {
         jumpToPhase('landing', 'mars');
         return;
       }
-      if (bodyId === 'earth') {
+      if (bodyId === 'earth' || bodyId === 'moon') {
         jumpToPhase('landing', 'moon');
         return;
       }
@@ -740,6 +753,41 @@ export default function App() {
       soundSynth.playClick();
     },
     [jumpToPhase]
+  );
+
+  const handleFlyToSolarBody = useCallback(
+    (bodyId: string) => {
+      const s = simRef.current;
+      s.space.navBodyId = bodyId;
+      s.space.autoPilot = true;
+      s.focusedSolarBodyId = null;
+      s.userOrbitActive = false;
+      setFocusedSolarBodyId(null);
+      setSelectedBodyPin(null);
+      s.orbitYaw = 0.55;
+      s.orbitPitch = 0.48;
+      s.orbitDistance = 22;
+      setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
+      soundSynth.init();
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleOpenLearnForObjective = useCallback(
+    (obj: RoverObjective) => {
+      if (obj.completed) return;
+      const existing = learnModalRef.current;
+      if (existing && existing.objectiveId === obj.id) {
+        learnModalRef.current = { ...existing, open: true };
+      } else {
+        learnModalRef.current = createInitialLearnModalState(obj);
+      }
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
   );
 
   // Per-frame physics + game progression loop
@@ -861,7 +909,15 @@ export default function App() {
       } else if (s.phase === 'space') {
         const prevTargets = s.space.visitedTargets.length;
         const prevSatLocked = s.space.orbitalSat.linkLocked;
-        const result = stepSpaceFlightPhysics(s.space, s.resources, s.input, s.donkiFlareActive, dt);
+        const result = stepSpaceFlightPhysics(
+          s.space,
+          s.resources,
+          s.input,
+          s.donkiFlareActive,
+          dt,
+          s.solarEpochYears ?? 0,
+          s.solarScaleMode ?? 'exploration'
+        );
         s.space = result.space;
         s.resources = result.resources;
         s.solarEpochYears = (s.solarEpochYears ?? 0) + dt * solarTimeSpeedRef.current * 0.08;
@@ -1060,13 +1116,11 @@ export default function App() {
         if (s.rover.planet === 'mars') {
           const mq = stepMarsQueue(marsQueueRef.current, s.rover, s.objectives, dt);
           marsQueueRef.current = mq.queueState;
-          effectiveInput = mq.input;
+          effectiveInput = mq.queueState.phase === 'IDLE' ? s.input : mq.input;
           if (mq.triggerDrillObjectiveId) {
             const obj = s.objectives.find((o) => o.id === mq.triggerDrillObjectiveId && !o.completed);
             if (obj) {
-              drillingConsoleRef.current = createInitialDrillingState(obj.id, obj.title, obj.planet);
-              soundSynth.playClick();
-              syncUiNow();
+              handleOpenLearnForObjective(obj);
             }
           }
         }
@@ -1259,7 +1313,7 @@ export default function App() {
         }
       }
     },
-    [completeObjectiveWithRewards, syncUiNow, unlockFieldNote]
+    [completeObjectiveWithRewards, handleOpenLearnForObjective, syncUiNow, unlockFieldNote]
   );
 
   const onFrameTickRef = useRef(onFrameTick);
@@ -1398,6 +1452,11 @@ export default function App() {
           syncUiNow();
           return;
         }
+        if (learnModalRef.current?.open) {
+          learnModalRef.current = { ...learnModalRef.current, open: false };
+          syncUiNow();
+          return;
+        }
         if (outpostConsoleRef.current.open) {
           outpostConsoleRef.current = { ...outpostConsoleRef.current, open: false };
           syncUiNow();
@@ -1528,8 +1587,12 @@ export default function App() {
           const nearObj = s.objectives.find(
             (o) => !o.completed && Math.hypot(o.x - s.rover.x, o.z - s.rover.z) < 6.8
           );
+          if (nearObj) {
+            handleOpenLearnForObjective(nearObj);
+            return;
+          }
           const atBase = Math.hypot(s.rover.x + 15, s.rover.z + 13) <= 22;
-          if (!nearObj && atBase) {
+          if (atBase) {
             outpostConsoleRef.current = {
               ...outpostConsoleRef.current,
               planet: s.rover.planet,
@@ -1602,7 +1665,15 @@ export default function App() {
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [closeMenu, fieldNotebookOpen, jumpToPhase, nasaModalOpen, openMenuWithTab, syncUiNow]);
+  }, [
+    closeMenu,
+    fieldNotebookOpen,
+    handleOpenLearnForObjective,
+    jumpToPhase,
+    nasaModalOpen,
+    openMenuWithTab,
+    syncUiNow,
+  ]);
 
   // Universal 360° drag-to-orbit + scroll-wheel zoom across every 3D stage & model
   const dragStateRef = useRef<{ active: boolean; x: number; y: number; startX: number; startY: number }>({
@@ -1646,7 +1717,14 @@ export default function App() {
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
-    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi || drillingConsoleUi?.open || outpostConsoleUi.open) {
+    if (
+      nasaModalOpen ||
+      fieldNotebookOpen ||
+      discoveryObjUi ||
+      drillingConsoleUi?.open ||
+      learnModalUi?.open ||
+      outpostConsoleUi.open
+    ) {
       return;
     }
     dragStateRef.current = {
@@ -1665,6 +1743,7 @@ export default function App() {
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
+      learnModalUi?.open ||
       outpostConsoleUi.open
     ) {
       return;
@@ -1751,12 +1830,19 @@ export default function App() {
   };
 
   const handleCanvasWheel = (e: React.WheelEvent) => {
-    if (nasaModalOpen || fieldNotebookOpen || discoveryObjUi || drillingConsoleUi?.open || outpostConsoleUi.open) {
+    if (
+      nasaModalOpen ||
+      fieldNotebookOpen ||
+      discoveryObjUi ||
+      drillingConsoleUi?.open ||
+      learnModalUi?.open ||
+      outpostConsoleUi.open
+    ) {
       return;
     }
     const s = simRef.current;
     const minD = s.phase === 'launch' ? 9 : s.phase === 'space' ? 4.5 : s.phase === 'landing' ? 5.5 : 3.2;
-    const maxD = s.phase === 'launch' ? 88 : s.phase === 'space' ? 160 : s.phase === 'landing' ? 80 : 65;
+    const maxD = s.phase === 'launch' ? 88 : s.phase === 'space' ? 240 : s.phase === 'landing' ? 80 : 65;
     s.userOrbitActive = true;
     s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.022, minD, maxD);
   };
@@ -2077,6 +2163,7 @@ export default function App() {
         !nasaModalOpen &&
         !fieldNotebookOpen &&
         !drillingConsoleUi?.open &&
+        !learnModalUi?.open &&
         !outpostConsoleUi.open &&
         !discoveryObjUi && (
           <WorldTargetPins
@@ -2085,14 +2172,7 @@ export default function App() {
             marsQueue={marsQueueUi}
             onInteractObjective={(objId) => {
               const obj = objectivesUi.find((o) => o.id === objId);
-              if (!obj || obj.completed) return;
-              drillingConsoleRef.current = createInitialDrillingState(
-                obj.id,
-                obj.title,
-                obj.planet
-              );
-              soundSynth.playClick();
-              syncUiNow();
+              if (obj) handleOpenLearnForObjective(obj);
             }}
             onOpenOutpost={() => {
               outpostConsoleRef.current = {
@@ -2229,6 +2309,7 @@ export default function App() {
           solarEpochYears={solarEpochYearsUi}
           onFocusSolarBody={handleFocusSolarBody}
           onExploreSolarBody={handleExploreSolarBody}
+          onFlyToSolarBody={handleFlyToSolarBody}
           onOpenMenuTab={openMenuWithTab}
           onOpenBriefing={() => jumpToPhase('briefing')}
           onOpenHardwareBay={() => jumpToPhase('inspector')}
@@ -2353,13 +2434,7 @@ export default function App() {
             setSpeedScale((prev) => (prev === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X'));
           }}
           onOpenDrillConsole={(obj) => {
-            drillingConsoleRef.current = createInitialDrillingState(
-              obj.id,
-              obj.title,
-              obj.planet
-            );
-            soundSynth.playClick();
-            syncUiNow();
+            handleOpenLearnForObjective(obj);
           }}
           onOpenOutpostConsole={() => {
             outpostConsoleRef.current = {
@@ -2533,13 +2608,23 @@ export default function App() {
             const objId = drillingConsoleRef.current?.objectiveId;
             drillingConsoleRef.current = null;
             setDrillingConsoleUi(null);
-            if (objId) {
+            if (objId && learnModalRef.current && learnModalRef.current.objectiveId === objId) {
+              learnModalRef.current = {
+                ...learnModalRef.current,
+                open: true,
+                sampleStudied: true,
+                activeStep: 'notes',
+              };
+              soundSynth.playSuccess();
+              syncUiNow();
+            } else if (objId) {
               completeObjectiveWithRewards(objId);
             } else {
               syncUiNow();
             }
           }}
           onClose={() => {
+            const objId = drillingConsoleRef.current?.objectiveId;
             if (drillingConsoleRef.current) {
               drillingConsoleRef.current = {
                 ...drillingConsoleRef.current,
@@ -2547,6 +2632,81 @@ export default function App() {
                 isDrilling: false,
               };
             }
+            if (objId && learnModalRef.current && learnModalRef.current.objectiveId === objId) {
+              learnModalRef.current = { ...learnModalRef.current, open: true };
+            }
+            syncUiNow();
+          }}
+        />
+      )}
+
+      {learnModalUi?.open && (
+        <LearnObjectModal
+          state={learnModalUi}
+          objective={objectivesUi.find((o) => o.id === learnModalUi.objectiveId) ?? null}
+          onSelectStep={(step) => {
+            if (!learnModalRef.current) return;
+            learnModalRef.current = { ...learnModalRef.current, activeStep: step };
+            soundSynth.playClick();
+            syncUiNow();
+          }}
+          onMarkSampleStudied={() => {
+            if (!learnModalRef.current) return;
+            learnModalRef.current = { ...learnModalRef.current, sampleStudied: true };
+            soundSynth.playSuccess();
+            syncUiNow();
+          }}
+          onMarkNotesRead={() => {
+            if (!learnModalRef.current) return;
+            learnModalRef.current = { ...learnModalRef.current, notesRead: true };
+            soundSynth.playClick();
+            syncUiNow();
+          }}
+          onSelectQuizAnswer={(index) => {
+            if (!learnModalRef.current) return;
+            const obj = simRef.current.objectives.find(
+              (o) => o.id === learnModalRef.current?.objectiveId
+            );
+            if (!obj) return;
+            const spec = getLearnModuleForObjective(obj);
+            const correct = index === spec.quiz.correctIndex;
+            if (correct) {
+              soundSynth.playSuccess();
+            } else {
+              soundSynth.playTone(230, 0.14, 'triangle', 0.12);
+            }
+            learnModalRef.current = {
+              ...learnModalRef.current,
+              selectedAnswer: index,
+              quizPassed: correct || learnModalRef.current.quizPassed,
+              quizFeedback: correct
+                ? spec.quiz.explanation
+                : 'Not quite — review the research notes and try another option.',
+            };
+            syncUiNow();
+          }}
+          onOpenTridentDrill={(obj) => {
+            if (learnModalRef.current) {
+              learnModalRef.current = { ...learnModalRef.current, open: false };
+            }
+            drillingConsoleRef.current = createInitialDrillingState(
+              obj.id,
+              obj.title,
+              obj.planet
+            );
+            soundSynth.playClick();
+            syncUiNow();
+          }}
+          onCompleteAndClaim={(objId) => {
+            learnModalRef.current = null;
+            setLearnModalUi(null);
+            completeObjectiveWithRewards(objId);
+          }}
+          onClose={() => {
+            if (learnModalRef.current) {
+              learnModalRef.current = { ...learnModalRef.current, open: false };
+            }
+            soundSynth.playClick();
             syncUiNow();
           }}
         />

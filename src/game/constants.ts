@@ -1,3 +1,4 @@
+import { getLiveSolarTargetPosition } from './solarSystemData';
 import type {
   CampaignMissionId,
   CampaignMissionSpec,
@@ -195,13 +196,18 @@ export interface SolarPlanetSpec {
   fact: string;
 }
 
+const relayPos0 = getLiveSolarTargetPosition('relay-orbit', 0, 'exploration');
+const moonPos0 = getLiveSolarTargetPosition('moon', 0, 'exploration');
+const gatewayPos0 = getLiveSolarTargetPosition('gateway', 0, 'exploration');
+const marsPos0 = getLiveSolarTargetPosition('mars', 0, 'exploration');
+
 export const SOLAR_TARGETS: Record<SpaceTargetId, SolarPlanetSpec> = {
   'relay-orbit': {
     id: 'relay-orbit',
     name: 'HERMES Orbit · LLO',
-    x: 6,
-    z: -4,
-    radius: 2.8,
+    x: relayPos0.x,
+    z: relayPos0.z,
+    radius: 2.4,
     realDistanceLabel: '365,000 km',
     nominalDays: 2.5,
     color: 0x38bdf8,
@@ -210,9 +216,9 @@ export const SOLAR_TARGETS: Record<SpaceTargetId, SolarPlanetSpec> = {
   moon: {
     id: 'moon',
     name: 'Moon · South Pole',
-    x: 26,
-    z: -18,
-    radius: 3.4,
+    x: moonPos0.x,
+    z: moonPos0.z,
+    radius: 2.2,
     realDistanceLabel: '384,400 km',
     nominalDays: 4,
     color: 0xcbd5e1,
@@ -221,9 +227,9 @@ export const SOLAR_TARGETS: Record<SpaceTargetId, SolarPlanetSpec> = {
   gateway: {
     id: 'gateway',
     name: 'Gateway · NRHO',
-    x: 42,
-    z: 14,
-    radius: 2.6,
+    x: gatewayPos0.x,
+    z: gatewayPos0.z,
+    radius: 2.2,
     realDistanceLabel: '405,000 km',
     nominalDays: 8,
     color: 0xfacc15,
@@ -232,9 +238,9 @@ export const SOLAR_TARGETS: Record<SpaceTargetId, SolarPlanetSpec> = {
   mars: {
     id: 'mars',
     name: 'Mars · Jezero',
-    x: 24,
-    z: -56,
-    radius: 4.3,
+    x: marsPos0.x,
+    z: marsPos0.z,
+    radius: 2.6,
     realDistanceLabel: '225,000,000 km',
     nominalDays: 210,
     color: 0xf97316,

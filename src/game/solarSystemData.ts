@@ -1,4 +1,6 @@
-export type SolarBodyCategory = 'star' | 'planet' | 'dwarf' | 'station' | 'belt' | 'comet';
+import type { CampaignMissionId, SpaceTargetId } from './types';
+
+export type SolarBodyCategory = 'star' | 'planet' | 'moon' | 'dwarf' | 'station' | 'belt' | 'comet';
 
 export interface SolarSystemBodySpec {
   id: string;
@@ -23,14 +25,18 @@ export interface SolarSystemBodySpec {
   moonsSummary: string;
   fact: string;
   landablePlanet?: 'moon' | 'mars';
-  targetId?: 'relay-orbit' | 'moon' | 'gateway' | 'mars';
+  targetId?: SpaceTargetId;
 }
+
+export const SOLAR_SUN_ORIGIN_X = -48;
+export const SOLAR_SUN_ORIGIN_Z = -36;
 
 export const PRIMARY_SOLAR_BAR_IDS = [
   'sun',
   'mercury',
   'venus',
   'earth',
+  'moon',
   'mars',
   'jupiter',
   'saturn',
@@ -50,7 +56,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     orbitalPeriodYears: 0,
     explorationRadiusUnits: 0,
     scientificScaleRadius: 0,
-    explorationBodySize: 9.8,
+    explorationBodySize: 9.2,
     color: 0xfbbf24,
     gravityG: 27.9,
     diameterDisplay: '1,392,700 km',
@@ -71,7 +77,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 0.39,
     orbitalPeriodYears: 0.24,
-    explorationRadiusUnits: 16,
+    explorationRadiusUnits: 16.5,
     scientificScaleRadius: 7.8,
     explorationBodySize: 1.15,
     color: 0x94a3b8,
@@ -94,7 +100,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 0.72,
     orbitalPeriodYears: 0.62,
-    explorationRadiusUnits: 24,
+    explorationRadiusUnits: 24.5,
     scientificScaleRadius: 12.2,
     explorationBodySize: 1.75,
     color: 0xfde68a,
@@ -117,9 +123,9 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 1.0,
     orbitalPeriodYears: 1.0,
-    explorationRadiusUnits: 34,
-    scientificScaleRadius: 16.5,
-    explorationBodySize: 2.0,
+    explorationRadiusUnits: 36.0,
+    scientificScaleRadius: 17.0,
+    explorationBodySize: 3.4,
     color: 0x38bdf8,
     gravityG: 1.0,
     diameterDisplay: '12,742 km',
@@ -135,6 +141,31 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     targetId: 'moon',
   },
   {
+    id: 'moon',
+    name: 'Moon',
+    shortName: 'Moon',
+    subtitle: 'Earth’s Natural Satellite',
+    category: 'moon',
+    semiMajorAu: 1.0,
+    orbitalPeriodYears: 0.0748,
+    explorationRadiusUnits: 10.5,
+    scientificScaleRadius: 4.2,
+    explorationBodySize: 1.45,
+    color: 0xcbd5e1,
+    gravityG: 0.165,
+    diameterDisplay: '3,474 km',
+    massDisplay: '7.35 × 10²² kg',
+    gravityDisplay: '1.62 m/s²',
+    orbitalPeriodDisplay: '27.32 days (around Earth)',
+    avgDistanceDisplay: '384,400 km from Earth',
+    lightTimeOneWay: '1.28 s from Earth',
+    tempRangeC: '-230°C poles to +120°C',
+    moonsSummary: 'Gateway NRHO Staging Orbit',
+    fact: 'Shadowed craters at the lunar South Pole trap ancient water ice right beside sunlit power ridges.',
+    landablePlanet: 'moon',
+    targetId: 'moon',
+  },
+  {
     id: 'mars',
     name: 'Mars',
     shortName: 'Mars',
@@ -142,9 +173,9 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 1.52,
     orbitalPeriodYears: 1.88,
-    explorationRadiusUnits: 46,
-    scientificScaleRadius: 24.0,
-    explorationBodySize: 1.55,
+    explorationRadiusUnits: 51.0,
+    scientificScaleRadius: 25.0,
+    explorationBodySize: 2.3,
     color: 0xf97316,
     gravityG: 0.38,
     diameterDisplay: '6,779 km',
@@ -167,9 +198,9 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'dwarf',
     semiMajorAu: 2.77,
     orbitalPeriodYears: 4.6,
-    explorationRadiusUnits: 57,
+    explorationRadiusUnits: 63.5,
     scientificScaleRadius: 36.0,
-    explorationBodySize: 0.9,
+    explorationBodySize: 0.95,
     color: 0xcbd5e1,
     gravityG: 0.029,
     diameterDisplay: '940 km',
@@ -190,8 +221,8 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 5.2,
     orbitalPeriodYears: 11.86,
-    explorationRadiusUnits: 72,
-    scientificScaleRadius: 56.0,
+    explorationRadiusUnits: 82.0,
+    scientificScaleRadius: 58.0,
     explorationBodySize: 4.4,
     color: 0xfdba74,
     gravityG: 2.53,
@@ -213,8 +244,8 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 9.58,
     orbitalPeriodYears: 29.45,
-    explorationRadiusUnits: 92,
-    scientificScaleRadius: 84.0,
+    explorationRadiusUnits: 104.0,
+    scientificScaleRadius: 86.0,
     explorationBodySize: 3.7,
     color: 0xfef08a,
     gravityG: 1.07,
@@ -236,7 +267,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 19.2,
     orbitalPeriodYears: 84.0,
-    explorationRadiusUnits: 112,
+    explorationRadiusUnits: 124.0,
     scientificScaleRadius: 122.0,
     explorationBodySize: 2.6,
     color: 0x67e8f9,
@@ -259,7 +290,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'planet',
     semiMajorAu: 30.05,
     orbitalPeriodYears: 164.8,
-    explorationRadiusUnits: 130,
+    explorationRadiusUnits: 142.0,
     scientificScaleRadius: 155.0,
     explorationBodySize: 2.5,
     color: 0x3b82f6,
@@ -282,9 +313,9 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'dwarf',
     semiMajorAu: 39.5,
     orbitalPeriodYears: 248.0,
-    explorationRadiusUnits: 146,
+    explorationRadiusUnits: 158.0,
     scientificScaleRadius: 180.0,
-    explorationBodySize: 0.95,
+    explorationBodySize: 1.0,
     color: 0xe2e8f0,
     gravityG: 0.063,
     diameterDisplay: '2,377 km',
@@ -305,9 +336,9 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'dwarf',
     semiMajorAu: 67.8,
     orbitalPeriodYears: 558.0,
-    explorationRadiusUnits: 162,
+    explorationRadiusUnits: 174.0,
     scientificScaleRadius: 205.0,
-    explorationBodySize: 0.85,
+    explorationBodySize: 0.95,
     color: 0xa5f3fc,
     gravityG: 0.084,
     diameterDisplay: '2,326 km',
@@ -328,7 +359,7 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     category: 'comet',
     semiMajorAu: 17.8,
     orbitalPeriodYears: 75.3,
-    explorationRadiusUnits: 66,
+    explorationRadiusUnits: 71.0,
     scientificScaleRadius: 48.0,
     explorationBodySize: 0.72,
     color: 0x7dd3fc,
@@ -347,39 +378,54 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
 
 export type SolarScaleMode = 'exploration' | 'scientific';
 
+const PHASE_SEEDS: Record<string, number> = {
+  mercury: 0.72,
+  venus: 2.15,
+  earth: 0.88,
+  moon: -0.35,
+  mars: 0.42,
+  ceres: 2.9,
+  jupiter: 5.15,
+  saturn: 1.35,
+  uranus: 3.9,
+  neptune: 5.7,
+  pluto: 2.6,
+  eris: 4.5,
+  halley: 0.25,
+};
+
 /**
- * Pure Keplerian orbital position helper (2D ecliptic XZ plane)
- * Centered on Sun at (originX, originZ).
+ * Pure Keplerian orbital position helper (2D ecliptic XZ plane).
+ * Planets orbit Sun at (originX, originZ). Earth's Moon orbits Earth locally!
  */
 export function computeKeplerBodyPosition(
   body: SolarSystemBodySpec,
   epochYears: number,
   scaleMode: SolarScaleMode,
-  originX = -48,
-  originZ = -36
+  originX = SOLAR_SUN_ORIGIN_X,
+  originZ = SOLAR_SUN_ORIGIN_Z
 ): { x: number; z: number; orbitalRadius: number; angleRad: number } {
   if (body.id === 'sun') {
     return { x: originX, z: originZ, orbitalRadius: 0, angleRad: 0 };
   }
+
+  if (body.id === 'moon') {
+    const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+    const earthPos = computeKeplerBodyPosition(earthSpec, epochYears, scaleMode, originX, originZ);
+    const moonR = scaleMode === 'scientific' ? body.scientificScaleRadius : body.explorationRadiusUnits;
+    const angleRad = (PHASE_SEEDS.moon ?? 0) + (epochYears / Math.max(0.05, body.orbitalPeriodYears)) * Math.PI * 2;
+    return {
+      x: earthPos.x + Math.cos(angleRad) * moonR,
+      z: earthPos.z + Math.sin(angleRad) * moonR,
+      orbitalRadius: moonR,
+      angleRad,
+    };
+  }
+
   const baseRadius =
     scaleMode === 'scientific' ? body.scientificScaleRadius : body.explorationRadiusUnits;
   const period = Math.max(0.05, body.orbitalPeriodYears);
-  // Deterministic non-overlapping initial phase offsets by body id
-  const phaseSeeds: Record<string, number> = {
-    mercury: 0.7,
-    venus: 2.1,
-    earth: 0.88, // keeps Earth near (-22, 26) at epochYears = 0!
-    mars: 0.42,
-    ceres: 2.9,
-    jupiter: 5.1,
-    saturn: 1.35,
-    uranus: 3.9,
-    neptune: 5.7,
-    pluto: 2.6,
-    eris: 4.5,
-    halley: 0.25,
-  };
-  const phase0 = phaseSeeds[body.id] ?? 0;
+  const phase0 = PHASE_SEEDS[body.id] ?? 0;
   const angleRad = phase0 + (epochYears / period) * Math.PI * 2;
   const ecc = body.category === 'comet' ? 0.56 : 0.03;
   const r = baseRadius * (1 - ecc * Math.cos(angleRad));
@@ -389,6 +435,63 @@ export function computeKeplerBodyPosition(
     orbitalRadius: r,
     angleRad,
   };
+}
+
+export function getLiveSolarTargetPosition(
+  targetId: SpaceTargetId,
+  epochYears = 0,
+  scaleMode: SolarScaleMode = 'exploration',
+  originX = SOLAR_SUN_ORIGIN_X,
+  originZ = SOLAR_SUN_ORIGIN_Z
+): { x: number; z: number; radius: number } {
+  const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+  const moonSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
+  const marsSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
+
+  const earthPos = computeKeplerBodyPosition(earthSpec, epochYears, scaleMode, originX, originZ);
+  const moonPos = computeKeplerBodyPosition(moonSpec, epochYears, scaleMode, originX, originZ);
+
+  if (targetId === 'moon') {
+    return { x: moonPos.x, z: moonPos.z, radius: moonSpec.explorationBodySize };
+  }
+
+  if (targetId === 'relay-orbit') {
+    const t = scaleMode === 'scientific' ? 0.62 : 0.65;
+    return {
+      x: earthPos.x + (moonPos.x - earthPos.x) * t,
+      z: earthPos.z + (moonPos.z - earthPos.z) * t,
+      radius: 2.4,
+    };
+  }
+
+  if (targetId === 'gateway') {
+    const dx = moonPos.x - earthPos.x;
+    const dz = moonPos.z - earthPos.z;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    const offset = scaleMode === 'scientific' ? 2.4 : 4.2;
+    return {
+      x: moonPos.x + (-dz / len) * offset,
+      z: moonPos.z + (dx / len) * offset,
+      radius: 2.2,
+    };
+  }
+
+  const marsPos = computeKeplerBodyPosition(marsSpec, epochYears, scaleMode, originX, originZ);
+  return { x: marsPos.x, z: marsPos.z, radius: marsSpec.explorationBodySize };
+}
+
+export function getShipSpawnForMission(
+  missionId: CampaignMissionId,
+  epochYears = 0,
+  scaleMode: SolarScaleMode = 'exploration'
+): { x: number; z: number } {
+  if (missionId === 'artemis-4') {
+    const moonPos = getLiveSolarTargetPosition('moon', epochYears, scaleMode);
+    return { x: moonPos.x - 1.6, z: moonPos.z + 4.4 };
+  }
+  const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+  const earthPos = computeKeplerBodyPosition(earthSpec, epochYears, scaleMode);
+  return { x: earthPos.x - 3.4, z: earthPos.z + 3.4 };
 }
 
 export function computeWeightOnBodyKg(earthWeightKg: number, gravityG: number): number {

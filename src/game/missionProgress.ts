@@ -1,5 +1,10 @@
 import { PHYSICS, SOLAR_TARGETS, getLandingZones } from './constants';
 import { clamp, getSurfaceTerrainHeight } from './physics';
+import {
+  type SolarScaleMode,
+  getLiveSolarTargetPosition,
+  getShipSpawnForMission,
+} from './solarSystemData';
 import type {
   CampaignMissionId,
   LandingState,
@@ -78,20 +83,24 @@ export function getLaunchMissionProgress(launch: LaunchState): MissionProgressIn
 
 export function getSpaceMissionProgress(
   space: SpaceFlightState,
-  missionId: CampaignMissionId
+  missionId: CampaignMissionId,
+  solarEpochYears = 0,
+  solarScaleMode: SolarScaleMode = 'exploration'
 ): MissionProgressInfo {
   const target = SOLAR_TARGETS[space.targetId];
-  const startX = missionId === 'artemis-4' ? 22 : -14;
-  const startZ = missionId === 'artemis-4' ? -14 : 18;
+  const liveTarget = getLiveSolarTargetPosition(space.targetId, solarEpochYears, solarScaleMode);
+  const spawn = getShipSpawnForMission(missionId, 0, solarScaleMode);
+  const startX = spawn.x;
+  const startZ = spawn.z;
 
   const captureRadius =
     space.targetId === 'relay-orbit'
-      ? 9.5
-      : target.radius + (space.targetId === 'mars' ? 5.2 : 4.8);
+      ? 5.5
+      : liveTarget.radius + (space.targetId === 'mars' ? 5.2 : 4.8);
 
-  const rawDist = Math.hypot(target.x - space.shipX, target.z - space.shipZ);
+  const rawDist = Math.hypot(liveTarget.x - space.shipX, liveTarget.z - space.shipZ);
   const remDist = Math.max(0, rawDist - captureRadius);
-  const totalLegSpan = Math.max(12, Math.hypot(target.x - startX, target.z - startZ) - captureRadius);
+  const totalLegSpan = Math.max(1, Math.hypot(liveTarget.x - startX, liveTarget.z - startZ) - captureRadius);
 
   if (space.targetId === 'relay-orbit') {
     const transitRatio = clamp(1 - remDist / totalLegSpan, 0, 1);

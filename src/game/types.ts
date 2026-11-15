@@ -200,6 +200,7 @@ export interface SpaceFlightState {
   visitedTargets: SpaceTargetId[];
   orbitalSat: OrbitalSatState;
   statusText: string;
+  navBodyId?: string | null;
 }
 
 export interface LandingZone {

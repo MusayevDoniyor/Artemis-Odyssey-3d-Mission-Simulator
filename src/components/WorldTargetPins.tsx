@@ -1,4 +1,4 @@
-import { Home, MapPin, Wrench } from 'lucide-react';
+import { BookOpen, Home, MapPin } from 'lucide-react';
 import type { MarsQueueState, SurfacePlanet, SurfaceWorldPrompt } from '../game/types';
 
 interface WorldTargetPinsProps {
@@ -56,8 +56,8 @@ export function WorldTargetPins({
                       </>
                     ) : (
                       <>
-                        <Wrench className="h-4 w-4 text-amber-300" />
-                        Sample {p.title}
+                        <BookOpen className="h-4 w-4 text-amber-300" />
+                        Learn &amp; Sample {p.title}
                       </>
                     )}
                   </span>

@@ -1,4 +1,4 @@
-import { Battery, Compass, Shield, Undo2, Wind, Wrench, X } from 'lucide-react';
+import { Battery, BookOpen, Compass, Shield, Undo2, Wind, X } from 'lucide-react';
 import { PHYSICS } from '../game/constants';
 import type {
   GameMenuTab,
@@ -74,19 +74,19 @@ export function RoverHUD({
   // One concise plain-language instruction
   let objectiveText = 'Return to Base Camp airlock.';
   if (nearestObjective && !nearestObjective.completed) {
-    objectiveText = `Sample ${nearestObjective.siteName}.`;
+    objectiveText = `Press E to learn & sample ${nearestObjective.siteName}.`;
   } else if (nextObj) {
     if (isMars) {
       objectiveText =
         marsQueue.phase === 'IDLE'
           ? marsQueue.queue.length > 0
             ? `Send ${marsQueue.queue.length} queued drive commands.`
-            : `Click ground or map toward ${nextObj.siteName}.`
+            : `Drive WASD or click terrain toward ${nextObj.siteName}.`
           : marsQueue.phase === 'TRANSMITTING'
             ? `Sending commands across 14 min radio lag.`
             : `Driving autonomously to ${nextObj.siteName}.`;
     } else {
-      objectiveText = `Drive to ${nextObj.siteName} for a core sample.`;
+      objectiveText = `Drive to ${nextObj.siteName} to study & sample.`;
     }
   } else if (atBaseCamp) {
     objectiveText = 'Enter Base Camp airlock to finish your sol.';
@@ -115,9 +115,13 @@ export function RoverHUD({
             { keys: 'Tab', label: 'Topo Map', action: () => onOpenMenuTab('map') },
           ]
         : [
-            { keys: 'Click', label: 'Set Target', action: undefined },
-            { keys: 'Tab', label: 'Full Map', action: () => onOpenMenuTab('map') },
-            { keys: 'Esc', label: 'Menu', action: () => onOpenMenuTab('settings') },
+            { keys: 'W/A/S/D', label: 'Drive', hold: 'forward' as const },
+            {
+              keys: nearestObjective ? 'E' : 'Click',
+              label: nearestObjective ? 'Learn' : 'Queue Waypoint',
+              action: nearestObjective ? () => onOpenDrillConsole(nearestObjective) : undefined,
+            },
+            { keys: 'Tab', label: 'Map', action: () => onOpenMenuTab('map') },
           ]
       : [
           { keys: '14m', label: 'Signal Lag', action: undefined },
@@ -130,7 +134,7 @@ export function RoverHUD({
           { keys: 'A/D', label: 'Turn', hold: 'left' as const },
           {
             keys: 'E',
-            label: nearestObjective ? 'Sample' : atBaseCamp ? 'Airlock' : 'Interact',
+            label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Interact',
             action: nearestObjective
               ? () => onOpenDrillConsole(nearestObjective)
               : atBaseCamp
@@ -142,7 +146,7 @@ export function RoverHUD({
           { keys: 'W', label: 'Drive', hold: 'forward' as const },
           {
             keys: nearestObjective ? 'E' : atBaseCamp ? 'E' : 'Q',
-            label: nearestObjective ? 'Sample' : atBaseCamp ? 'Airlock' : 'Turn Mast',
+            label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Turn Mast',
             action: nearestObjective
               ? () => onOpenDrillConsole(nearestObjective)
               : atBaseCamp
@@ -368,8 +372,8 @@ export function RoverHUD({
               onClick={() => onOpenDrillConsole(nearestObjective)}
               className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-2xl border-amber-400/60 px-4 py-2 text-base font-bold text-amber-300 hover:border-amber-300"
             >
-              <Wrench className="h-4 w-4" />
-              Open TRIDENT Drill
+              <BookOpen className="h-4 w-4" />
+              Learn &amp; Sample ({nearestObjective.siteName})
             </button>
           )}
 
