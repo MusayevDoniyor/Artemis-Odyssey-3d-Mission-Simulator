@@ -264,6 +264,27 @@ export function stepLaunchPhysics(
     return L;
   }
 
+  // Once 165 km circular parking orbit is inserted, execute SECO-1 cutoff and coast cleanly
+  // (preserving remaining ICPS LH2/LOX propellant for the manual/interactive TLI burn).
+  if (L.orbitReached) {
+    const rParkM = PHYSICS.EARTH_RADIUS_M + PHYSICS.SLS_ORBIT_TARGET_KM * 1000;
+    const vParkMs = Math.sqrt(PHYSICS.EARTH_MU_M3_S2 / rParkM);
+    L.throttle = 0;
+    L.thrustKn = 0;
+    L.dragKn = 0;
+    L.twr = 0;
+    L.netAccelMs2 = 0;
+    L.pitchDeg = 90;
+    L.altitudeKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.verticalSpeedMs = 0;
+    L.horizontalSpeedMs = Math.round(vParkMs);
+    L.orbitalVelocityTargetMs = Math.round(vParkMs);
+    L.apoapsisKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.periapsisKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.orbitalEccentricity = 0;
+    return L;
+  }
+
   if (input.action) {
     L = separateLaunchStage(L);
   }
@@ -444,8 +465,19 @@ export function stepLaunchPhysics(
 
   // True orbital insertion gate: requires upper stage active, target altitude AND orbital velocity >= 95% circular speed
   if (L.coreSeparated && L.altitudeKm >= PHYSICS.SLS_ORBIT_TARGET_KM && vNow >= vCircMs * 0.95) {
+    const rParkM = rEarth + PHYSICS.SLS_ORBIT_TARGET_KM * 1000;
+    const vParkMs = Math.sqrt(PHYSICS.EARTH_MU_M3_S2 / rParkM);
     L.orbitReached = true;
-    L.altitudeKm = Math.max(PHYSICS.SLS_ORBIT_TARGET_KM, L.altitudeKm);
+    L.altitudeKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.verticalSpeedMs = 0;
+    L.horizontalSpeedMs = Math.round(Math.max(vParkMs, Math.min(vNow, vParkMs * 1.03)));
+    L.throttle = 0;
+    L.thrustKn = 0;
+    L.twr = 0;
+    L.pitchDeg = 90;
+    L.apoapsisKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.periapsisKm = PHYSICS.SLS_ORBIT_TARGET_KM;
+    L.orbitalEccentricity = 0;
   }
 
   return L;
@@ -563,9 +595,90 @@ export function stepSpaceFlightPhysics(
   const targetRadius = getBodyVisualRadiusUnits(targetBodyId, solarScaleMode);
   const targetLabel = navSpec ? navSpec.name : targetMeta.name;
 
-  const dx = targetX - s.shipX;
-  const dz = targetZ - s.shipZ;
-  const distToTarget = Math.hypot(dx, dz);
+  const shipStartDx = targetX - s.shipX;
+  const shipStartDz = targetZ - s.shipZ;
+  const distToTarget = Math.hypot(shipStartDx, shipStartDz);
+
+  // Compute live gravity-well centers for dominant Sphere of Influence (SOI) & orbital escape physics
+  const sunSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'sun')!;
+  const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+  const moonSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
+  const marsSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
+
+  const sunBodyPos = computeKeplerBodyPosition(
+    sunSpec,
+    solarEpochYears,
+    solarScaleMode,
+    SOLAR_SUN_ORIGIN_X,
+    SOLAR_SUN_ORIGIN_Z,
+    localAnchorId
+  );
+  const earthBodyPos = computeKeplerBodyPosition(
+    earthSpec,
+    solarEpochYears,
+    solarScaleMode,
+    SOLAR_SUN_ORIGIN_X,
+    SOLAR_SUN_ORIGIN_Z,
+    localAnchorId
+  );
+  const moonBodyPos = computeKeplerBodyPosition(
+    moonSpec,
+    solarEpochYears,
+    solarScaleMode,
+    SOLAR_SUN_ORIGIN_X,
+    SOLAR_SUN_ORIGIN_Z,
+    localAnchorId
+  );
+  const marsBodyPos = computeKeplerBodyPosition(
+    marsSpec,
+    solarEpochYears,
+    solarScaleMode,
+    SOLAR_SUN_ORIGIN_X,
+    SOLAR_SUN_ORIGIN_Z,
+    localAnchorId
+  );
+
+  const distEarth = Math.hypot(s.shipX - earthBodyPos.x, s.shipZ - earthBodyPos.z);
+  const distMoon = Math.hypot(s.shipX - moonBodyPos.x, s.shipZ - moonBodyPos.z);
+  const distMars = Math.hypot(s.shipX - marsBodyPos.x, s.shipZ - marsBodyPos.z);
+  const distSun = Math.hypot(s.shipX - sunBodyPos.x, s.shipZ - sunBodyPos.z);
+
+  const soiRadii =
+    solarScaleMode === 'scientific'
+      ? { moon: 0.65, earth: 4.2, mars: 3.2 }
+      : solarScaleMode === 'local'
+        ? { moon: 66.0, earth: 925.0, mars: 577.0 }
+        : { moon: 2.9, earth: 10.5, mars: 7.5 };
+
+  let domId: 'moon' | 'earth' | 'mars' | 'sun' = 'sun';
+  let domPos = sunBodyPos;
+  let domDist = distSun;
+  let domMuSi = PLANETARY_CATALOG_SI.sun.muM3S2;
+  let domMuScene = solarScaleMode === 'scientific' ? 18.0 : solarScaleMode === 'local' ? 0 : 24.0;
+  let domName = 'Sun';
+
+  if (distMoon <= soiRadii.moon) {
+    domId = 'moon';
+    domPos = moonBodyPos;
+    domDist = distMoon;
+    domMuSi = PLANETARY_CATALOG_SI.moon.muM3S2;
+    domMuScene = solarScaleMode === 'scientific' ? 0.14 : solarScaleMode === 'local' ? 22.0 : 3.2;
+    domName = 'Moon';
+  } else if (distEarth <= soiRadii.earth) {
+    domId = 'earth';
+    domPos = earthBodyPos;
+    domDist = distEarth;
+    domMuSi = PLANETARY_CATALOG_SI.earth.muM3S2;
+    domMuScene = solarScaleMode === 'scientific' ? 0.45 : solarScaleMode === 'local' ? 140.0 : 12.0;
+    domName = 'Earth';
+  } else if (distMars <= soiRadii.mars) {
+    domId = 'mars';
+    domPos = marsBodyPos;
+    domDist = distMars;
+    domMuSi = PLANETARY_CATALOG_SI.mars.muM3S2;
+    domMuScene = solarScaleMode === 'scientific' ? 0.22 : solarScaleMode === 'local' ? 48.0 : 5.4;
+    domName = 'Mars';
+  }
 
   let thrusting = input.forward;
   let braking = input.backward;
@@ -588,11 +701,36 @@ export function stepSpaceFlightPhysics(
             : 4.2);
 
   if (s.autoPilot) {
-    const desiredHeading = Math.atan2(dx, dz);
+    let steerX = shipStartDx;
+    let steerZ = shipStartDz;
+    // If Earth lies directly between Orion and distant target during departure, arc cleanly around Earth's limb
+    if (distToTarget > 2.2 && targetBodyId !== 'earth') {
+      const eRelX = earthBodyPos.x - s.shipX;
+      const eRelZ = earthBodyPos.z - s.shipZ;
+      const tNorm = Math.max(0.001, distToTarget);
+      const tDirX = shipStartDx / tNorm;
+      const tDirZ = shipStartDz / tNorm;
+      const proj = eRelX * tDirX + eRelZ * tDirZ;
+      const earthClearR = getBodyVisualRadiusUnits('earth', solarScaleMode) * 1.45;
+      if (proj > 0 && proj < distToTarget) {
+        const perpX = eRelX - proj * tDirX;
+        const perpZ = eRelZ - proj * tDirZ;
+        const perpDist = Math.hypot(perpX, perpZ);
+        if (perpDist < earthClearR) {
+          const tangX = -tDirZ;
+          const tangZ = tDirX;
+          const sideSign = perpX * tangX + perpZ * tangZ >= 0 ? -1 : 1;
+          steerX += tangX * sideSign * earthClearR * 1.6;
+          steerZ += tangZ * sideSign * earthClearR * 1.6;
+        }
+      }
+    }
+
+    const desiredHeading = Math.atan2(steerX, steerZ);
     let diff = desiredHeading - s.headingRad;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    s.headingRad += clamp(diff, -3.6 * dt, 3.6 * dt);
+    s.headingRad += clamp(diff, -3.8 * dt, 3.8 * dt);
 
     const speed = Math.hypot(s.vx, s.vz);
     if (distToTarget > captureRadius * 0.72) {
@@ -631,11 +769,30 @@ export function stepSpaceFlightPhysics(
       res.power = Math.max(0, res.power - 2.0 * dt);
     }
   } else if (braking) {
-    // RCS retro-thruster braking (gentle orbital velocity cancellation, zero vacuum drag when coasting!)
+    // RCS retro-thruster braking
     s.vx *= Math.max(0, 1 - 4.0 * dt);
     s.vz *= Math.max(0, 1 - 4.0 * dt);
   }
-  // When neither thrusting nor braking in vacuum, conserve momentum naturally
+
+  // Central gravitational acceleration toward active dominant Sphere of Influence (SOI)
+  // Skip gravity pull only while actively docked / holding station inside a target capture orbit.
+  const domVisRadius = getBodyVisualRadiusUnits(domId, solarScaleMode);
+  const rSoft = Math.max(domVisRadius * 1.25, domDist);
+  const inStationHold =
+    (distToTarget <= captureRadius &&
+      (s.autoPilot || (s.inSatDeployZone && input.action) || (s.targetId === 'relay-orbit' && s.orbitalSat.linkLocked))) ||
+    (s.autoPilot && distToTarget <= captureRadius * 0.8);
+
+  if (!inStationHold && domMuScene > 0 && domDist > 0.02) {
+    const gAccel = Math.min(accel * 0.42, domMuScene / (rSoft * rSoft));
+    const gx = (domPos.x - s.shipX) / domDist;
+    const gz = (domPos.z - s.shipZ) / domDist;
+    s.vx += gx * gAccel * dt;
+    s.vz += gz * gAccel * dt;
+  } else if (inStationHold && !thrusting && !braking) {
+    s.vx *= Math.max(0, 1 - 3.5 * dt);
+    s.vz *= Math.max(0, 1 - 3.5 * dt);
+  }
 
   const maxSpeed =
     (s.boostActive ? 28 : 18) *
@@ -790,20 +947,77 @@ export function stepSpaceFlightPhysics(
     Math.hypot(s.shipX - mars.x, s.shipZ - mars.z) <=
     mars.radius + (solarScaleMode === 'scientific' ? 1.2 : solarScaleMode === 'local' ? 4.2 : 5.2);
 
-  // Physical trajectory regime & telemetry readouts
+  // Physical Vis-Viva orbital energy, escape velocity & trajectory regime relative to active gravity well
+  const dx = targetX - s.shipX;
+  const dz = targetZ - s.shipZ;
   const relDist = Math.max(0.001, distToTarget);
-  const radialVel = (s.vx * dx + s.vz * dz) / relDist;
-  const tangVel = Math.abs(s.vx * -dz + s.vz * dx) / relDist;
+  const radialVelTarget = (s.vx * dx + s.vz * dz) / relDist;
+  const tangVelTarget = Math.abs(s.vx * -dz + s.vz * dx) / relDist;
+
+  // Compute physical SI radius around dominant body
+  let domRadiusPhysM = SI.AU_M;
+  if (solarScaleMode === 'local') {
+    domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI[domId].meanRadiusM + 120_000, domDist * 1_000_000);
+  } else if (solarScaleMode === 'scientific') {
+    if (domId === 'sun') {
+      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.sun.meanRadiusM * 2, (domDist / 160) * SI.AU_M);
+    } else {
+      domRadiusPhysM = Math.max(
+        PLANETARY_CATALOG_SI[domId].meanRadiusM + 120_000,
+        (domDist / 0.032) * PLANETARY_CATALOG_SI.earth.meanRadiusM
+      );
+    }
+  } else {
+    if (domId === 'earth') {
+      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.earth.meanRadiusM + 165_000, (domDist / 5.8) * 384_400_000);
+    } else if (domId === 'moon') {
+      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.moon.meanRadiusM + 100_000, (domDist / 2.2) * 18_000_000);
+    } else if (domId === 'mars') {
+      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.mars.meanRadiusM + 250_000, (domDist / 2.8) * 45_000_000);
+    } else {
+      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.sun.meanRadiusM * 2, (domDist / 38.5) * SI.AU_M);
+    }
+  }
+
+  const vCircPhysMs = Math.sqrt(domMuSi / domRadiusPhysM);
+  const vEscPhysMs = Math.sqrt((2 * domMuSi) / domRadiusPhysM);
+  const vEscScene = domMuScene > 0 ? Math.sqrt((2 * domMuScene) / rSoft) : 3.2;
+
+  const domDx = s.shipX - domPos.x;
+  const domDz = s.shipZ - domPos.z;
+  const domLen = Math.max(0.001, Math.hypot(domDx, domDz));
+  const radialOutwardWell = (s.vx * domDx + s.vz * domDz) / domLen;
+  const tangWell = Math.abs(s.vx * -domDz + s.vz * domDx) / domLen;
+
   const dockedOrKeep = Boolean((s.arrivedMoon || s.arrivedGateway || s.arrivedMars || s.inSatDeployZone) && spd < 0.8);
+  const vPhysMs =
+    spd < 0.05
+      ? vCircPhysMs
+      : vCircPhysMs + (spd / Math.max(0.45, vEscScene)) * (vEscPhysMs - vCircPhysMs) * 1.15;
+  const specEnergyPhys = 0.5 * vPhysMs * vPhysMs - domMuSi / domRadiusPhysM;
+  const hPhys = domRadiusPhysM * vPhysMs * (spd > 0.05 ? Math.min(1, Math.max(0.25, tangWell / Math.max(0.01, spd))) : 1.0);
+  const eccWell = Math.sqrt(
+    Math.max(0, 1 + (2 * specEnergyPhys * hPhys * hPhys) / Math.pow(domMuSi, 2))
+  );
+  const isEscapingWell = !dockedOrKeep && domId !== 'sun' && specEnergyPhys >= 0 && radialOutwardWell > 0.15;
+
   s.trajectoryRegime = classifySpacecraftTrajectory({
     speedUnitsPerSec: spd,
-    radialVelUnitsPerSec: -radialVel,
-    tangentialVelUnitsPerSec: tangVel,
+    radialVelUnitsPerSec: -radialVelTarget,
+    tangentialVelUnitsPerSec: tangVelTarget,
     distanceToTargetUnits: distToTarget,
     targetBodyRadiusUnits: targetRadius,
     autoPilot: s.autoPilot,
     dockedOrStationKeeping: dockedOrKeep,
+    eccentricityEstimate: eccWell,
+    specificEnergyJKg: specEnergyPhys,
+    isEscapingWell,
   });
+
+  s.dominantBodyName = domName;
+  s.escapeVelocityKmS = Math.round((vEscPhysMs / 1000) * 100) / 100;
+  s.orbitalEccentricity = Math.round(eccWell * 100) / 100;
+  s.orbitalSpeedKmS = Math.round((vPhysMs / 1000) * 100) / 100;
 
   s.distanceFromSunAu = Math.round(sunAuNow * 1000) / 1000;
   if (solarScaleMode === 'local') {
@@ -818,7 +1032,6 @@ export function stepSpaceFlightPhysics(
       ? Math.round(distToTarget * (384_400 / 5.8))
       : Math.round(metersToKm((distToTarget / 38.5) * SI.AU_M));
   }
-  s.orbitalSpeedKmS = Math.round((1.02 + spd * 0.42) * 100) / 100;
 
   if (s.orbitalSat.linkLocked && s.arrivedGateway) {
     s.statusText = 'Gateway NRHO Link Online! Ready to transfer ISRU payload.';
@@ -832,6 +1045,8 @@ export function stepSpaceFlightPhysics(
     s.statusText = 'Jezero Capture Orbit Reached! Ready for 0.38g Mars Descent.';
   } else if (s.inRadiationZone) {
     s.statusText = 'Solar Radiation Zone! Activate Water-Wall Storm Shield or steer clear of the Sun!';
+  } else if (isEscapingWell) {
+    s.statusText = `Escaping ${domName} gravity well (v > ${s.escapeVelocityKmS.toFixed(2)} km/s) -> ${targetLabel}`;
   } else {
     s.statusText = `Course set for ${targetLabel} (${(s.distanceToTargetKm ?? 0).toLocaleString()} km)`;
   }

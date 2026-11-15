@@ -390,7 +390,7 @@ export function GameMenuModal({
                         type="range"
                         min={0}
                         max={4}
-                        step={0.5}
+                        step={0.25}
                         value={solarTimeSpeed}
                         onChange={(e) => onChangeSolarTimeSpeed(Number(e.target.value))}
                         className="accent-amber-400"

@@ -13,6 +13,7 @@ export type OrbitalTrajectoryRegime =
   | 'Circular Orbit'
   | 'Elliptical Orbit'
   | 'Transfer Trajectory'
+  | 'Hyperbolic Escape'
   | 'Rendezvous'
   | 'Flyby'
   | 'Landing Trajectory'
@@ -413,7 +414,7 @@ export function projectHeliocentricSIToScene(
 }
 
 /**
- * Classifies spacecraft trajectory regime strictly from physical state relative to nearest target.
+ * Classifies spacecraft trajectory regime strictly from physical state relative to active gravity well / target.
  */
 export function classifySpacecraftTrajectory(params: {
   speedUnitsPerSec: number;
@@ -424,8 +425,18 @@ export function classifySpacecraftTrajectory(params: {
   autoPilot: boolean;
   dockedOrStationKeeping: boolean;
   eccentricityEstimate?: number;
+  specificEnergyJKg?: number;
+  isEscapingWell?: boolean;
 }): OrbitalTrajectoryRegime {
   if (params.dockedOrStationKeeping) return 'Station-Keeping';
+  if (
+    params.isEscapingWell ||
+    (typeof params.specificEnergyJKg === 'number' &&
+      params.specificEnergyJKg >= 0 &&
+      params.speedUnitsPerSec > 0.6)
+  ) {
+    return 'Hyperbolic Escape';
+  }
   if (params.distanceToTargetUnits <= params.targetBodyRadiusUnits + 3.0) {
     if (params.speedUnitsPerSec < 1.2) return 'Rendezvous';
     if (params.radialVelUnitsPerSec < -0.5) return 'Landing Trajectory';

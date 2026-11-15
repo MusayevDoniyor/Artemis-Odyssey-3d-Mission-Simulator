@@ -19,9 +19,11 @@ import {
   Settings,
   Shield,
   Trophy,
+  Volume2,
   Wind,
   X,
 } from 'lucide-react';
+import type { MusicState } from '../game/audio';
 import {
   PRIMARY_SOLAR_BAR_IDS,
   SOLAR_SUN_ORIGIN_X,
@@ -58,6 +60,9 @@ interface SpaceFlightHUDProps {
   localAnchorId: 'earth' | 'moon' | 'mars';
   horizonsProvenance: { source: string; provenance: DataProvenance; isLive: boolean };
   solarEpochYears: number;
+  musicState?: MusicState;
+  muted?: boolean;
+  onUnlockAudio?: () => void;
   onFocusSolarBody: (bodyId: string | null) => void;
   onExploreSolarBody: (bodyId: string) => void;
   onFlyToSolarBody?: (bodyId: string) => void;
@@ -93,6 +98,9 @@ export function SpaceFlightHUD({
   localAnchorId,
   horizonsProvenance,
   solarEpochYears,
+  musicState,
+  muted,
+  onUnlockAudio,
   onFocusSolarBody,
   onExploreSolarBody,
   onFlyToSolarBody,
@@ -349,8 +357,18 @@ export function SpaceFlightHUD({
             </button>
           </nav>
 
-          {/* Right: NASA Data Online Status + Insignia */}
+          {/* Right: Enable Audio (when blocked) + NASA Data Online Status + Insignia */}
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
+            {musicState?.audioBlocked && musicState.musicEnabled && !muted && onUnlockAudio && (
+              <button
+                type="button"
+                onClick={onUnlockAudio}
+                className="hud-cta-cyan inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-hud text-[11px] font-bold tracking-wider uppercase shadow-[0_0_16px_rgba(34,211,238,0.4)]"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                Enable Audio
+              </button>
+            )}
             <button
               type="button"
               onClick={onOpenNasaModal}
@@ -914,8 +932,24 @@ export function SpaceFlightHUD({
                       {space.orbitalSpeedKmS.toFixed(2)} km/s
                     </span>
                   )}
+                  {space.dominantBodyName && (
+                    <span className="text-sky-200">· {space.dominantBodyName} SOI</span>
+                  )}
                   {space.trajectoryRegime && (
-                    <span className="text-slate-300">· {space.trajectoryRegime}</span>
+                    <span
+                      className={
+                        space.trajectoryRegime === 'Hyperbolic Escape'
+                          ? 'font-semibold text-amber-300'
+                          : 'text-slate-300'
+                      }
+                    >
+                      · {space.trajectoryRegime}
+                    </span>
+                  )}
+                  {space.escapeVelocityKmS != null && (
+                    <span className="text-slate-400">
+                      (v_esc {space.escapeVelocityKmS.toFixed(2)})
+                    </span>
                   )}
                   {space.distanceFromSunAu != null && (
                     <span className="text-slate-300">· {space.distanceFromSunAu.toFixed(3)} AU</span>

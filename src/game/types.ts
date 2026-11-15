@@ -194,6 +194,7 @@ export type SpacecraftTrajectoryType =
   | 'Circular Orbit'
   | 'Elliptical Orbit'
   | 'Transfer Trajectory'
+  | 'Hyperbolic Escape'
   | 'Rendezvous'
   | 'Flyby'
   | 'Landing Trajectory'
@@ -222,6 +223,9 @@ export interface SpaceFlightState {
   navBodyId?: string | null;
   trajectoryRegime?: SpacecraftTrajectoryType;
   orbitalSpeedKmS?: number;
+  escapeVelocityKmS?: number;
+  dominantBodyName?: string;
+  orbitalEccentricity?: number;
   distanceFromSunAu?: number;
   distanceToTargetKm?: number;
 }
@@ -388,6 +392,11 @@ export interface LeoTransferState {
   tliDeltaVAppliedMs: number;
   tliTargetDeltaVMs: number;
   readyForSpaceTransition: boolean;
+  targetVelocityKmS?: number;
+  escapeVelocityKmS?: number;
+  apoapsisKm?: number;
+  eccentricity?: number;
+  fuelBurnedPct?: number;
 }
 
 export type MarsEdlStage =

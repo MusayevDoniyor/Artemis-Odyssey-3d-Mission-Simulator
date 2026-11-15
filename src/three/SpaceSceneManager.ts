@@ -1195,8 +1195,8 @@ export class SpaceSceneManager {
       (phase === 'inspector' && (s.showcase === 'rover' || s.showcase === 'outpost'));
 
     // Rotate Earth gently in Lunar Sky & update custom atmospheric scattering + separate Fresnel blue rim mesh
-    this.lunarEnv.earthGlobe.rotation.y += dt * 0.025;
-    this.lunarEnv.earthClouds.rotation.y += dt * 0.033;
+    this.lunarEnv.earthGlobe.rotation.y += dt * 0.008;
+    this.lunarEnv.earthClouds.rotation.y += dt * 0.011;
     const lunarEarthDist = Math.hypot(
       this.camera.position.x - this.lunarEnv.earthGroup.position.x,
       this.camera.position.y - this.lunarEnv.earthGroup.position.y,
@@ -1369,6 +1369,9 @@ export class SpaceSceneManager {
       lc.icpsFlame.visible = false;
       lc.machCone.visible = false;
       lc.flameGroup.visible = false;
+      for (let i = 0; i < lc.esmSolarPivots.length; i++) {
+        lc.esmSolarPivots[i].rotation.x = 0;
+      }
       lc.trenchLight.intensity = 0;
       lc.rocketEngineGlow.intensity = 0;
       lc.padSpotlight.intensity = 5.8;
@@ -1444,6 +1447,9 @@ export class SpaceSceneManager {
       lc.icpsFlame.visible = false;
       lc.machCone.visible = false;
       lc.flameGroup.visible = false;
+      for (let i = 0; i < lc.esmSolarPivots.length; i++) {
+        lc.esmSolarPivots[i].rotation.x = 0;
+      }
       lc.trenchLight.intensity = 0;
       (this.scene.background as THREE.Color).setHex(0x0b132b);
 
@@ -1522,10 +1528,15 @@ export class SpaceSceneManager {
     lc.cloudLayer.visible = atmoDensityRatio > 0.015;
     lc.padSpotlight.intensity = alt < 8 ? 5.8 * (1 - alt / 8) : 0;
 
+    const tliPct =
+      L.orbitReached && s.leoTransfer
+        ? Math.min(1, Math.max(0, s.leoTransfer.tliBurnProgressPct / 100))
+        : 0;
     const limbAppear = Math.min(1, Math.max(0, (alt - 16) / 34));
     const limbFade = limbAppear * limbAppear * (3 - 2 * limbAppear);
     lc.earthLimb.visible = limbFade > 0.01;
-    lc.earthLimb.position.y = -102 - Math.min(20, Math.max(0, alt - 16) * 0.12);
+    lc.earthLimb.position.x = -tliPct * 16;
+    lc.earthLimb.position.y = -102 - Math.min(20, Math.max(0, alt - 16) * 0.12) - tliPct * 14;
     lc.earthLimbGlobeMat.opacity = limbFade;
     lc.earthLimbGlobeMat.transparent = limbFade < 0.99;
     lc.earthLimbGlobeMat.depthWrite = limbFade >= 0.95;
@@ -1553,8 +1564,6 @@ export class SpaceSceneManager {
         orbitalRimBoost
       );
     }
-    lc.leoOrbitRing.visible = L.orbitReached;
-    lc.leoOrbitRing.position.copy(lc.earthLimb.position);
 
     // Sky transitions seamlessly via Rayleigh density decay from Florida twilight to orbital deep space
     const spaceFade = 1 - skyScatter;
@@ -1566,18 +1575,38 @@ export class SpaceSceneManager {
       (targetPitchRad - this.launchPitchVisualRad) * (1 - Math.exp(-3.4 * dt));
     const sinP = Math.sin(this.launchPitchVisualRad);
     const cosP = Math.cos(this.launchPitchVisualRad);
-    lc.rocketFull.position.set(0, liftY, 0);
+    lc.rocketFull.position.set(tliPct * 6.5, liftY + tliPct * 1.4, 0);
     lc.rocketFull.rotation.set(0, 0, -this.launchPitchVisualRad);
 
     // World-space center of active stack & exhaust nozzle along rocket pitch vector
-    const stackCenterLocalY = L.coreSeparated ? 20.5 : 12.2;
-    const focusX = stackCenterLocalY * sinP;
-    const focusY = liftY + stackCenterLocalY * cosP;
-    const nozzleLocalY = L.coreSeparated ? 17.8 : -0.2;
-    const nozzleX = nozzleLocalY * sinP;
-    const nozzleY = liftY + nozzleLocalY * cosP;
+    const stackCenterLocalY = L.coreSeparated ? 20.4 : 12.2;
+    const focusX = lc.rocketFull.position.x + stackCenterLocalY * sinP;
+    const focusY = liftY + lc.rocketFull.position.y - liftY + stackCenterLocalY * cosP;
+    const nozzleLocalY = L.coreSeparated ? 17.22 : -0.2;
+    const nozzleX = lc.rocketFull.position.x + nozzleLocalY * sinP;
+    const nozzleY = lc.rocketFull.position.y + nozzleLocalY * cosP;
     const exDirX = -sinP;
     const exDirY = -cosP;
+
+    // Align LEO circular orbit path cleanly through Orion's orbital altitude well above Earth's surface
+    lc.leoOrbitRing.visible = L.orbitReached;
+    if (lc.leoOrbitRing.visible) {
+      lc.leoOrbitRing.position.copy(lc.earthLimb.position);
+      const rOrbit = Math.hypot(
+        focusX - lc.earthLimb.position.x,
+        focusY - lc.earthLimb.position.y
+      );
+      lc.leoOrbitRing.scale.setScalar(Math.max(1.0, rOrbit / 108.5));
+      (lc.leoOrbitRing.material as THREE.MeshBasicMaterial).opacity = 0.42 * (1 - tliPct * 0.65);
+    }
+
+    // Deploy Orion ESM X-wing solar arrays once LAS jettisons / orbital vacuum is reached
+    const targetWingAngle = L.lasJettisoned || L.orbitReached ? -(Math.PI * 0.44) : 0;
+    const wingBlend = 1 - Math.exp(-3.2 * dt);
+    for (let i = 0; i < lc.esmSolarPivots.length; i++) {
+      const p = lc.esmSolarPivots[i];
+      p.rotation.x += (targetWingAngle - p.rotation.x) * wingBlend;
+    }
 
     // Flame + trench fire + deluge steam cloud + Transonic Mach Cone + Vacuum Plume Expansion
     const tliBurning = Boolean(L.orbitReached && s.leoTransfer?.tliBurnActive);
@@ -1738,8 +1767,13 @@ export class SpaceSceneManager {
       );
       this.camLookTarget.set(focusX, focusY, 0);
     } else if (L.orbitReached) {
-      this.camPosTarget.set(focusX - 8.5, focusY + 4.4, 12.2);
-      this.camLookTarget.set(focusX + 3.2, focusY - 0.6, -1.2);
+      const pullBack = tliPct * 3.8;
+      this.camPosTarget.set(
+        focusX - (4.8 + pullBack),
+        focusY + 2.3 + tliPct * 0.8,
+        7.2 + pullBack * 0.65
+      );
+      this.camLookTarget.set(focusX + 0.35, focusY - 0.35, 0);
     } else if (alt < 1.8) {
       this.camPosTarget.set(13.5 + shakeX, liftY + 7.5 + shakeY, 24.5);
       this.camLookTarget.set(focusX, Math.max(11.5, focusY - 0.8), 0);
@@ -2078,7 +2112,7 @@ export class SpaceSceneManager {
       0.14,
       Math.sin(elapsedSec * 0.7) * 2.76
     );
-    ss.gatewayGroup.rotation.y += dt * 0.15;
+    ss.gatewayGroup.rotation.y += dt * 0.045;
 
     // Position Sun & heliocentric lighting / belts
     this.sunOriginVec.set(sunPos.x, sunPos.y, sunPos.z);
@@ -2094,7 +2128,7 @@ export class SpaceSceneManager {
     ss.sunOuterGlow.scale.set(sunVisR * 4.2, sunVisR * 4.2, 1);
 
     ss.asteroidBelt.position.copy(this.sunOriginVec);
-    ss.asteroidBelt.rotation.y += dt * 0.015;
+    ss.asteroidBelt.rotation.y += dt * 0.004;
     ss.kuiperBelt.visible = !isLocal;
     ss.oortCloud.visible = !isLocal;
     ss.stormRing.visible = !isLocal;
@@ -2180,10 +2214,11 @@ export class SpaceSceneManager {
       const spinMesh = ss.planetSpinMeshes[b.id];
       if (spinMesh && siEntry && siEntry.siderealRotationPeriodS !== 0) {
         const periodDays = siEntry.siderealRotationPeriodS / 86400;
-        const spinRate = Math.sign(periodDays) * Math.min(2.4, Math.max(0.04, 1.8 / Math.abs(periodDays)));
-        spinMesh.rotation.y += dt * spinRate * 0.32;
+        const spinRate =
+          Math.sign(periodDays) * Math.min(0.65, Math.max(0.015, 0.42 / Math.abs(periodDays)));
+        spinMesh.rotation.y += dt * spinRate * 0.22;
         if (b.id === 'earth') {
-          ss.earthClouds.rotation.y += dt * spinRate * 0.44;
+          ss.earthClouds.rotation.y += dt * spinRate * 0.28;
         }
       }
 

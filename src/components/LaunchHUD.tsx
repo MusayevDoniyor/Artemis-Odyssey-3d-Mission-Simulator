@@ -113,10 +113,16 @@ export function LaunchHUD({
               </span>
             </div>
             <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">{objectiveLine}</p>
-            <div className="mt-1.5 flex items-center justify-between font-mono-tech text-[10px] font-semibold text-cyan-200/80">
-              <span>{PHYSICS.LAUNCH_TIME_SCALE}× Time Scale · Real SI Propulsion</span>
+            <div className="mt-1.5 flex items-center justify-between gap-2 font-mono-tech text-[10px] font-semibold text-cyan-200/80">
               <span>
-                Target {(launch.orbitalVelocityTargetMs / 1000).toFixed(2)} km/s
+                {launch.orbitReached
+                  ? 'RL10B-2 Orbital Transfer'
+                  : `${PHYSICS.LAUNCH_TIME_SCALE}× Time Scale · Real SI Propulsion`}
+              </span>
+              <span className="text-right tabular-nums">
+                {launch.orbitReached
+                  ? `Target ${(leoTransfer.targetVelocityKmS ?? 10.96).toFixed(2)} km/s · ${(leoTransfer.apoapsisKm ?? 165) >= 350000 ? 'TLI Escape' : `Apo ${leoTransfer.apoapsisKm ?? 165} km`}`
+                  : `Target ${(launch.orbitalVelocityTargetMs / 1000).toFixed(2)} km/s`}
               </span>
             </div>
             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
@@ -318,7 +324,7 @@ export function LaunchHUD({
           )}
 
           {launch.orbitReached && (
-            <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5">
+            <div className="hud-soft pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2.5">
               <Orbit className="h-5 w-5 shrink-0 text-cyan-300" />
               <div className="text-sm font-semibold whitespace-nowrap text-white tabular-nums">
                 165 km Orbit · {leoTransfer.orbitalVelocityKmS.toFixed(2)} km/s ({Math.round(leoTransfer.tliBurnProgressPct)}%)
@@ -332,6 +338,14 @@ export function LaunchHUD({
               >
                 <Flame className="h-4 w-4 shrink-0" />
                 {leoTransfer.tliBurnActive ? 'Firing TLI...' : 'Fire TLI Burn'}
+              </button>
+              <button
+                type="button"
+                data-testid="skip-tli-btn"
+                onClick={onSkipToSpace}
+                className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-300 transition hover:border-cyan-400 hover:text-white"
+              >
+                Skip
               </button>
             </div>
           )}
@@ -396,14 +410,18 @@ export function LaunchHUD({
           </button>
           <button
             type="button"
-            onClick={launch.orbitReached ? onSkipToSpace : onSeparateStage}
+            onClick={launch.orbitReached ? onFireTliBurn : onSeparateStage}
             className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap hover:text-amber-300"
           >
             <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-xs font-bold text-white">
               Space
             </span>
             <span className="font-medium text-slate-200">
-              {launch.orbitReached ? 'Skip Space' : 'Stage'}
+              {launch.orbitReached
+                ? leoTransfer.tliBurnActive
+                  ? 'Firing TLI'
+                  : 'Fire TLI'
+                : 'Stage'}
             </span>
           </button>
           <button

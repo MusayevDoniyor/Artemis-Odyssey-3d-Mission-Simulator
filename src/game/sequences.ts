@@ -55,18 +55,27 @@ export function areAllPreLaunchChecksGo(checks: PreLaunchChecks): boolean {
   return checks.powerBus && checks.cryoChill && checks.delugeArmed && checks.crewArmClear;
 }
 
-export function createInitialLeoTransferState(): LeoTransferState {
+export function createInitialLeoTransferState(targetDeltaVMs = 3150): LeoTransferState {
+  const rOrbitM = 6371000 + 165000;
+  const muEarth = 3.986004418e14;
+  const vCircKmS = Math.sqrt(muEarth / rOrbitM) / 1000;
+  const vEscKmS = Math.sqrt((2 * muEarth) / rOrbitM) / 1000;
   return {
     inParkingOrbit: false,
     orbitAltitudeKm: 165,
-    orbitalVelocityKmS: 7.81,
+    orbitalVelocityKmS: Number(vCircKmS.toFixed(2)),
     inclinationDeg: 28.5,
     orbitalPeriodMin: 87.8,
     tliBurnActive: false,
     tliBurnProgressPct: 0,
     tliDeltaVAppliedMs: 0,
-    tliTargetDeltaVMs: 3150,
+    tliTargetDeltaVMs: targetDeltaVMs,
     readyForSpaceTransition: false,
+    targetVelocityKmS: Number((vCircKmS + targetDeltaVMs / 1000).toFixed(2)),
+    escapeVelocityKmS: Number(vEscKmS.toFixed(2)),
+    apoapsisKm: 165,
+    eccentricity: 0,
+    fuelBurnedPct: 0,
   };
 }
 
@@ -74,29 +83,94 @@ export function stepLeoTransfer(
   state: LeoTransferState,
   dt: number,
   orbitReached: boolean,
-  achievedSpeedKmS?: number
+  achievedSpeedKmS?: number,
+  options?: { altitudeKm?: number; icpsFuelPct?: number }
 ): LeoTransferState {
   if (!orbitReached) return state;
 
-  const baseSpeed = achievedSpeedKmS && achievedSpeedKmS > 1 ? achievedSpeedKmS : 7.81;
+  const rEarthM = 6371000;
+  const muEarth = 3.986004418e14;
+  const altKm = Math.max(150, options?.altitudeKm ?? (state.orbitAltitudeKm || 165));
+  const rPerigeeM = rEarthM + altKm * 1000;
+  const vCircMs = Math.sqrt(muEarth / rPerigeeM);
+  const vEscMs = Math.sqrt((2 * muEarth) / rPerigeeM);
+
+  const baseSpeedKmS =
+    state.tliDeltaVAppliedMs > 0
+      ? vCircMs / 1000
+      : achievedSpeedKmS && achievedSpeedKmS > 5.5 && achievedSpeedKmS < 8.1
+        ? achievedSpeedKmS
+        : vCircMs / 1000;
+
+  const targetDvMs = state.tliTargetDeltaVMs || 3150;
   const next: LeoTransferState = {
     ...state,
     inParkingOrbit: true,
-    orbitAltitudeKm: 165,
-    orbitalVelocityKmS: Number(baseSpeed.toFixed(2)),
+    orbitAltitudeKm: Math.round(altKm),
+    escapeVelocityKmS: Number((vEscMs / 1000).toFixed(2)),
+    targetVelocityKmS: Number((baseSpeedKmS + targetDvMs / 1000).toFixed(2)),
+    orbitalVelocityKmS: Number((baseSpeedKmS + (state.tliDeltaVAppliedMs || 0) / 1000).toFixed(2)),
   };
 
   if (next.tliBurnActive && !next.readyForSpaceTransition) {
-    // 4.2-second trainer TLI burn (3150 m/s delta-v)
-    const ratePctPerSec = 24;
-    const progress = Math.min(100, next.tliBurnProgressPct + ratePctPerSec * dt);
-    next.tliBurnProgressPct = progress;
-    next.tliDeltaVAppliedMs = Math.round((progress / 100) * next.tliTargetDeltaVMs);
-    next.orbitalVelocityKmS = Number((baseSpeed + (progress / 100) * 3.15).toFixed(2));
-    if (progress >= 100) {
+    // Physical RL10B-2 vacuum burn: F = 110.1 kN, Isp = 462 s, wet ICPS+Orion mass
+    const rl10ThrustN = 110100;
+    const rl10IspS = 462.0;
+    const g0 = 9.80665;
+    const dryMassKg = 30000;
+    const totalPropKg = 29000;
+    const currentFuelPct = Math.max(
+      4,
+      (options?.icpsFuelPct ?? 92) - (next.fuelBurnedPct ?? 0)
+    );
+    const propMassKg = (totalPropKg * currentFuelPct) / 100;
+    const massKg = dryMassKg + propMassKg;
+
+    // Orbital departure time compression (~185x real-time so ~800s RL10 burn plays smoothly over ~4.4s)
+    const burnTimeScale = 185;
+    const burnDt = Math.min(dt, 0.1) * burnTimeScale;
+    const accelMs2 = rl10ThrustN / massKg;
+    const dvStepMs = accelMs2 * burnDt;
+
+    const nextDvMs = Math.min(targetDvMs, (next.tliDeltaVAppliedMs || 0) + dvStepMs);
+    const mdotKgS = rl10ThrustN / (rl10IspS * g0);
+    const burnedPctStep = ((mdotKgS * burnDt) / totalPropKg) * 100;
+
+    next.tliDeltaVAppliedMs = Math.round(nextDvMs);
+    next.tliBurnProgressPct = Math.min(100, (nextDvMs / targetDvMs) * 100);
+    next.fuelBurnedPct = Math.min(95, (next.fuelBurnedPct ?? 0) + burnedPctStep);
+
+    const vNowMs = baseSpeedKmS * 1000 + nextDvMs;
+    next.orbitalVelocityKmS = Number((vNowMs / 1000).toFixed(2));
+
+    // Real Vis-Viva orbital energy & eccentricity at perigee departure
+    const specEnergy = 0.5 * vNowMs * vNowMs - muEarth / rPerigeeM;
+    const hAng = rPerigeeM * vNowMs;
+    const ecc = Math.sqrt(Math.max(0, 1 + (2 * specEnergy * hAng * hAng) / (muEarth * muEarth)));
+    next.eccentricity = Number(ecc.toFixed(3));
+    if (specEnergy < -10) {
+      const aOrbit = -muEarth / (2 * specEnergy);
+      next.apoapsisKm = Math.round((aOrbit * (1 + ecc) - rEarthM) / 1000);
+    } else {
+      next.apoapsisKm = 400_000; // Hyperbolic escape trajectory
+    }
+
+    if (next.tliBurnProgressPct >= 99.9) {
+      next.tliBurnProgressPct = 100;
+      next.tliDeltaVAppliedMs = targetDvMs;
       next.tliBurnActive = false;
       next.readyForSpaceTransition = true;
     }
+  } else {
+    const vNowMs = baseSpeedKmS * 1000 + (next.tliDeltaVAppliedMs || 0);
+    const specEnergy = 0.5 * vNowMs * vNowMs - muEarth / rPerigeeM;
+    const hAng = rPerigeeM * vNowMs;
+    const ecc = Math.sqrt(Math.max(0, 1 + (2 * specEnergy * hAng * hAng) / (muEarth * muEarth)));
+    next.eccentricity = Number(ecc.toFixed(3));
+    next.apoapsisKm =
+      specEnergy < -10
+        ? Math.round(((-muEarth / (2 * specEnergy)) * (1 + ecc) - rEarthM) / 1000)
+        : 400_000;
   }
 
   return next;

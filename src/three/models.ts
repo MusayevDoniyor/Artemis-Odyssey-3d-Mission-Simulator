@@ -1837,6 +1837,7 @@ export interface LaunchComplexHandles {
   srbRightBsm: THREE.Mesh;
   upperGroup: THREE.Group;
   icpsFlame: THREE.Group;
+  esmSolarPivots: THREE.Group[];
   machCone: THREE.Mesh;
   abortTower: THREE.Group;
   lasFlame: THREE.Mesh;
@@ -2445,13 +2446,12 @@ export function createLaunchComplexAndSLS(
   earthLimb.visible = false;
   group.add(earthLimb);
 
-  // Low Earth Orbit (LEO) Parking Track Arc visible once orbitReached is achieved
+  // Low Earth Orbit (LEO) Parking Trajectory Arc aligned in Orion's orbital plane above Earth's atmosphere
   const leoOrbitRing = new THREE.Mesh(
-    new THREE.TorusGeometry(99.5, 0.35, 10, 96),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78 })
+    new THREE.TorusGeometry(108.5, 0.14, 12, 144),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42 })
   );
   leoOrbitRing.position.copy(earthLimb.position);
-  leoOrbitRing.rotation.x = 0.25;
   leoOrbitRing.visible = false;
   group.add(leoOrbitRing);
 
@@ -2505,6 +2505,22 @@ export function createLaunchComplexAndSLS(
     throat.position.set(px, py - 0.04, pz);
     coreGroup.add(throat);
   });
+
+  // Launch Vehicle Stage Adapter (LVSA) stays attached to Core Stage upon MECO separation,
+  // cleanly exposing ICPS + RL10B-2 vacuum nozzle bell on the remaining upper stage!
+  const lvsa = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.64, 1.05, 1.45, 28),
+    new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.46, metalness: 0.22 })
+  );
+  lvsa.position.y = 17.78;
+  coreGroup.add(lvsa);
+  const lvsaCollar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.66, 0.66, 0.14, 28),
+    collarMat
+  );
+  lvsaCollar.position.y = 18.46;
+  coreGroup.add(lvsaCollar);
+
   tagPart(coreGroup, 'sls-core');
 
   // Twin 5-Segment Solid Rocket Boosters (54.9m = 13.73u height x 3.71m = 0.464u radius)
@@ -2570,45 +2586,83 @@ export function createLaunchComplexAndSLS(
   const srbLeftBsm = srbLeftBuilt.bsm;
   const srbRightBsm = srbRightBuilt.bsm;
 
-  // Upper Stage Stack (LVSA + ICPS 5.1m dia + Stage Adapter + ESM + Orion + LAS Ogive Tower -> 24.58u = 98.3m)
+  // Upper Stage Stack (ICPS 5.1m dia + RL10B-2 Bell + OSA + ESA Service Module + Unfolding X-Wing Solar Arrays + Orion + LAS)
   const upperGroup = new THREE.Group();
   const icpsGroup = new THREE.Group();
 
-  const lvsa = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.64, 1.05, 1.45, 28),
-    new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.46, metalness: 0.22 })
+  // ICPS Aft Carbon-Composite Thrust Structure & Cryogenic COPV Helium Spheres
+  const icpsAftSkirt = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.62, 0.34, 0.56, 24),
+    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.38, metalness: 0.72 })
   );
-  lvsa.position.y = 17.78;
-  icpsGroup.add(lvsa);
+  icpsAftSkirt.position.y = 18.42;
+  icpsGroup.add(icpsAftSkirt);
+
+  [-0.42, 0.42].forEach((hx) => {
+    const heliumTank = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 14, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.28, metalness: 0.78 })
+    );
+    heliumTank.position.set(hx, 18.28, 0.22);
+    icpsGroup.add(heliumTank);
+  });
 
   const icps = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.64, 0.64, 2.05, 24),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.42 })
+    new THREE.CylinderGeometry(0.64, 0.64, 1.72, 28),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.36 })
   );
   icps.position.y = 19.52;
   icpsGroup.add(icps);
 
-  // ICPS RL10B-2 Vacuum Cryogenic Engine Bell & Plume
-  const icpsNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.32, 0.66, 16, 1, true), bellMat);
-  icpsNozzle.position.y = 18.2;
+  // ICPS Structural Rib Collars
+  [18.74, 20.32].forEach((ry) => {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.655, 0.655, 0.09, 28), collarMat);
+    ring.position.y = ry;
+    icpsGroup.add(ring);
+  });
+
+  // Exposed RL10B-2 Extendable Carbon-Carbon Vacuum Engine Bell & Luminous Cryogenic Plume
+  const rl10Gimbal = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.24, 16), collarMat);
+  rl10Gimbal.position.y = 18.08;
+  icpsGroup.add(rl10Gimbal);
+
+  const icpsNozzleMat = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    metalness: 0.88,
+    roughness: 0.26,
+    side: THREE.DoubleSide,
+  });
+  const icpsNozzle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.4, 0.86, 24, 1, true),
+    icpsNozzleMat
+  );
+  icpsNozzle.position.y = 17.64;
   icpsGroup.add(icpsNozzle);
 
+  const icpsThroatGlow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.15, 16),
+    new THREE.MeshBasicMaterial({ color: 0x7dd3fc, side: THREE.DoubleSide })
+  );
+  icpsThroatGlow.rotation.x = Math.PI / 2;
+  icpsThroatGlow.position.y = 17.95;
+  icpsGroup.add(icpsThroatGlow);
+
   const icpsFlame = new THREE.Group();
-  icpsFlame.position.y = 17.85;
+  icpsFlame.position.y = 17.22;
   const icpsOuter = new THREE.Mesh(
-    new THREE.ConeGeometry(0.6, 4.6, 16),
+    new THREE.ConeGeometry(0.68, 4.8, 18),
     new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.74,
+      opacity: 0.68,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
   );
   icpsOuter.rotation.x = Math.PI;
-  icpsOuter.position.y = -2.3;
+  icpsOuter.position.y = -2.4;
   const icpsCore = new THREE.Mesh(
-    new THREE.ConeGeometry(0.26, 2.6, 12),
+    new THREE.ConeGeometry(0.28, 2.7, 14),
     new THREE.MeshBasicMaterial({
       color: 0xe0f2fe,
       transparent: true,
@@ -2618,7 +2672,7 @@ export function createLaunchComplexAndSLS(
     })
   );
   icpsCore.rotation.x = Math.PI;
-  icpsCore.position.y = -1.3;
+  icpsCore.position.y = -1.35;
   icpsFlame.add(icpsOuter, icpsCore);
   icpsFlame.visible = false;
   icpsGroup.add(icpsFlame);
@@ -2635,48 +2689,85 @@ export function createLaunchComplexAndSLS(
 
   const orionStack = new THREE.Group();
   const stageAdapter = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.63, 0.64, 0.42, 28),
-    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.38 })
+    new THREE.CylinderGeometry(0.63, 0.64, 0.44, 28),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.32, metalness: 0.4 })
   );
-  stageAdapter.position.y = 20.75;
+  stageAdapter.position.y = 20.62;
   orionStack.add(stageAdapter);
 
-  // European Service Module (ESM) cylindrical bus + folded solar bay ribs & RCS quads
+  // European Service Module (ESM) cylindrical bus + unfolding 4-wing X-Wing Solar Arrays & RCS quads
   const esmBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.63, 0.63, 0.72, 24),
-    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.32, metalness: 0.65 })
+    new THREE.CylinderGeometry(0.63, 0.63, 0.78, 26),
+    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.68 })
   );
-  esmBody.position.y = 21.32;
+  esmBody.position.y = 21.22;
   orionStack.add(esmBody);
 
+  const esmSolarPivots: THREE.Group[] = [];
+  const esmWingMat = new THREE.MeshStandardMaterial({
+    map: tex.solarPanel,
+    color: 0xbfdbfe,
+    metalness: 0.52,
+    roughness: 0.22,
+  });
   [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((ea) => {
-    const solarRib = new THREE.Mesh(
-      new THREE.BoxGeometry(0.17, 0.54, 0.07),
-      new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xbfdbfe, metalness: 0.55, roughness: 0.2 })
-    );
-    solarRib.position.set(Math.sin(ea) * 0.64, 21.32, Math.cos(ea) * 0.64);
-    solarRib.rotation.y = ea;
-    orionStack.add(solarRib);
+    const wingAngle = ea + Math.PI / 4;
+    const yawWrap = new THREE.Group();
+    yawWrap.position.set(Math.sin(wingAngle) * 0.66, 21.42, Math.cos(wingAngle) * 0.66);
+    yawWrap.rotation.y = wingAngle;
 
-    const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.09), collarMat);
-    rcsPod.position.set(Math.sin(ea + Math.PI / 4) * 0.66, 21.44, Math.cos(ea + Math.PI / 4) * 0.66);
+    const hingePivot = new THREE.Group();
+    // Folded vertically along ESM during atmospheric ascent; negative X rotation unfolds radially outward into X-wing
+    const wingMesh = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.48, 0.05), esmWingMat);
+    wingMesh.position.y = -0.74;
+    const wingBoom = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.54, 8), collarMat);
+    wingBoom.position.y = -0.74;
+    hingePivot.add(wingMesh, wingBoom);
+
+    yawWrap.add(hingePivot);
+    orionStack.add(yawWrap);
+    esmSolarPivots.push(hingePivot);
+
+    const rcsPod = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), collarMat);
+    rcsPod.position.set(Math.sin(ea) * 0.67, 21.38, Math.cos(ea) * 0.67);
     orionStack.add(rcsPod);
   });
 
   const heatshieldRing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.64, 0.63, 0.14, 28),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.45, metalness: 0.5 })
+    new THREE.CylinderGeometry(0.65, 0.63, 0.14, 28),
+    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.48, metalness: 0.45 })
   );
-  heatshieldRing.position.y = 21.74;
+  heatshieldRing.position.y = 21.68;
   orionStack.add(heatshieldRing);
 
   // Orion Crew Module frustum seated flush atop ESM (5.02m dia = 0.628u max radius)
   const orion = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32, 0.63, 0.84, 28),
+    new THREE.CylinderGeometry(0.32, 0.64, 0.86, 28),
     new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, roughness: 0.34, metalness: 0.3 })
   );
-  orion.position.y = 22.22;
+  orion.position.y = 22.18;
   orionStack.add(orion);
+
+  // Orion Crew Cockpit Windows & Forward Docking Collar (exposed cleanly once LAS jettisons!)
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x0ea5e9,
+    emissive: 0x0284c7,
+    emissiveIntensity: 0.45,
+    metalness: 0.9,
+    roughness: 0.1,
+  });
+  [-0.14, 0.14].forEach((wx) => {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.04), windowMat);
+    win.position.set(wx, 22.28, 0.47);
+    win.rotation.x = -0.36;
+    orionStack.add(win);
+  });
+  const dockingCollar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.32, 0.16, 20),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.72, roughness: 0.25 })
+  );
+  dockingCollar.position.y = 22.68;
+  orionStack.add(dockingCollar);
 
   // Transonic Mach-1 Condensation Vapor Cone
   const machCone = new THREE.Mesh(
@@ -2840,6 +2931,7 @@ export function createLaunchComplexAndSLS(
     srbRightBsm,
     upperGroup,
     icpsFlame,
+    esmSolarPivots,
     machCone,
     abortTower,
     lasFlame,

@@ -91,8 +91,11 @@ import {
 import type { HorizonsEphemerisResponse } from './game/jplHorizons';
 import type { DataProvenance } from './game/planetaryCatalog';
 import {
+  SOLAR_SUN_ORIGIN_X,
+  SOLAR_SUN_ORIGIN_Z,
   SOLAR_SYSTEM_BODIES,
   type SolarScaleMode,
+  getLiveSolarTargetPosition,
   reprojectShipBetweenScaleModes,
   setActiveHorizonsVectors,
 } from './game/solarSystemData';
@@ -272,7 +275,7 @@ export default function App() {
   const outpostConsoleRef = useRef<OutpostConsoleState>(createInitialOutpostConsoleState('moon'));
   const marsQueueRef = useRef<MarsQueueState>(createInitialMarsQueueState(14));
   const mastPanDegRef = useRef<number>(0);
-  const solarTimeSpeedRef = useRef<number>(0.8);
+  const solarTimeSpeedRef = useRef<number>(0.5);
   const calmElapsedRef = useRef<number>(0);
   const toastVisibleSecRef = useRef<number>(0);
   const toastFactIndexRef = useRef<number>(0);
@@ -328,7 +331,7 @@ export default function App() {
   const [solarScaleMode, setSolarScaleMode] = useState<SolarScaleMode>('exploration');
   const [spaceCameraMode, setSpaceCameraMode] = useState<SpaceCameraMode>('track');
   const [localAnchorId, setLocalAnchorId] = useState<'earth' | 'moon' | 'mars'>('earth');
-  const [solarTimeSpeed, setSolarTimeSpeed] = useState<number>(0.8);
+  const [solarTimeSpeed, setSolarTimeSpeed] = useState<number>(0.5);
   const [solarEpochYearsUi, setSolarEpochYearsUi] = useState<number>(0);
   const [focusedSolarBodyId, setFocusedSolarBodyId] = useState<string | null>(null);
   const [exploredSolarBodyIds, setExploredSolarBodyIds] = useState<string[]>(['earth']);
@@ -570,10 +573,14 @@ export default function App() {
     const unsub = soundSynth.subscribeMusicState(setMusicState);
     const unlock = () => soundSynth.unlockMusicOnGesture();
     window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('click', unlock, { passive: true });
+    window.addEventListener('touchstart', unlock, { passive: true });
     window.addEventListener('keydown', unlock, { passive: true });
     return () => {
       unsub();
       window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
       window.removeEventListener('keydown', unlock);
     };
   }, []);
@@ -692,7 +699,9 @@ export default function App() {
         s.orbitDistance = 38;
         s.resources = applyPayloadBonus(payloadRef.current);
         s.launch = createInitialLaunchState(s.launch.autoGuidance);
-        s.leoTransfer = createInitialLeoTransferState();
+        s.leoTransfer = createInitialLeoTransferState(
+          s.campaignMission === 'mars-pathfinder' ? 3600 : 3150
+        );
         setPreLaunchChecks(createInitialPreLaunchChecks());
         launchPrevCountdownDigitRef.current = 4;
         scoreRef.current = 0;
@@ -1065,12 +1074,29 @@ export default function App() {
         }
 
         if (s.launch.orbitReached) {
-          const leo = s.leoTransfer || createInitialLeoTransferState();
+          const tliTargetDeltaVMs = s.campaignMission === 'mars-pathfinder' ? 3600 : 3150;
+          const leo = s.leoTransfer || createInitialLeoTransferState(tliTargetDeltaVMs);
           const wasInOrbit = leo.inParkingOrbit;
+          const prevFuelBurnedPct = leo.fuelBurnedPct ?? 0;
           const achievedSpeedKmS =
             Math.hypot(s.launch.verticalSpeedMs, s.launch.horizontalSpeedMs) / 1000;
-          const nextLeo = stepLeoTransfer(leo, dt, true, achievedSpeedKmS);
+          const nextLeo = stepLeoTransfer(leo, dt, true, achievedSpeedKmS, {
+            altitudeKm: s.launch.altitudeKm,
+            icpsFuelPct: s.launch.fuelPct,
+          });
           s.leoTransfer = nextLeo;
+
+          const burnedStepPct = Math.max(0, (nextLeo.fuelBurnedPct ?? 0) - prevFuelBurnedPct);
+          if (burnedStepPct > 0) {
+            s.launch.fuelPct = clamp(s.launch.fuelPct - burnedStepPct, 0, 100);
+          }
+          s.launch.horizontalSpeedMs = Math.round(nextLeo.orbitalVelocityKmS * 1000);
+          if (typeof nextLeo.apoapsisKm === 'number') {
+            s.launch.apoapsisKm = nextLeo.apoapsisKm;
+          }
+          if (typeof nextLeo.eccentricity === 'number') {
+            s.launch.orbitalEccentricity = nextLeo.eccentricity;
+          }
 
           if (!wasInOrbit) {
             soundSynth.playSuccess();
@@ -1094,7 +1120,26 @@ export default function App() {
             phaseTimerRef.current = 0;
             activeAnomalyRef.current = null;
             s.solarEpochYears = 0;
-            s.space = createInitialSpaceFlightState(s.campaignMission, carryoverRef.current);
+            const nextSpace = createInitialSpaceFlightState(
+              s.campaignMission,
+              carryoverRef.current
+            );
+            const liveTargetPos = getLiveSolarTargetPosition(
+              nextSpace.targetId,
+              0,
+              s.solarScaleMode ?? 'exploration',
+              SOLAR_SUN_ORIGIN_X,
+              SOLAR_SUN_ORIGIN_Z,
+              s.localAnchorId ?? 'earth'
+            );
+            const depDx = liveTargetPos.x - nextSpace.shipX;
+            const depDz = liveTargetPos.z - nextSpace.shipZ;
+            const depDist = Math.max(0.001, Math.hypot(depDx, depDz));
+            const depSpeed = s.campaignMission === 'mars-pathfinder' ? 3.8 : 2.9;
+            nextSpace.vx = (depDx / depDist) * depSpeed;
+            nextSpace.vz = (depDz / depDist) * depSpeed;
+            nextSpace.headingRad = Math.atan2(depDx, depDz);
+            s.space = nextSpace;
             syncUiNow();
             return;
           }
@@ -1121,7 +1166,7 @@ export default function App() {
         );
         s.space = result.space;
         s.resources = result.resources;
-        s.solarEpochYears = (s.solarEpochYears ?? 0) + dt * solarTimeSpeedRef.current * 0.08;
+        s.solarEpochYears = (s.solarEpochYears ?? 0) + dt * solarTimeSpeedRef.current * 0.008;
         phaseTimerRef.current += dt;
 
         // Trigger orbital Applied Knowledge Anomaly in Artemis II or Artemis IV
@@ -1708,7 +1753,9 @@ export default function App() {
       if (s.phase === 'launch' && e.code === 'KeyR' && !e.repeat) {
         s.input = { ...EMPTY_INPUT };
         s.launch = createInitialLaunchState(s.launch.autoGuidance);
-        s.leoTransfer = createInitialLeoTransferState();
+        s.leoTransfer = createInitialLeoTransferState(
+          s.campaignMission === 'mars-pathfinder' ? 3600 : 3150
+        );
         launchPrevCountdownDigitRef.current = 4;
         soundSynth.setThrustVolume(0);
         soundSynth.resetAtmosphere();
@@ -1718,16 +1765,30 @@ export default function App() {
 
       if (
         s.phase === 'launch' &&
-        e.code === 'Space' &&
         !e.repeat &&
         s.launch.launchSequence === 'ASCENDING'
       ) {
-        const prev = s.launch;
-        const next = separateLaunchStage(prev);
-        if (next.srbSeparated !== prev.srbSeparated || next.coreSeparated !== prev.coreSeparated) {
-          s.launch = next;
-          soundSynth.playStageSep();
-          syncUiNow();
+        if (s.launch.orbitReached) {
+          if (
+            (e.code === 'Space' || e.code === 'KeyW') &&
+            !s.leoTransfer?.tliBurnActive &&
+            !s.leoTransfer?.readyForSpaceTransition
+          ) {
+            const tliTargetDeltaVMs = s.campaignMission === 'mars-pathfinder' ? 3600 : 3150;
+            const cur = s.leoTransfer || createInitialLeoTransferState(tliTargetDeltaVMs);
+            s.leoTransfer = { ...cur, tliBurnActive: true };
+            soundSynth.playIgnitionRoar();
+            syncUiNow();
+            return;
+          }
+        } else if (e.code === 'Space') {
+          const prev = s.launch;
+          const next = separateLaunchStage(prev);
+          if (next.srbSeparated !== prev.srbSeparated || next.coreSeparated !== prev.coreSeparated) {
+            s.launch = next;
+            soundSynth.playStageSep();
+            syncUiNow();
+          }
         }
       }
 
@@ -2559,7 +2620,8 @@ export default function App() {
           onFireTliBurn={() => {
             soundSynth.init();
             soundSynth.playIgnitionRoar();
-            const cur = simRef.current.leoTransfer || createInitialLeoTransferState();
+            const tliTargetDeltaVMs = simRef.current.campaignMission === 'mars-pathfinder' ? 3600 : 3150;
+            const cur = simRef.current.leoTransfer || createInitialLeoTransferState(tliTargetDeltaVMs);
             simRef.current.leoTransfer = { ...cur, tliBurnActive: true };
             syncUiNow();
           }}
@@ -2584,7 +2646,9 @@ export default function App() {
               planet: simRef.current.planet,
             };
             simRef.current.launch = createInitialLaunchState(simRef.current.launch.autoGuidance);
-            simRef.current.leoTransfer = createInitialLeoTransferState();
+            simRef.current.leoTransfer = createInitialLeoTransferState(
+              simRef.current.campaignMission === 'mars-pathfinder' ? 3600 : 3150
+            );
             setPreLaunchChecks(createInitialPreLaunchChecks());
             launchPrevCountdownDigitRef.current = 4;
             syncUiNow();
@@ -2608,6 +2672,9 @@ export default function App() {
           localAnchorId={localAnchorId}
           horizonsProvenance={horizonsProvenance}
           solarEpochYears={solarEpochYearsUi}
+          musicState={musicState}
+          muted={muted}
+          onUnlockAudio={() => soundSynth.unlockMusicOnGesture()}
           onFocusSolarBody={handleFocusSolarBody}
           onExploreSolarBody={handleExploreSolarBody}
           onFlyToSolarBody={handleFlyToSolarBody}

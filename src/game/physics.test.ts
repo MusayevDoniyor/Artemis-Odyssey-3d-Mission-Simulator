@@ -388,4 +388,80 @@ test('Orion navBodyId autopilot navigates to outer worlds past ±95 bounds clean
   );
 });
 
+test('SECO-1 parking orbit holds 165 km without over-burning fuel, and RL10B-2 TLI raises apoapsis to escape', async () => {
+  const { createInitialLeoTransferState, stepLeoTransfer } = await import('./sequences');
+  let L = createInitialLaunchState();
+  L = beginLaunchCountdown(L);
+  for (let i = 0; i < 65; i++) {
+    L = stepLaunchPhysics(L, { forward: false, left: false, right: false, action: false }, 0.05);
+  }
+  for (let i = 0; i < 450; i++) {
+    L = stepLaunchPhysics(L, { forward: true, left: false, right: false, action: false }, 0.05);
+    if (L.altitudeKm >= PHYSICS.SLS_SRB_SEP_ALT_KM && !L.srbSeparated) {
+      L = separateLaunchStage(L);
+    }
+    if (L.srbSeparated && L.altitudeKm >= PHYSICS.SLS_CORE_SEP_ALT_KM && !L.coreSeparated) {
+      L = separateLaunchStage(L);
+    }
+    if (L.orbitReached) break;
+  }
+  assert.equal(L.orbitReached, true);
+
+  // Holding forward for 2 more seconds after SECO-1 orbital insertion must NOT burn propellant or shoot velocity skyward
+  const fuelAtSeco = L.fuelPct;
+  for (let i = 0; i < 40; i++) {
+    L = stepLaunchPhysics(L, { forward: true, left: false, right: false, action: false }, 0.05);
+  }
+  assert.equal(L.fuelPct, fuelAtSeco, 'SECO-1 must preserve upper-stage propellant for TLI');
+  assert.equal(L.altitudeKm, PHYSICS.SLS_ORBIT_TARGET_KM);
+  assert.ok(L.horizontalSpeedMs < 8100, `Parking orbit speed should hold ~7.8 km/s, got ${L.horizontalSpeedMs}`);
+
+  // Fire RL10B-2 TLI burn: must burn fuel realistically and push Vis-Viva apoapsis & velocity to escape
+  let leo = createInitialLeoTransferState(3150);
+  leo = stepLeoTransfer(leo, 0.05, true, L.horizontalSpeedMs / 1000, {
+    altitudeKm: L.altitudeKm,
+    icpsFuelPct: L.fuelPct,
+  });
+  leo = { ...leo, tliBurnActive: true };
+  for (let i = 0; i < 200; i++) {
+    leo = stepLeoTransfer(leo, 0.05, true, undefined, {
+      altitudeKm: L.altitudeKm,
+      icpsFuelPct: L.fuelPct,
+    });
+    if (leo.readyForSpaceTransition) break;
+  }
+  assert.equal(leo.readyForSpaceTransition, true, 'RL10B-2 TLI burn should reach 100% escape');
+  assert.ok((leo.fuelBurnedPct ?? 0) > 25, 'TLI burn should consume significant RL10 propellant');
+  assert.ok(leo.orbitalVelocityKmS >= 10.8, `TLI velocity should exceed 10.8 km/s, got ${leo.orbitalVelocityKmS}`);
+  assert.ok((leo.apoapsisKm ?? 0) >= 350000, 'TLI should raise apoapsis to Lunar/escape distance');
+});
+
+test('Deep space flight tracks dominant SOI gravity well and classifies Hyperbolic Escape above escape velocity', () => {
+  let space = createInitialSpaceFlightState('artemis-2');
+  // Seed strong departure velocity while inside Earth SOI
+  space.vx = 0;
+  space.vz = 14.0;
+  let res = { power: 90, oxygen: 90, shield: 90 };
+
+  const out = stepSpaceFlightPhysics(
+    space,
+    res,
+    { forward: true, backward: false, left: false, right: false, boost: true, action: false },
+    false,
+    0.05,
+    0,
+    'exploration'
+  );
+  assert.equal(out.space.dominantBodyName, 'Earth', 'Orion starting near Earth should report Earth SOI');
+  assert.ok(
+    (out.space.escapeVelocityKmS ?? 0) > 0,
+    'Escape velocity v_esc should be populated dynamically'
+  );
+  assert.equal(
+    out.space.trajectoryRegime,
+    'Hyperbolic Escape',
+    `High-energy departure should classify as Hyperbolic Escape, got ${out.space.trajectoryRegime}`
+  );
+});
+
 
