@@ -1,4 +1,4 @@
-import { Battery, Compass, Flame, Orbit, Play, Rocket, Shield, Wind, X } from 'lucide-react';
+import { Battery, Compass, Flame, Gauge, Orbit, Play, Rocket, Shield, Wind, X } from 'lucide-react';
 import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
 import { PRE_LAUNCH_ITEMS, areAllPreLaunchChecksGo } from '../game/sequences';
 import type {
@@ -49,6 +49,11 @@ export function LaunchHUD({
   const inspectedPart = selectedPartId ? LAUNCH_PART_DETAILS[selectedPartId] || null : null;
   const speedTotal = Math.round(Math.hypot(launch.verticalSpeedMs, launch.horizontalSpeedMs));
   const distToOrbitKm = Math.max(0, Math.round(PHYSICS.SLS_ORBIT_TARGET_KM - launch.altitudeKm));
+  const orbitProgressPct = Math.min(
+    100,
+    Math.round((launch.altitudeKm / PHYSICS.SLS_ORBIT_TARGET_KM) * 100)
+  );
+  const fuelPctClamped = Math.max(0, Math.min(100, Math.round(launch.fuelPct)));
   const countdownDigit = Math.max(1, Math.ceil(launch.countdownSec));
   const allChecksGo = areAllPreLaunchChecksGo(preLaunchChecks);
   const doneCount = PRE_LAUNCH_ITEMS.filter((i) => preLaunchChecks[i.key]).length;
@@ -67,7 +72,7 @@ export function LaunchHUD({
     counterText = `${Math.round(launch.altitudeKm)} km`;
   } else if (launch.launchSequence === 'ASCENDING') {
     objectiveLine = 'Climb smoothly to 165 km parking orbit.';
-    counterText = `${Math.round(launch.altitudeKm)} / 165`;
+    counterText = `${Math.round(launch.altitudeKm)} / 165 km`;
   } else if (launch.launchSequence === 'READY') {
     objectiveLine = 'Hold W or Space to ignite RS-25 engines.';
     counterText = 'GO';
@@ -77,131 +82,163 @@ export function LaunchHUD({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-5">
-      {/* TOP ROW: Group 1 & Group 2 */}
+    <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4 lg:p-5">
+      {/* TOP ROW: Compact Edge-Hugging Objective (Left) & Meters + Always-Visible Propellant (Right) */}
       <div className="flex items-start justify-between gap-4">
-        {/* GROUP 1: Top-Left Wordmark + Objective */}
-        <div data-testid="hud-group-objective" className="flex flex-col items-start gap-3">
-          <div className="flex items-center gap-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        {/* GROUP 1: Top-Left Wordmark + Objective + Altitude Progress */}
+        <div data-testid="hud-group-objective" className="flex flex-col items-start gap-2.5">
+          <div className="flex items-center gap-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
               <path d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z" fill="#FFFFFF" />
               <path d="M7 22C12 18 20 15 28 16.5" stroke="#22D3EE" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
             <div className="leading-none">
-              <span className="block font-display text-sm font-extrabold tracking-widest text-white">ARTEMIS</span>
-              <span className="block font-display text-sm font-extrabold tracking-widest text-cyan-300">ODYSSEY</span>
+              <span className="block font-display text-xs font-extrabold tracking-[0.14em] text-white lg:text-sm">
+                ARTEMIS
+              </span>
+              <span className="block font-display text-xs font-extrabold tracking-[0.14em] text-cyan-300 lg:text-sm">
+                ODYSSEY
+              </span>
             </div>
           </div>
 
-          <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
-            <div className="flex items-center gap-2 text-base font-bold text-cyan-300">
-              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-cyan-400" />
-              <span>LC-39B Ascent</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-4">
-              <p className="text-base leading-snug text-slate-100">{objectiveLine}</p>
-              <span className="shrink-0 text-base font-bold text-slate-200 tabular-nums">
+          <section className="hud-soft pointer-events-auto w-[300px] rounded-2xl px-3.5 py-2.5 text-slate-100 lg:w-[324px]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-cyan-300 lg:text-sm">
+                <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400" />
+                <span>LC-39B Ascent</span>
+              </div>
+              <span className="shrink-0 text-xs font-bold text-slate-200 tabular-nums lg:text-sm">
                 {counterText}
               </span>
+            </div>
+            <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">{objectiveLine}</p>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-400 transition-all duration-200"
+                style={{
+                  width: `${launch.orbitReached ? Math.max(12, Math.round(leoTransfer.tliBurnProgressPct)) : orbitProgressPct}%`,
+                }}
+              />
             </div>
           </section>
 
           {inspectedPart && (
             <div
               data-testid="launch-part-callout"
-              className="hud-soft pointer-events-auto max-w-xs rounded-2xl p-3.5 text-slate-100"
+              className="hud-soft pointer-events-auto w-[300px] rounded-2xl p-3 text-slate-100 lg:w-[324px]"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-base font-bold text-amber-300">{inspectedPart.name}</span>
+                <span className="text-sm font-bold text-amber-300">{inspectedPart.name}</span>
                 {onClearSelectedPart && (
                   <button
                     type="button"
                     aria-label="Close part note"
                     onClick={onClearSelectedPart}
-                    className="rounded-lg p-1 text-slate-400 hover:text-white"
+                    className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
-              <p className="mt-1 text-sm text-slate-300">{inspectedPart.fact}</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">{inspectedPart.fact}</p>
             </div>
           )}
         </div>
 
-        {/* GROUP 2: Top-Right 3 Meters + Orbit Distance (+ Conditional Fuel/Steep Chip) */}
+        {/* GROUP 2: Top-Right 4 Core Telemetry Meters + Always-Visible Propellant Bar */}
         <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
-          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-4 py-2.5 tabular-nums">
-            <div className="flex items-center gap-2.5 pr-4">
-              <Battery className="h-5 w-5 text-amber-400" />
+          <div className="hud-soft pointer-events-auto flex items-center divide-x divide-sky-400/15 rounded-2xl px-3.5 py-2 tabular-nums">
+            <div className="flex items-center gap-2 pr-3.5">
+              <Battery className="h-4 w-4 text-amber-400 lg:h-5 lg:w-5" />
               <div>
-                <span className="block text-lg leading-none font-bold text-white">
+                <span className="block text-sm leading-none font-bold text-white lg:text-base">
                   {Math.round(resources.power)}%
                 </span>
-                <span className="text-sm text-slate-400">Power</span>
+                <span className="text-xs text-slate-400">Power</span>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 px-4">
-              <Wind className="h-5 w-5 text-sky-300" />
+            <div className="flex items-center gap-2 px-3.5">
+              <Wind className="h-4 w-4 text-sky-300 lg:h-5 lg:w-5" />
               <div>
-                <span className="block text-lg leading-none font-bold text-white">
+                <span className="block text-sm leading-none font-bold text-white lg:text-base">
                   {Math.round(resources.oxygen)}%
                 </span>
-                <span className="text-sm text-slate-400">Air</span>
+                <span className="text-xs text-slate-400">Air</span>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 px-4">
-              <Shield className="h-5 w-5 text-emerald-300" />
+            <div className="flex items-center gap-2 px-3.5">
+              <Shield className="h-4 w-4 text-emerald-300 lg:h-5 lg:w-5" />
               <div>
-                <span className="block text-lg leading-none font-bold text-white">
+                <span className="block text-sm leading-none font-bold text-white lg:text-base">
                   {Math.round(resources.shield)}%
                 </span>
-                <span className="text-sm text-slate-400">Shield</span>
+                <span className="text-xs text-slate-400">Shield</span>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 pl-4">
-              <Compass className="h-5 w-5 text-amber-400" />
+            <div className="flex items-center gap-2 pl-3.5">
+              <Compass className="h-4 w-4 text-cyan-300 lg:h-5 lg:w-5" />
               <div>
-                <span data-testid="launch-altitude" className="block text-lg leading-none font-bold text-white">
+                <span
+                  data-testid="launch-altitude"
+                  className="block text-sm leading-none font-bold text-white lg:text-base"
+                >
                   {distToOrbitKm} km
                 </span>
-                <span className="text-sm text-slate-400">To Orbit</span>
+                <span className="text-xs text-slate-400">To Orbit</span>
               </div>
             </div>
           </div>
 
-          {(launch.fuelPct < 35 || Math.abs(launch.pitchDeg) > 58) && (
-            <div className="flex gap-2">
-              {launch.fuelPct < 35 && (
-                <span className="hud-soft rounded-xl px-3 py-1.5 text-sm font-semibold text-amber-200">
-                  Propellant {Math.round(launch.fuelPct)}%
-                </span>
-              )}
-              {Math.abs(launch.pitchDeg) > 58 && (
-                <span className="hud-soft-alert rounded-xl px-3 py-1.5 text-sm font-semibold text-rose-200">
-                  Steep Pitch {Math.round(launch.pitchDeg)}°
-                </span>
-              )}
+          {/* Always-visible compact Propellant readout + conditional Steep Pitch chip */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div
+              data-testid="launch-propellant-status"
+              className={`pointer-events-auto flex items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-semibold tabular-nums ${
+                fuelPctClamped < 25 ? 'hud-soft-alert text-rose-200' : 'hud-soft text-slate-200'
+              }`}
+            >
+              <Gauge className={`h-3.5 w-3.5 shrink-0 ${fuelPctClamped < 25 ? 'text-rose-300' : 'text-amber-300'}`} />
+              <span className="whitespace-nowrap">Propellant</span>
+              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full rounded-full transition-all duration-150 ${
+                    fuelPctClamped < 25
+                      ? 'bg-rose-400'
+                      : fuelPctClamped < 50
+                        ? 'bg-amber-400'
+                        : 'bg-cyan-400'
+                  }`}
+                  style={{ width: `${fuelPctClamped}%` }}
+                />
+              </div>
+              <span className="font-bold text-white">{fuelPctClamped}%</span>
             </div>
-          )}
+
+            {Math.abs(launch.pitchDeg) > 58 && !launch.orbitReached && (
+              <span className="hud-soft-alert rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-rose-200 tabular-nums">
+                Steep Pitch {Math.round(launch.pitchDeg)}°
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* BOTTOM ROW: Group 3 (Circular Pitch Orb), Group 5 (Sequence/Speed), Group 4 (Hints) */}
+      {/* BOTTOM ROW: Compact Pitch Dial (Left), Action / Speed Bar (Center), 3-Hint Card (Right) */}
       <div className="flex items-end justify-between gap-4">
-        {/* GROUP 3: Bottom-Left Circular Pitch Horizon Dial (Click -> Menu) */}
+        {/* GROUP 3: Bottom-Left Circular Pitch Horizon Dial (Click -> Map / Menu) */}
         <button
           type="button"
           data-testid="hud-group-radar"
           onClick={() => onOpenMenuTab('map')}
           title="Open Ascent Map & Menu [Tab]"
-          className="hud-soft pointer-events-auto relative h-36 w-36 shrink-0 rounded-full p-1 transition hover:border-sky-400/60"
+          className="hud-soft pointer-events-auto relative h-28 w-28 shrink-0 rounded-full p-1 transition hover:border-sky-400/60 lg:h-[116px] lg:w-[116px]"
         >
           <svg viewBox="0 0 144 144" className="h-full w-full">
             <circle cx="72" cy="72" r="60" fill="#0b1222" stroke="rgba(56,189,248,0.28)" strokeWidth="1.5" />
             <line x1="20" y1="72" x2="124" y2="72" stroke="rgba(148,163,184,0.22)" strokeWidth="1" />
             <g transform={`translate(72, 72) rotate(${launch.pitchDeg})`}>
-              <line x1="-26" y1="0" x2="26" y2="0" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="-24" y1="0" x2="24" y2="0" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
               <polygon points="0,-24 -5,-12 5,-12" fill="#fbbf24" />
             </g>
             <text x="72" y="114" textAnchor="middle" fontSize="12" fontWeight="700" fill="#f8fafc">
@@ -210,14 +247,14 @@ export function LaunchHUD({
           </svg>
         </button>
 
-        {/* GROUP 5: Bottom-Center Sequence CTA / Speedometer */}
-        <div data-testid="hud-group-speed" className="flex flex-col items-center gap-2.5">
+        {/* GROUP 5: Bottom-Center Sequence CTA / Stage Action / Speed & Pressure */}
+        <div data-testid="hud-group-speed" className="flex flex-col items-center gap-2">
           {launch.launchSequence === 'PRE_SIM' && (
             <div
               data-testid="prelaunch-checklist-panel"
-              className="hud-soft pointer-events-auto flex flex-col gap-2.5 rounded-2xl p-4 text-base"
+              className="hud-soft pointer-events-auto flex flex-col gap-2 rounded-2xl p-3 text-sm"
             >
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {PRE_LAUNCH_ITEMS.map((item) => {
                   const checked = preLaunchChecks[item.key];
                   return (
@@ -226,7 +263,7 @@ export function LaunchHUD({
                       type="button"
                       data-testid={`prelaunch-chk-${item.key}`}
                       onClick={() => onTogglePreLaunchCheck(item.key)}
-                      className={`rounded-xl border px-3 py-1.5 text-left text-sm font-semibold transition ${
+                      className={`rounded-xl border px-3 py-1.5 text-left text-xs font-semibold whitespace-nowrap transition ${
                         checked
                           ? 'border-cyan-400/75 bg-cyan-500/20 text-cyan-100'
                           : 'border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-cyan-300'
@@ -244,7 +281,7 @@ export function LaunchHUD({
                   if (!allChecksGo) onVerifyAllPreLaunchChecks();
                   onBeginSimulation();
                 }}
-                className="hud-cta-cyan inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-base font-bold"
+                className="hud-cta-cyan inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-bold whitespace-nowrap"
               >
                 <Play className="h-4 w-4 fill-white" />
                 {allChecksGo ? 'Begin Countdown' : 'Verify & Start'}
@@ -253,9 +290,11 @@ export function LaunchHUD({
           )}
 
           {launch.launchSequence === 'COUNTDOWN' && (
-            <div className="hud-soft rounded-2xl px-8 py-3 text-center">
-              <div className="font-display text-4xl font-bold text-cyan-300">T-{countdownDigit}</div>
-              <div className="text-sm text-slate-200">Arming RS-25 Core</div>
+            <div className="hud-soft rounded-2xl px-6 py-2.5 text-center">
+              <div className="font-display text-3xl font-bold text-cyan-300 tabular-nums">
+                T-{countdownDigit}
+              </div>
+              <div className="text-xs font-medium text-slate-200">Arming RS-25 Core</div>
             </div>
           )}
 
@@ -265,17 +304,17 @@ export function LaunchHUD({
               data-testid="start-launch-btn"
               data-hold-keys="forward"
               onClick={onStartLaunch}
-              className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-2 rounded-2xl px-7 py-3 text-lg font-bold"
+              className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-2 rounded-2xl px-6 py-2.5 text-base font-bold whitespace-nowrap"
             >
-              <Rocket className="h-5 w-5" />
+              <Rocket className="h-5 w-5 shrink-0" />
               Ignite &amp; Launch
             </button>
           )}
 
           {launch.orbitReached && (
-            <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-5 py-3">
-              <Orbit className="h-5 w-5 text-cyan-300" />
-              <div className="text-base font-semibold text-white">
+            <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5">
+              <Orbit className="h-5 w-5 shrink-0 text-cyan-300" />
+              <div className="text-sm font-semibold whitespace-nowrap text-white tabular-nums">
                 165 km Orbit ({Math.round(leoTransfer.tliBurnProgressPct)}%)
               </div>
               <button
@@ -283,9 +322,9 @@ export function LaunchHUD({
                 data-testid="fire-tli-btn"
                 disabled={leoTransfer.tliBurnActive || leoTransfer.readyForSpaceTransition}
                 onClick={onFireTliBurn}
-                className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-4 py-2 text-base font-bold disabled:opacity-60"
+                className="hud-cta-cyan inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-sm font-bold whitespace-nowrap disabled:opacity-60"
               >
-                <Flame className="h-4 w-4" />
+                <Flame className="h-4 w-4 shrink-0" />
                 {leoTransfer.tliBurnActive ? 'Firing TLI...' : 'Fire TLI Burn'}
               </button>
             </div>
@@ -295,7 +334,7 @@ export function LaunchHUD({
             <button
               type="button"
               onClick={onSeparateStage}
-              className="pointer-events-auto rounded-2xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 shadow-lg hover:bg-amber-400"
+              className="pointer-events-auto rounded-2xl bg-amber-500 px-5 py-2 text-sm font-bold whitespace-nowrap text-slate-950 shadow-lg hover:bg-amber-400"
             >
               {launch.stagePrompt === 'SRB_SEP'
                 ? 'Press Space: Drop Boosters'
@@ -304,28 +343,29 @@ export function LaunchHUD({
           )}
 
           {isMoving && !launch.orbitReached && (
-            <div className="hud-soft flex items-center gap-4 rounded-2xl px-5 py-2 tabular-nums">
-              <span data-testid="launch-speed" className="text-2xl font-bold text-white">
+            <div className="hud-soft flex items-center gap-3.5 rounded-2xl px-4 py-2 tabular-nums">
+              <span data-testid="launch-speed" className="text-lg font-bold text-white lg:text-xl">
                 {speedTotal} m/s
               </span>
-              <span className="text-base text-amber-300">
+              <span className="h-4 w-px bg-white/15" />
+              <span className="text-sm font-semibold text-amber-300">
                 {Math.round(launch.dynamicPressureKpa)} kPa
               </span>
             </div>
           )}
         </div>
 
-        {/* GROUP 4: Bottom-Right Max 3 Contextual Hints */}
+        {/* GROUP 4: Bottom-Right Compact 3 Contextual Keyboard Hints */}
         <div
           data-testid="hud-group-hints"
-          className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2.5 text-base"
+          className="hud-soft pointer-events-auto flex shrink-0 items-center gap-3 rounded-2xl px-3.5 py-2 text-xs lg:text-sm"
         >
           <button
             type="button"
             onClick={onToggleAutoGuidance}
-            className="inline-flex items-center gap-2 hover:text-amber-300"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-xs font-bold text-white">
               A/D
             </span>
             <span className="font-medium text-slate-200">
@@ -335,9 +375,9 @@ export function LaunchHUD({
           <button
             type="button"
             onClick={launch.orbitReached ? onSkipToSpace : onSeparateStage}
-            className="inline-flex items-center gap-2 hover:text-amber-300"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-xs font-bold text-white">
               Space
             </span>
             <span className="font-medium text-slate-200">
@@ -347,11 +387,11 @@ export function LaunchHUD({
           <button
             type="button"
             onClick={() => onOpenMenuTab('map')}
-            title="Open Mission Menu (Press R to Reset Pad)"
+            title="Open Mission Menu (Double-click or R to Reset Pad)"
             onDoubleClick={onResetLaunch}
-            className="inline-flex items-center gap-2 hover:text-amber-300"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap hover:text-amber-300"
           >
-            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-sm font-bold text-white">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-md border border-sky-400/30 bg-slate-900/90 px-1.5 py-0.5 text-xs font-bold text-white">
               Esc
             </span>
             <span className="font-medium text-slate-200">Menu</span>

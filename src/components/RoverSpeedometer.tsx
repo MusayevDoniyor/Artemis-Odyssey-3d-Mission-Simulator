@@ -24,20 +24,20 @@ export function RoverSpeedometer({
     <section
       data-testid="viper-speedometer"
       aria-label="Rover Speedometer"
-      className="hud-soft pointer-events-auto flex items-center gap-4 rounded-2xl px-5 py-2.5 tabular-nums"
+      className="hud-soft pointer-events-auto flex items-center gap-3.5 rounded-2xl px-4 py-2 tabular-nums"
     >
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-baseline gap-1.5">
         <span
           data-testid="viper-speed-ms"
-          className="text-3xl leading-none font-bold text-white"
+          className="text-2xl leading-none font-bold text-white"
         >
           {isReal ? speedInfo.displayMs.toFixed(2) : speedInfo.displayMs.toFixed(1)}
         </span>
-        <span className="text-base font-semibold text-slate-300">m/s</span>
+        <span className="text-xs font-semibold text-slate-300">m/s</span>
       </div>
 
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-base">
+        <div className="flex items-center gap-2 text-xs lg:text-sm">
           <span
             data-testid="viper-speed-kmh"
             className="font-semibold text-cyan-300"
@@ -46,19 +46,19 @@ export function RoverSpeedometer({
           </span>
           <span
             data-testid="viper-gear-label"
-            className="rounded-md bg-sky-500/15 px-2 py-0.5 text-sm font-bold text-slate-100"
+            className="rounded-md bg-sky-500/15 px-1.5 py-0.5 text-xs font-bold text-slate-100"
           >
             {tel.gearLabel}
           </span>
           {marsLagLabel && (
-            <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-sm font-semibold text-amber-200">
+            <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-xs font-semibold text-amber-200">
               {marsLagLabel}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-800">
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-800">
             <div
               className="h-full rounded-full bg-cyan-400 transition-all"
               style={{ width: `${Math.max(4, fillPct)}%` }}
@@ -69,7 +69,7 @@ export function RoverSpeedometer({
               type="button"
               data-testid="toggle-speed-scale-btn"
               onClick={onToggleSpeedScale}
-              className="text-sm font-semibold text-slate-300 hover:text-cyan-300"
+              className="text-xs font-semibold text-slate-300 hover:text-cyan-300"
             >
               {isReal ? 'Real 1×' : 'Kid ×25'}
             </button>

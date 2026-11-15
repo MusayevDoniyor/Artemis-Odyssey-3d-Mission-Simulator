@@ -16,7 +16,7 @@ import type { AnomalyChoice, MissionAnomaly } from '../game/types';
 interface CenteredEventCardProps {
   anomaly: MissionAnomaly | null;
   apollo1202Active: boolean;
-  placement?: 'space-corner' | 'center';
+  placement?: 'space-corner' | 'rover-compact' | 'center';
   onResolveAnomaly: (anomalyId: string, choiceId: string) => void;
   onDismissAnomaly?: (anomalyId: string) => void;
   onAckApollo1202: () => void;
@@ -91,6 +91,7 @@ export function CenteredEventCard({
 }: CenteredEventCardProps) {
   const [openHelpIdx, setOpenHelpIdx] = useState<number | null>(null);
   const [minimizedForId, setMinimizedForId] = useState<string | null>(null);
+  const [expandedRoverId, setExpandedRoverId] = useState<string | null>(null);
 
   if (apollo1202Active) {
     return (
@@ -145,8 +146,11 @@ export function CenteredEventCard({
 
   if (!anomaly || anomaly.resolvedChoiceId) return null;
 
-  const isMinimized = minimizedForId === anomaly.id;
+  const isRoverCompact = placement === 'rover-compact';
   const isCorner = placement === 'space-corner';
+  const isMinimized = isRoverCompact
+    ? expandedRoverId !== anomaly.id
+    : minimizedForId === anomaly.id;
 
   // Enforce max 2 high-clarity decision options (optimal vs contrast)
   const sortedChoices = [...anomaly.choices];
@@ -155,35 +159,51 @@ export function CenteredEventCard({
   const displayChoices = [optimal, contrast].filter((c): c is AnomalyChoice => Boolean(c));
   const helpTerms = getAnomalyHelpTerms(`${anomaly.title} ${anomaly.context}`);
 
-  // Compact minimized warning chip tucked away from planetary center
+  // Step 1 (Rover compact notification) OR minimized corner chip — clear of rover & Enter Airlock
   if (isMinimized) {
     return (
       <div
         className={
-          isCorner
-            ? 'pointer-events-none fixed top-[178px] left-4 z-20 lg:left-6'
-            : 'pointer-events-none fixed top-20 left-1/2 z-20 -translate-x-1/2'
+          isRoverCompact
+            ? 'pointer-events-none fixed top-[118px] right-4 z-20 lg:right-5'
+            : isCorner
+              ? 'pointer-events-none fixed top-[178px] left-4 z-20 lg:left-6'
+              : 'pointer-events-none fixed top-20 left-1/2 z-20 -translate-x-1/2'
         }
       >
         <div
           data-testid="centered-event-card"
-          className="hud-soft pointer-events-auto flex items-center gap-2.5 rounded-xl border-amber-400/45 px-3 py-2 text-slate-100 shadow-lg"
+          className="hud-soft pointer-events-auto flex items-center gap-2.5 rounded-2xl border-amber-400/50 px-3.5 py-2 text-slate-100 shadow-lg"
         >
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-amber-400/35 bg-amber-500/15">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-xs font-bold text-white">{anomaly.title}</div>
+            {isRoverCompact && (
+              <div className="text-[11px] font-medium text-amber-200/85">
+                {anomaly.nasaRef}
+              </div>
+            )}
+          </div>
           <button
             type="button"
-            onClick={() => setMinimizedForId(null)}
-            className="inline-flex items-center gap-2 text-left text-xs font-bold whitespace-nowrap text-white hover:text-cyan-200"
+            data-testid={isRoverCompact ? 'open-rover-alert-btn' : undefined}
+            onClick={() =>
+              isRoverCompact ? setExpandedRoverId(anomaly.id) : setMinimizedForId(null)
+            }
+            className="hud-btn-glass inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold whitespace-nowrap text-cyan-200 transition hover:border-cyan-300"
           >
-            <span>{anomaly.title}</span>
+            <span>{isRoverCompact ? 'Open Alert' : 'Expand'}</span>
             <ChevronDown className="h-3.5 w-3.5 text-cyan-300" />
           </button>
           {onDismissAnomaly && (
             <button
               type="button"
+              data-testid="dismiss-event-btn"
               aria-label="Dismiss mission alert"
               onClick={() => onDismissAnomaly(anomaly.id)}
-              className="rounded-md p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="rounded-lg p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -193,31 +213,34 @@ export function CenteredEventCard({
     );
   }
 
+  // Step 2: Expanded off-center panel (Rover top-right dock OR Space top-left dock OR Launch/Landing center)
   return (
     <div
       className={
-        isCorner
-          ? 'pointer-events-none fixed top-[176px] left-4 z-20 w-[336px] max-w-[calc(100vw-2rem)] lg:left-6'
-          : 'pointer-events-none fixed inset-0 z-20 flex items-center justify-center p-4'
+        isRoverCompact
+          ? 'pointer-events-none fixed top-[118px] right-4 z-20 w-[410px] max-w-[calc(100vw-2rem)] lg:right-5'
+          : isCorner
+            ? 'pointer-events-none fixed top-[176px] left-4 z-20 w-[336px] max-w-[calc(100vw-2rem)] lg:left-6'
+            : 'pointer-events-none fixed inset-0 z-20 flex items-center justify-center p-4'
       }
     >
       <div
         data-testid="centered-event-card"
-        className={`hud-soft animate-modal-enter pointer-events-auto rounded-2xl border-amber-400/40 text-slate-100 ${
-          isCorner ? 'w-full p-3.5' : 'w-full max-w-lg p-5'
+        className={`hud-soft animate-modal-enter pointer-events-auto rounded-2xl border-amber-400/45 text-slate-100 ${
+          isRoverCompact || isCorner ? 'w-full p-4' : 'w-full max-w-lg p-5'
         }`}
       >
         {/* Header Row: Warning Indicator + Title + Minimize / Dismiss */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-2">
-            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-amber-400/35 bg-amber-500/12">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-400/35 bg-amber-500/15">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
             </span>
             <div className="min-w-0">
               <h2 className="font-display text-sm leading-snug font-bold text-white">
                 {anomaly.title}
               </h2>
-              <p className="mt-0.5 text-[11px] font-medium text-amber-200/80">
+              <p className="mt-0.5 text-xs font-medium text-amber-200/85">
                 {anomaly.nasaRef}
               </p>
             </div>
@@ -229,7 +252,9 @@ export function CenteredEventCard({
               data-testid="minimize-event-btn"
               aria-label="Minimize alert"
               title="Minimize Alert"
-              onClick={() => setMinimizedForId(anomaly.id)}
+              onClick={() =>
+                isRoverCompact ? setExpandedRoverId(null) : setMinimizedForId(anomaly.id)
+              }
               className="rounded-lg p-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               <Minimize2 className="h-3.5 w-3.5" />
@@ -250,7 +275,7 @@ export function CenteredEventCard({
         </div>
 
         {/* Event Description */}
-        <p className="mt-2 text-xs leading-relaxed text-slate-200">{anomaly.context}</p>
+        <p className="mt-2.5 text-xs leading-relaxed text-slate-200">{anomaly.context}</p>
 
         {/* Single-line Technical Term Help Toggles */}
         {helpTerms.length > 0 && (

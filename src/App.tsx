@@ -2525,7 +2525,13 @@ export default function App() {
           <CenteredEventCard
             anomaly={activeAnomalyUi}
             apollo1202Active={phase === 'landing' && apollo1202Active}
-            placement={phase === 'space' ? 'space-corner' : 'center'}
+            placement={
+              phase === 'space'
+                ? 'space-corner'
+                : phase === 'rover'
+                  ? 'rover-compact'
+                  : 'center'
+            }
             onResolveAnomaly={handleResolveAnomaly}
             onDismissAnomaly={handleDismissAnomaly}
             onAckApollo1202={() => {

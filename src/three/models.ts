@@ -1792,6 +1792,9 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
 export interface LaunchComplexHandles {
   group: THREE.Group;
   groundGroup: THREE.Group;
+  skyDomeMat: THREE.MeshBasicMaterial;
+  cloudMat: THREE.SpriteMaterial;
+  coolCloudMat: THREE.SpriteMaterial;
   earthLimb: THREE.Group;
   moonMesh: THREE.Mesh;
   cloudLayer: THREE.Group;
@@ -1809,6 +1812,8 @@ export interface LaunchComplexHandles {
   lasFlame: THREE.Mesh;
   flameGroup: THREE.Group;
   trenchLight: THREE.PointLight;
+  rocketEngineGlow: THREE.PointLight;
+  padSpotlight: THREE.SpotLight;
   leoOrbitRing: THREE.Mesh;
 }
 
@@ -2283,9 +2288,17 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   const group = new THREE.Group();
   group.visible = false;
 
+  const skyDomeMat = new THREE.MeshBasicMaterial({
+    map: tex.duskSky,
+    side: THREE.BackSide,
+    fog: false,
+    transparent: true,
+    opacity: 1.0,
+    depthWrite: false,
+  });
   const skyDome = new THREE.Mesh(
     new THREE.SphereGeometry(760, 32, 22),
-    new THREE.MeshBasicMaterial({ map: tex.duskSky, side: THREE.BackSide, fog: false })
+    skyDomeMat
   );
   group.add(skyDome);
 
@@ -2313,14 +2326,14 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     map: tex.cloudPuff,
     color: 0xfde68a,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.44,
     depthWrite: false,
   });
   const coolCloudMat = new THREE.SpriteMaterial({
     map: tex.cloudPuff,
     color: 0x94a3b8,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.36,
     depthWrite: false,
   });
   for (let i = 0; i < 36; i++) {
@@ -2350,18 +2363,44 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   groundGroup.add(tower);
   groundGroup.add(buildPerimeterInfrastructure(tex));
 
-  const trenchLight = new THREE.PointLight(0xf97316, 0, 56);
-  trenchLight.position.set(0, 1.4, 2.0);
+  const trenchLight = new THREE.PointLight(0xf97316, 0, 72);
+  trenchLight.position.set(0, 2.2, 2.2);
   groundGroup.add(trenchLight);
+
+  // Pad Xenon Spotlight illuminating SLS hull & LC-39B tower with crisp contrast
+  const padSpotlight = new THREE.SpotLight(0xe0f2fe, 5.8, 120, Math.PI / 3.8, 0.55, 0.6);
+  padSpotlight.position.set(19, 10, 24);
+  padSpotlight.target.position.set(0, 14, 0);
+  groundGroup.add(padSpotlight, padSpotlight.target);
   group.add(groundGroup);
 
-  // Curved Earth Horizon for > 20 km
+  // Curved Earth Horizon with Atmospheric Cyan Limb Halo for > 18 km
   const earthLimb = new THREE.Group();
-  earthLimb.position.set(0, -102, 0);
+  earthLimb.position.set(0, -104, 0);
   earthLimb.add(
     new THREE.Mesh(
-      new THREE.SphereGeometry(95, 40, 28),
-      new THREE.MeshStandardMaterial({ map: tex.earthAlbedo, color: 0xffffff, roughness: 0.55, metalness: 0.1 })
+      new THREE.SphereGeometry(95, 48, 32),
+      new THREE.MeshStandardMaterial({
+        map: tex.earthAlbedo,
+        color: 0xffffff,
+        roughness: 0.48,
+        metalness: 0.12,
+        emissive: 0x082f49,
+        emissiveIntensity: 0.18,
+      })
+    )
+  );
+  earthLimb.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(96.8, 44, 28),
+      new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.24,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        depthWrite: false,
+      })
     )
   );
   earthLimb.visible = false;
@@ -2370,7 +2409,7 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   // Low Earth Orbit (LEO) Parking Track Arc visible once orbitReached is achieved
   const leoOrbitRing = new THREE.Mesh(
     new THREE.TorusGeometry(99.5, 0.35, 10, 96),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.75 })
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78 })
   );
   leoOrbitRing.position.copy(earthLimb.position);
   leoOrbitRing.rotation.x = 0.25;
@@ -2518,17 +2557,29 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   const icpsFlame = new THREE.Group();
   icpsFlame.position.y = 18.2;
   const icpsOuter = new THREE.Mesh(
-    new THREE.ConeGeometry(0.54, 4.2, 16),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.68 })
+    new THREE.ConeGeometry(0.62, 4.8, 16),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.74,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
   );
   icpsOuter.rotation.x = Math.PI;
-  icpsOuter.position.y = -2.1;
+  icpsOuter.position.y = -2.4;
   const icpsCore = new THREE.Mesh(
-    new THREE.ConeGeometry(0.24, 2.4, 12),
-    new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.92 })
+    new THREE.ConeGeometry(0.28, 2.8, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0.94,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
   );
   icpsCore.rotation.x = Math.PI;
-  icpsCore.position.y = -1.2;
+  icpsCore.position.y = -1.4;
   icpsFlame.add(icpsOuter, icpsCore);
   icpsFlame.visible = false;
   icpsGroup.add(icpsFlame);
@@ -2648,41 +2699,83 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   const flameGroup = new THREE.Group();
   rs25Positions.forEach(([px, , pz]) => {
     const outer = new THREE.Mesh(
-      new THREE.ConeGeometry(0.28, 2.6, 14),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.88 })
+      new THREE.ConeGeometry(0.32, 3.2, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.88,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
     outer.rotation.x = Math.PI;
-    outer.position.set(px, -0.5, pz);
+    outer.position.set(px, -0.7, pz);
     flameGroup.add(outer);
 
     const core = new THREE.Mesh(
-      new THREE.ConeGeometry(0.14, 1.65, 10),
-      new THREE.MeshBasicMaterial({ color: 0xfef9c3, transparent: true, opacity: 0.95 })
+      new THREE.ConeGeometry(0.16, 1.9, 10),
+      new THREE.MeshBasicMaterial({
+        color: 0xfef9c3,
+        transparent: true,
+        opacity: 0.96,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
     core.rotation.x = Math.PI;
-    core.position.set(px, -0.2, pz);
+    core.position.set(px, -0.3, pz);
     flameGroup.add(core);
   });
   [-1.62, 1.62].forEach((bx) => {
+    const srbHalo = new THREE.Mesh(
+      new THREE.ConeGeometry(1.15, 6.8, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xfb923c,
+        transparent: true,
+        opacity: 0.34,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    srbHalo.rotation.x = Math.PI;
+    srbHalo.position.set(bx, -2.7, 0);
+    flameGroup.add(srbHalo);
+
     const srbOuter = new THREE.Mesh(
-      new THREE.ConeGeometry(0.76, 5.4, 16),
-      new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.85 })
+      new THREE.ConeGeometry(0.82, 5.8, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xf97316,
+        transparent: true,
+        opacity: 0.86,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
     srbOuter.rotation.x = Math.PI;
-    srbOuter.position.set(bx, -2.1, 0);
+    srbOuter.position.set(bx, -2.2, 0);
     flameGroup.add(srbOuter);
 
     const srbInner = new THREE.Mesh(
-      new THREE.ConeGeometry(0.42, 3.6, 12),
-      new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.95 })
+      new THREE.ConeGeometry(0.46, 3.8, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0xfef08a,
+        transparent: true,
+        opacity: 0.98,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
     );
     srbInner.rotation.x = Math.PI;
-    srbInner.position.set(bx, -1.3, 0);
+    srbInner.position.set(bx, -1.35, 0);
     flameGroup.add(srbInner);
   });
   flameGroup.position.y = 0.6;
   flameGroup.visible = false;
   coreGroup.add(flameGroup);
+
+  const rocketEngineGlow = new THREE.PointLight(0xfdba74, 0, 42, 1.2);
+  rocketEngineGlow.position.set(0, -1.2, 1.5);
+  rocketFull.add(rocketEngineGlow);
 
   rocketFull.add(coreGroup, srbLeft, srbRight, upperGroup);
   group.add(rocketFull);
@@ -2690,6 +2783,9 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
   return {
     group,
     groundGroup,
+    skyDomeMat,
+    cloudMat,
+    coolCloudMat,
     earthLimb,
     moonMesh,
     cloudLayer,
@@ -2707,6 +2803,8 @@ export function createLaunchComplexAndSLS(tex: ProceduralTextureSet): LaunchComp
     lasFlame,
     flameGroup,
     trenchLight,
+    rocketEngineGlow,
+    padSpotlight,
     leoOrbitRing,
   };
 }
@@ -2961,6 +3059,8 @@ export interface SolarSystemHandles {
   sunOuterGlow: THREE.Sprite;
   shipGroup: THREE.Group;
   shipFlame: THREE.Mesh;
+  shipPlumeInner: THREE.Mesh;
+  shipFillLight: THREE.PointLight;
   shipShieldShell: THREE.Mesh;
   shipWingsGroup: THREE.Group;
   earthBodyGroup: THREE.Group;
@@ -2985,6 +3085,8 @@ export interface SolarSystemHandles {
   halleyTail: THREE.Mesh;
   kuiperBelt: THREE.Points;
   oortCloud: THREE.Points;
+  spaceDust: THREE.Points;
+  spaceDustSeeds: Float32Array;
   targetBeacon: THREE.Mesh;
   courseLine: THREE.Line;
 }
@@ -3617,13 +3719,39 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   shipGroup.add(shipWingsGroup);
 
   const shipFlame = new THREE.Mesh(
-    new THREE.ConeGeometry(0.55, 2.5, 12),
-    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9 })
+    new THREE.ConeGeometry(0.62, 3.1, 14),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.72,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
   );
   shipFlame.rotation.x = -Math.PI / 2;
-  shipFlame.position.z = -2.85;
+  shipFlame.position.z = -3.15;
   shipFlame.visible = false;
   shipGroup.add(shipFlame);
+
+  const shipPlumeInner = new THREE.Mesh(
+    new THREE.ConeGeometry(0.28, 1.85, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0.94,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  shipPlumeInner.rotation.x = -Math.PI / 2;
+  shipPlumeInner.position.z = -2.55;
+  shipPlumeInner.visible = false;
+  shipGroup.add(shipPlumeInner);
+
+  // Subtle local orbital key/rim fill so Orion's white thermal tiles & blue wings gleam in deep space
+  const shipFillLight = new THREE.PointLight(0xe0f2fe, 2.2, 16, 1.2);
+  shipFillLight.position.set(2.4, 3.1, 2.8);
+  shipGroup.add(shipFillLight);
 
   const shipShieldShell = new THREE.Mesh(
     new THREE.SphereGeometry(2.55, 18, 16),
@@ -3872,12 +4000,45 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   oortCloud.position.copy(sunPos);
   group.add(oortCloud);
 
+  // Subtle close-range space parallax micro-dust around Orion (wrapped seamlessly per frame)
+  const dustCount = 220;
+  const spaceDustSeeds = new Float32Array(dustCount * 3);
+  const dustPositions = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    const sx = (Math.random() - 0.5) * 56;
+    const sy = (Math.random() - 0.5) * 24;
+    const sz = (Math.random() - 0.5) * 56;
+    spaceDustSeeds[i * 3] = sx;
+    spaceDustSeeds[i * 3 + 1] = sy;
+    spaceDustSeeds[i * 3 + 2] = sz;
+    dustPositions[i * 3] = sx;
+    dustPositions[i * 3 + 1] = sy;
+    dustPositions[i * 3 + 2] = sz;
+  }
+  const dustGeo = new THREE.BufferGeometry();
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+  const spaceDust = new THREE.Points(
+    dustGeo,
+    new THREE.PointsMaterial({
+      color: 0xbae6fd,
+      size: 0.14,
+      transparent: true,
+      opacity: 0.45,
+      sizeAttenuation: true,
+      depthWrite: false,
+    })
+  );
+  spaceDust.frustumCulled = false;
+  group.add(spaceDust);
+
   return {
     group,
     sun,
     sunOuterGlow,
     shipGroup,
     shipFlame,
+    shipPlumeInner,
+    shipFillLight,
     shipShieldShell,
     shipWingsGroup,
     earthBodyGroup,
@@ -3898,6 +4059,8 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     halleyTail,
     kuiperBelt,
     oortCloud,
+    spaceDust,
+    spaceDustSeeds,
     targetBeacon,
     courseLine,
   };
