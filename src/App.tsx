@@ -195,6 +195,14 @@ export default function App() {
   const [roverUi, setRoverUi] = useState<RoverState>(simRef.current.rover);
   const [resourcesUi, setResourcesUi] = useState<ResourceState>(simRef.current.resources);
   const [objectivesUi, setObjectivesUi] = useState<RoverObjective[]>(simRef.current.objectives);
+  const [roverInputUi, setRoverInputUi] = useState<
+    Pick<InputState, 'forward' | 'backward' | 'left' | 'right'>
+  >({
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+  });
   const [activeAnomalyUi, setActiveAnomalyUi] = useState<MissionAnomaly | null>(null);
   const [discoveryObjUi, setDiscoveryObjUi] = useState<RoverObjective | null>(null);
   const [scoreUi, setScoreUi] = useState<number>(0);
@@ -219,6 +227,12 @@ export default function App() {
     setRoverUi({ ...s.rover });
     setResourcesUi({ ...s.resources });
     setObjectivesUi(s.objectives.map((o) => ({ ...o })));
+    setRoverInputUi({
+      forward: s.input.forward,
+      backward: s.input.backward,
+      left: s.input.left,
+      right: s.input.right,
+    });
     setActiveAnomalyUi(activeAnomalyRef.current ? { ...activeAnomalyRef.current } : null);
     setDiscoveryObjUi(discoveryObjRef.current ? { ...discoveryObjRef.current } : null);
     setScoreUi(scoreRef.current);
@@ -736,16 +750,52 @@ export default function App() {
 
   // Unified Keyboard + Pointer + Hold-Button Input Hub
   useEffect(() => {
+    const syncRoverInputState = () => {
+      if (simRef.current.phase !== 'rover') return;
+      const inp = simRef.current.input;
+      setRoverInputUi((prev) =>
+        prev.forward === inp.forward &&
+        prev.backward === inp.backward &&
+        prev.left === inp.left &&
+        prev.right === inp.right
+          ? prev
+          : {
+              forward: inp.forward,
+              backward: inp.backward,
+              left: inp.left,
+              right: inp.right,
+            }
+      );
+    };
+
     const releaseAll = () => {
       simRef.current.input = { ...EMPTY_INPUT };
+      setRoverInputUi((prev) =>
+        !prev.forward && !prev.backward && !prev.left && !prev.right
+          ? prev
+          : { forward: false, backward: false, left: false, right: false }
+      );
     };
 
     const setInputKey = (code: string, down: boolean) => {
       const inp = simRef.current.input;
-      if (code === 'KeyW' || code === 'ArrowUp') inp.forward = down;
-      if (code === 'KeyS' || code === 'ArrowDown') inp.backward = down;
-      if (code === 'KeyA' || code === 'ArrowLeft') inp.left = down;
-      if (code === 'KeyD' || code === 'ArrowRight') inp.right = down;
+      let moveChanged = false;
+      if (code === 'KeyW' || code === 'ArrowUp') {
+        moveChanged = inp.forward !== down;
+        inp.forward = down;
+      }
+      if (code === 'KeyS' || code === 'ArrowDown') {
+        moveChanged = inp.backward !== down;
+        inp.backward = down;
+      }
+      if (code === 'KeyA' || code === 'ArrowLeft') {
+        moveChanged = inp.left !== down;
+        inp.left = down;
+      }
+      if (code === 'KeyD' || code === 'ArrowRight') {
+        moveChanged = inp.right !== down;
+        inp.right = down;
+      }
       if (code === 'Space' || code === 'KeyE') {
         inp.action = down;
         if (code === 'Space') {
@@ -757,6 +807,7 @@ export default function App() {
       if (code === 'KeyZ') inp.throttleDown = down;
       if (code === 'KeyX') inp.cutoff = down;
       if (code === 'KeyB') inp.killDrift = down;
+      if (moveChanged) syncRoverInputState();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -898,6 +949,7 @@ export default function App() {
       heldBtnKeys.forEach((k) => {
         simRef.current.input[k] = true;
       });
+      syncRoverInputState();
     };
     const onPointerUp = () => {
       if (heldBtnKeys.length > 0) {
@@ -905,6 +957,7 @@ export default function App() {
           simRef.current.input[k] = false;
         });
         heldBtnKeys = [];
+        syncRoverInputState();
       }
     };
 
@@ -1333,6 +1386,7 @@ export default function App() {
       {phase === 'rover' && (
         <RoverHUD
           rover={roverUi}
+          roverInput={roverInputUi}
           resources={resourcesUi}
           objectives={objectivesUi}
           carryover={carryoverUi}

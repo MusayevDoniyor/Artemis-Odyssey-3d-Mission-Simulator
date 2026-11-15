@@ -1,4 +1,5 @@
 import { ArrowLeft, BookOpen, Database, Drill, Rocket, ShieldCheck, Sun, Wind } from 'lucide-react';
+import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER, PAYLOADS } from '../game/constants';
 import type {
   CampaignCarryoverState,
@@ -191,7 +192,7 @@ export function BriefingOverlay({
       : `Space Weather · ${donki.classType}`;
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/88 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-10 flex items-center justify-center overflow-y-auto bg-slate-950/94 p-4">
       <div className="hud-panel tactical-frame animate-modal-enter my-auto w-full max-w-4xl rounded-2xl p-5 md:p-6">
         {/* Top Bar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-cyan-500/20 pb-3.5">
@@ -204,6 +205,17 @@ export function BriefingOverlay({
               <ArrowLeft className="mr-1 inline h-3.5 w-3.5 text-cyan-300" />
               Command Deck
             </button>
+            <div
+              data-testid="briefing-mission-patch"
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-amber-400/55 bg-[#050811] shadow-[0_0_16px_rgba(245,158,11,0.2)]"
+            >
+              <img
+                src={missionPatchImg}
+                alt="Artemis Odyssey Mission Patch"
+                referrerPolicy="no-referrer"
+                className="h-full w-full scale-[1.18] object-cover"
+              />
+            </div>
             <div>
               <p className="font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-300 uppercase">
                 {mission.code} · {mission.planet === 'mars' ? 'MARS 0.38g' : 'MOON 0.165g'}

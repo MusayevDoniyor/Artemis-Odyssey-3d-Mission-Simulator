@@ -3,6 +3,7 @@ import { getRoverMissionProgress } from '../game/missionProgress';
 import type {
   CameraMode,
   CampaignCarryoverState,
+  InputState,
   MissionAnomaly,
   ResourceState,
   RoverDriveMode,
@@ -15,6 +16,7 @@ import { SurfaceMapPanel } from './SurfaceMapPanel';
 
 interface RoverHUDProps {
   rover: RoverState;
+  roverInput: Pick<InputState, 'forward' | 'backward' | 'left' | 'right'>;
   resources: ResourceState;
   objectives: RoverObjective[];
   carryover: CampaignCarryoverState;
@@ -44,6 +46,7 @@ const DRIVE_MODES: Array<{ id: RoverDriveMode; keyHint: string; label: string }>
 
 export function RoverHUD({
   rover,
+  roverInput,
   resources,
   objectives,
   carryover,
@@ -65,6 +68,9 @@ export function RoverHUD({
 }: RoverHUDProps) {
   const isMars = rover.planet === 'mars';
   const missionProgress = getRoverMissionProgress(rover, objectives);
+  const isMoving =
+    roverInput.forward || roverInput.backward || roverInput.left || roverInput.right;
+  const wheelGlowTone = roverInput.backward ? 'amber' : isMars ? 'orange' : 'cyan';
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
@@ -301,33 +307,117 @@ export function RoverHUD({
             ))}
           </div>
 
+          {/* 4-Wheel Drive & Thruster Glow Indicator (transient CSS opacity animation while moving) */}
+          <div
+            data-testid="rover-wheel-glow-pod"
+            data-moving={isMoving ? 'true' : 'false'}
+            aria-label="Rover Wheel Torque Status"
+            className="relative flex items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-950/90 px-2.5 py-1"
+          >
+            <div className="relative grid grid-cols-2 gap-x-2.5 gap-y-1.5">
+              {/* Central chassis crossbar */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-1/2 h-4 w-2 -translate-x-1/2 -translate-y-1/2 rounded-xs bg-slate-700/80"
+              />
+              {(['FL', 'FR', 'RL', 'RR'] as const).map((wheelId) => {
+                const isFront = wheelId === 'FL' || wheelId === 'FR';
+                const isLeftWheel = wheelId === 'FL' || wheelId === 'RL';
+                const steerBoost =
+                  (roverInput.left && isLeftWheel) || (roverInput.right && !isLeftWheel);
+                const glowBg =
+                  wheelGlowTone === 'amber'
+                    ? 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]'
+                    : wheelGlowTone === 'orange'
+                      ? 'bg-orange-400 shadow-[0_0_12px_rgba(251,146,60,0.9)]'
+                      : 'bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)]';
+
+                return (
+                  <span
+                    key={wheelId}
+                    className={`relative z-10 h-2.5 w-1.5 rounded-xs border border-slate-600 bg-slate-800 transition-transform duration-150 ${
+                      isFront && roverInput.left
+                        ? '-rotate-12'
+                        : isFront && roverInput.right
+                          ? 'rotate-12'
+                          : rover.driveMode === 'CRAB' && (roverInput.left || roverInput.right)
+                            ? roverInput.left
+                              ? '-rotate-45'
+                              : 'rotate-45'
+                            : ''
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none absolute -inset-1 rounded-sm transition-opacity duration-200 ${glowBg} ${
+                        isMoving
+                          ? steerBoost
+                            ? 'rover-wheel-glow-active opacity-100'
+                            : 'rover-wheel-glow-active opacity-85'
+                          : 'opacity-0'
+                      }`}
+                    />
+                  </span>
+                );
+              })}
+            </div>
+            <span
+              className={`font-mono-tech text-[10px] font-bold tracking-wider uppercase transition-opacity duration-200 ${
+                isMoving
+                  ? wheelGlowTone === 'amber'
+                    ? 'text-amber-300 opacity-100'
+                    : wheelGlowTone === 'orange'
+                      ? 'text-orange-300 opacity-100'
+                      : 'text-cyan-300 opacity-100'
+                  : 'text-slate-500 opacity-75'
+              }`}
+            >
+              {isMoving ? (roverInput.backward ? 'REV' : 'TORQ') : 'IDLE'}
+            </span>
+          </div>
+
           <div className="h-5 w-px bg-slate-700" />
 
           <button
             type="button"
             data-hold-keys="left"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 font-semibold text-slate-100"
+            className={`rounded-lg border px-2.5 py-1.5 font-semibold transition ${
+              roverInput.left
+                ? 'border-cyan-400 bg-cyan-500/25 text-white shadow-[0_0_12px_rgba(34,211,238,0.3)]'
+                : 'border-slate-700 bg-slate-900 text-slate-100'
+            }`}
           >
             <span className="keycap">A</span>
           </button>
           <button
             type="button"
             data-hold-keys="forward"
-            className="rounded-lg bg-sky-500/20 px-3 py-1.5 font-bold text-sky-100 ring-1 ring-sky-400/50"
+            className={`rounded-lg px-3 py-1.5 font-bold ring-1 transition ${
+              roverInput.forward
+                ? 'bg-cyan-500/35 text-white ring-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.35)]'
+                : 'bg-sky-500/20 text-sky-100 ring-sky-400/50'
+            }`}
           >
             <span className="keycap mr-1">W</span> Move
           </button>
           <button
             type="button"
             data-hold-keys="backward"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 font-semibold text-slate-100"
+            className={`rounded-lg border px-2.5 py-1.5 font-semibold transition ${
+              roverInput.backward
+                ? 'border-amber-400 bg-amber-500/25 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                : 'border-slate-700 bg-slate-900 text-slate-100'
+            }`}
           >
             <span className="keycap">S</span>
           </button>
           <button
             type="button"
             data-hold-keys="right"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 font-semibold text-slate-100"
+            className={`rounded-lg border px-2.5 py-1.5 font-semibold transition ${
+              roverInput.right
+                ? 'border-cyan-400 bg-cyan-500/25 text-white shadow-[0_0_12px_rgba(34,211,238,0.3)]'
+                : 'border-slate-700 bg-slate-900 text-slate-100'
+            }`}
           >
             <span className="keycap">D</span>
           </button>

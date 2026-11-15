@@ -7,8 +7,34 @@ import { GoogleGenAI } from '@google/genai';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = Number(process.env.PORT || 3000);
 const isProduction = process.env.NODE_ENV === 'production';
+
+function resolveServerPort(): number {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--port' && args[i + 1]) {
+      const parsed = Number(args[i + 1]);
+      if (Number.isInteger(parsed) && parsed > 0) return parsed;
+    } else if (arg.startsWith('--port=')) {
+      const parsed = Number(arg.slice('--port='.length));
+      if (Number.isInteger(parsed) && parsed > 0) return parsed;
+    }
+  }
+
+  const envPort = Number(process.env.PORT);
+  if (Number.isInteger(envPort) && envPort > 0) {
+    // Container proxy (nginx) binds 8080 in AI Studio dev; Vite/Express dev server must listen on 3000.
+    if (!isProduction && envPort === 8080) {
+      return 3000;
+    }
+    return envPort;
+  }
+
+  return 3000;
+}
+
+const PORT = resolveServerPort();
 
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -379,7 +405,11 @@ async function startServer() {
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        ws: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -391,9 +421,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const httpServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Artemis Odyssey server listening on http://localhost:${PORT}`);
+  });
+
+  httpServer.on('error', (err) => {
+    console.error(`Failed to start Artemis Odyssey server on port ${PORT}:`, err);
+    process.exit(1);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Artemis Odyssey server initialization failed:', err);
+  process.exit(1);
+});

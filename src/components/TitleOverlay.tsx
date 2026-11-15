@@ -1,4 +1,5 @@
 import { BookOpen, Database, Play, Volume2, VolumeX } from 'lucide-react';
+import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
 import type {
   CampaignCarryoverState,
@@ -98,14 +99,27 @@ export function TitleOverlay({
         </button>
       </div>
 
-      {/* Left-aligned NASA Emblem + Title Lockup & Campaign */}
+      {/* Left-aligned NASA Emblem + Mission Patch + Title Lockup & Campaign */}
       <div className="relative z-10 max-w-xl px-6 md:px-10">
         <div className="mb-3 flex items-center gap-3.5">
-          <NASAInsignia size={56} className="shrink-0" />
+          <div
+            data-testid="title-mission-patch"
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-amber-400/60 bg-[#050811] shadow-[0_0_24px_rgba(34,211,238,0.22)]"
+          >
+            <img
+              src={missionPatchImg}
+              alt="Artemis Odyssey Official Mission Patch"
+              referrerPolicy="no-referrer"
+              className="h-full w-full scale-[1.18] object-cover"
+            />
+          </div>
           <div>
-            <p className="font-hud text-[11px] font-bold tracking-[0.26em] text-cyan-300 uppercase">
-              NASA Flight Operations Simulator
-            </p>
+            <div className="flex items-center gap-2">
+              <NASAInsignia size={22} className="shrink-0" />
+              <p className="font-hud text-[11px] font-bold tracking-[0.24em] text-cyan-300 uppercase">
+                NASA Flight Operations Simulator
+              </p>
+            </div>
             <h1 className="font-display text-4xl font-extrabold tracking-wide text-white uppercase md:text-5xl">
               ARTEMIS ODYSSEY
             </h1>
