@@ -40,6 +40,7 @@ import type {
   VehicleShowcaseId,
 } from '../game/types';
 import { NASAInsignia } from './NASAInsignia';
+import { StatusPill } from './ui';
 
 type AcademyTab = 'missions' | 'vehicles' | 'training' | 'data';
 type NoteFilter = 'all' | FieldNote['category'];
@@ -47,7 +48,6 @@ type NoteFilter = 'all' | FieldNote['category'];
 interface MobileAcademyViewProps {
   donki: DonkiStatus;
   osdr: OsdrStatus;
-  onOpenNasaModal: () => void;
 }
 
 const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = HARDWARE_ORDER.map(
@@ -57,7 +57,6 @@ const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = HARDWARE_
 export function MobileAcademyView({
   donki,
   osdr,
-  onOpenNasaModal,
 }: MobileAcademyViewProps) {
   const [activeTab, setActiveTab] = useState<AcademyTab>('missions');
   const [selectedMission, setSelectedMission] = useState<CampaignMissionId>('artemis-2');
@@ -107,22 +106,18 @@ export function MobileAcademyView({
             <NASAInsignia size={36} className="shrink-0" />
             <div className="min-w-0">
               <p className="truncate font-hud text-[10px] font-bold tracking-[0.2em] text-cyan-300 uppercase">
-                NASA Space Apps · Mobile Academy
+                Flight Operations · Mobile Academy
               </p>
               <h1 className="truncate font-display text-base font-extrabold tracking-wide text-white uppercase">
                 ARTEMIS ODYSSEY
               </h1>
+              <p className="truncate font-body text-[9px] text-slate-400">
+                Unofficial educational project · Not affiliated with NASA
+              </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenNasaModal}
-            className="hud-panel inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-hud text-[11px] font-bold tracking-wide text-emerald-300 uppercase transition active:scale-[0.98]"
-          >
-            <Database className="h-3.5 w-3.5" />
-            Live API
-          </button>
+          <StatusPill donki={donki} osdr={osdr} compact />
         </div>
 
         {/* 4-Tab Tactical Navigation */}
@@ -661,13 +656,6 @@ export function MobileAcademyView({
                   <h2 className="font-hud text-xs font-bold tracking-wider text-emerald-300 uppercase">
                     NASA OSDR Radiobiology Grounding
                   </h2>
-                  <button
-                    type="button"
-                    onClick={onOpenNasaModal}
-                    className="font-mono-tech text-[10px] font-bold text-cyan-300 underline"
-                  >
-                    Open Full Inspector
-                  </button>
                 </div>
 
                 {osdr.studies.length > 0 ? (

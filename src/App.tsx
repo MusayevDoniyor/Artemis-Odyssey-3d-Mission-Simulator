@@ -1,7 +1,6 @@
 import { Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BriefingOverlay } from './components/BriefingOverlay';
-import { CalmFactToast } from './components/CalmFactToast';
 import { CenteredEventCard } from './components/CenteredEventCard';
 import { DrillingModal } from './components/DrillingModal';
 import { FieldNotebookModal } from './components/FieldNotebookModal';
@@ -10,9 +9,7 @@ import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
 import { LearnObjectModal } from './components/LearnObjectModal';
 import { MobileAcademyView } from './components/MobileAcademyView';
-import { NasaDataModal } from './components/NasaDataModal';
 import { OutcomeModal } from './components/OutcomeModal';
-import { OutpostConsoleModal } from './components/OutpostConsoleModal';
 import { RoverHUD } from './components/RoverHUD';
 import { SpaceFlightHUD } from './components/SpaceFlightHUD';
 import { TitleOverlay } from './components/TitleOverlay';
@@ -56,12 +53,6 @@ import {
   getMissionStartingBaseResources,
   getMissionStartingResources,
 } from './game/missionBriefing';
-import {
-  createInitialOutpostConsoleState,
-  stepAirlockCycle,
-  switchOutpostPowerSource,
-  toggleOutpostAirlock,
-} from './game/outpost';
 import {
   applyAnomalyDecision,
   beginLaunchCountdown,
@@ -122,8 +113,6 @@ import type {
   MarsQueueState,
   MissionAnomaly,
   OsdrStatus,
-  OutpostConsoleState,
-  OutpostInteriorRoom,
   PayloadId,
   PostLandingUnstowState,
   PowerSourceMode,
@@ -285,7 +274,6 @@ export default function App() {
   const apollo1202ClearedRef = useRef<boolean>(false);
   const drillingConsoleRef = useRef<DrillingConsoleState | null>(null);
   const learnModalRef = useRef<LearnModalState | null>(null);
-  const outpostConsoleRef = useRef<OutpostConsoleState>(createInitialOutpostConsoleState('moon'));
   const marsQueueRef = useRef<MarsQueueState>(createInitialMarsQueueState(14));
   const mastPanDegRef = useRef<number>(0);
   const solarTimeSpeedRef = useRef<number>(0.5);
@@ -310,7 +298,6 @@ export default function App() {
   const [selectedPayload, setSelectedPayload] = useState<PayloadId>('oxygen-tanks');
   const [donki, setDonki] = useState<DonkiStatus>(DEFAULT_DONKI);
   const [osdr, setOsdr] = useState<OsdrStatus>(DEFAULT_OSDR);
-  const [nasaModalOpen, setNasaModalOpen] = useState<boolean>(false);
   const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window === 'undefined' ? true : window.innerWidth >= 1024
@@ -337,9 +324,6 @@ export default function App() {
   const [speedScale, setSpeedScale] = useState<TelemetrySpeedScale>('KID_25X');
   const [drillingConsoleUi, setDrillingConsoleUi] = useState<DrillingConsoleState | null>(null);
   const [learnModalUi, setLearnModalUi] = useState<LearnModalState | null>(null);
-  const [outpostConsoleUi, setOutpostConsoleUi] = useState<OutpostConsoleState>(() =>
-    createInitialOutpostConsoleState('moon')
-  );
 
   const [solarScaleMode, setSolarScaleMode] = useState<SolarScaleMode>('exploration');
   const [spaceCameraMode, setSpaceCameraMode] = useState<SpaceCameraMode>('track');
@@ -367,12 +351,10 @@ export default function App() {
 
   useEffect(() => {
     modalOpenRef.current =
-      nasaModalOpen ||
       fieldNotebookOpen ||
       Boolean(drillingConsoleUi?.open) ||
-      Boolean(learnModalUi?.open) ||
-      outpostConsoleUi.open;
-  }, [nasaModalOpen, fieldNotebookOpen, drillingConsoleUi, learnModalUi, outpostConsoleUi]);
+      Boolean(learnModalUi?.open);
+  }, [fieldNotebookOpen, drillingConsoleUi, learnModalUi]);
 
   useEffect(() => {
     menuOpenRef.current = menuOpen;
@@ -445,7 +427,6 @@ export default function App() {
     setDiscoveryObjUi(discoveryObjRef.current ? { ...discoveryObjRef.current } : null);
     setDrillingConsoleUi(drillingConsoleRef.current ? { ...drillingConsoleRef.current } : null);
     setLearnModalUi(learnModalRef.current ? { ...learnModalRef.current } : null);
-    setOutpostConsoleUi({ ...outpostConsoleRef.current });
     setMarsQueueUi({ ...marsQueueRef.current });
     setScoreUi(scoreRef.current);
     setFailReason(failReasonRef.current);
@@ -542,11 +523,11 @@ export default function App() {
     let bodyState = 'playing';
     if (phase === 'title') bodyState = 'title';
     else if (phase === 'gameover' || phase === 'victory') bodyState = 'gameover';
-    else if (paused || nasaModalOpen || fieldNotebookOpen || discoveryObjUi || learnModalUi?.open) {
+    else if (paused || fieldNotebookOpen || discoveryObjUi || learnModalUi?.open) {
       bodyState = 'paused';
     }
     document.body.dataset.state = bodyState;
-  }, [isDesktop, phase, paused, nasaModalOpen, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
+  }, [isDesktop, phase, paused, fieldNotebookOpen, discoveryObjUi, learnModalUi]);
 
   // Fetch live NASA DONKI + OSDR + JPL Horizons state vectors
   useEffect(() => {
@@ -653,7 +634,6 @@ export default function App() {
       activeAnomalyRef.current = null;
       drillingConsoleRef.current = null;
       learnModalRef.current = null;
-      outpostConsoleRef.current = createInitialOutpostConsoleState(targetPlanet);
       s.kilopowerActive = false;
       phaseTimerRef.current = 0;
       failReasonRef.current = '';
@@ -1032,9 +1012,6 @@ export default function App() {
             soundSynth.playCautionAlarm();
           }
         }
-        if (outpostConsoleRef.current.open) {
-          outpostConsoleRef.current = stepAirlockCycle(outpostConsoleRef.current, dt);
-        }
       }
 
       if (s.paused || modalOpenRef.current || menuOpenRef.current || discoveryObjRef.current) {
@@ -1044,9 +1021,6 @@ export default function App() {
           lastUiSyncRef.current = nowModal;
           if (drillingConsoleRef.current?.open) {
             setDrillingConsoleUi({ ...drillingConsoleRef.current });
-          }
-          if (outpostConsoleRef.current.open) {
-            setOutpostConsoleUi({ ...outpostConsoleRef.current });
           }
         }
         return;
@@ -1278,7 +1252,6 @@ export default function App() {
             s.mastPanRad = 0;
             sceneMgrRef.current?.resetWheelTracks();
             s.objectives = clonePlanetObjectives(pose.planet);
-            outpostConsoleRef.current = createInitialOutpostConsoleState(pose.planet);
             activeAnomalyRef.current = null;
             phaseTimerRef.current = 0;
             scienceMultRef.current = 1.0;
@@ -1439,9 +1412,9 @@ export default function App() {
         const atBaseCamp = Math.hypot(s.rover.x + 15, s.rover.z + 13) <= 22;
         const flareDrain =
           (s.donkiFlareActive ? 0.28 : 0.11) * bermFactor * (atBaseCamp ? 0.25 : 1);
-        const kiloBonus = outpostConsoleRef.current.kilopowerActive ? 0.28 : 0;
+        const kiloBonus = 0;
         const dustPenalty =
-          s.rover.planet === 'mars' && !outpostConsoleRef.current.kilopowerActive
+          s.rover.planet === 'mars'
             ? (s.rover.dustAccumulationPct / 100) * 0.24
             : 0;
 
@@ -1748,15 +1721,6 @@ export default function App() {
           syncUiNow();
           return;
         }
-        if (outpostConsoleRef.current.open) {
-          outpostConsoleRef.current = { ...outpostConsoleRef.current, open: false };
-          syncUiNow();
-          return;
-        }
-        if (nasaModalOpen) {
-          setNasaModalOpen(false);
-          return;
-        }
         if (fieldNotebookOpen) {
           setFieldNotebookOpen(false);
           return;
@@ -1781,7 +1745,6 @@ export default function App() {
       if (
         s.phase === 'title' &&
         !menuOpenRef.current &&
-        !nasaModalOpen &&
         !fieldNotebookOpen &&
         (e.code === 'Enter' || e.code === 'Space')
       ) {
@@ -1908,17 +1871,6 @@ export default function App() {
             handleOpenLearnForObjective(nearObj);
             return;
           }
-          const atBase = Math.hypot(s.rover.x + 15, s.rover.z + 13) <= 22;
-          if (atBase) {
-            outpostConsoleRef.current = {
-              ...outpostConsoleRef.current,
-              planet: s.rover.planet,
-              open: true,
-            };
-            soundSynth.playClick();
-            syncUiNow();
-            return;
-          }
         }
         if (e.code === 'Digit1') s.rover.driveMode = 'DRIVE';
         if (e.code === 'Digit2') s.rover.driveMode = 'CRAB';
@@ -1987,7 +1939,6 @@ export default function App() {
     fieldNotebookOpen,
     handleOpenLearnForObjective,
     jumpToPhase,
-    nasaModalOpen,
     openMenuWithTab,
     syncUiNow,
   ]);
@@ -2142,12 +2093,10 @@ export default function App() {
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
     if (
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
-      learnModalUi?.open ||
-      outpostConsoleUi.open
+      learnModalUi?.open
     ) {
       return;
     }
@@ -2167,12 +2116,10 @@ export default function App() {
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
     if (
       menuOpen ||
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
-      learnModalUi?.open ||
-      outpostConsoleUi.open
+      learnModalUi?.open
     ) {
       return;
     }
@@ -2261,7 +2208,7 @@ export default function App() {
 
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
     if (simRef.current.phase !== 'inspector') return;
-    if (menuOpen || nasaModalOpen || fieldNotebookOpen) return;
+    if (menuOpen || fieldNotebookOpen) return;
     const hit = sceneMgrRef.current?.pickInspectorHit(
       e.clientX,
       e.clientY,
@@ -2279,12 +2226,10 @@ export default function App() {
 
   const handleCanvasWheel = (e: React.WheelEvent) => {
     if (
-      nasaModalOpen ||
       fieldNotebookOpen ||
       discoveryObjUi ||
       drillingConsoleUi?.open ||
-      learnModalUi?.open ||
-      outpostConsoleUi.open
+      learnModalUi?.open
     ) {
       return;
     }
@@ -2532,13 +2477,6 @@ export default function App() {
         <MobileAcademyView
           donki={donki}
           osdr={osdr}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
-        />
-        <NasaDataModal
-          open={nasaModalOpen}
-          donki={donki}
-          osdr={osdr}
-          onClose={() => setNasaModalOpen(false)}
         />
       </div>
     );
@@ -2612,7 +2550,6 @@ export default function App() {
             jumpToPhase('briefing');
           }}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
           onOpenMenuTab={openMenuWithTab}
           muted={muted}
           onToggleMute={toggleMute}
@@ -2693,18 +2630,15 @@ export default function App() {
           osdr={osdr}
           onBack={() => jumpToPhase('title')}
           onLaunch={startActiveMission}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
 
       {phase === 'rover' &&
         !menuOpen &&
-        !nasaModalOpen &&
         !fieldNotebookOpen &&
         !drillingConsoleUi?.open &&
         !learnModalUi?.open &&
-        !outpostConsoleUi.open &&
         !discoveryObjUi && (
           <WorldTargetPins
             prompts={worldPrompts}
@@ -2713,15 +2647,6 @@ export default function App() {
             onInteractObjective={(objId) => {
               const obj = objectivesUi.find((o) => o.id === objId);
               if (obj) handleOpenLearnForObjective(obj);
-            }}
-            onOpenOutpost={() => {
-              outpostConsoleRef.current = {
-                ...outpostConsoleRef.current,
-                planet: simRef.current.rover.planet,
-                open: true,
-              };
-              soundSynth.playClick();
-              syncUiNow();
             }}
             onQueueMarsTarget={(prompt) => {
               soundSynth.init();
@@ -2887,7 +2812,6 @@ export default function App() {
           onOpenBriefing={() => jumpToPhase('briefing')}
           onOpenHardwareBay={() => jumpToPhase('inspector')}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
           onToggleAutoPilot={() => {
             simRef.current.space.autoPilot = !simRef.current.space.autoPilot;
             syncUiNow();
@@ -2957,8 +2881,7 @@ export default function App() {
               simRef.current.mastPanRad = 0;
               sceneMgrRef.current?.resetWheelTracks();
               simRef.current.objectives = clonePlanetObjectives(pose.planet);
-              outpostConsoleRef.current = createInitialOutpostConsoleState(pose.planet);
-              simRef.current.unstow = null;
+                simRef.current.unstow = null;
               simRef.current.phase = 'rover';
               soundSynth.playSuccess();
               syncUiNow();
@@ -3008,15 +2931,6 @@ export default function App() {
           }}
           onOpenDrillConsole={(obj) => {
             handleOpenLearnForObjective(obj);
-          }}
-          onOpenOutpostConsole={() => {
-            outpostConsoleRef.current = {
-              ...outpostConsoleRef.current,
-              planet: simRef.current.rover.planet,
-              open: true,
-            };
-            soundSynth.playClick();
-            syncUiNow();
           }}
           onOpenMenuTab={openMenuWithTab}
           onSetDriveMode={(mode: RoverDriveMode) => {
@@ -3085,17 +2999,6 @@ export default function App() {
           />
         )}
 
-      {!menuOpen && !discoveryObjUi && (
-        <CalmFactToast
-          fact={activeToastFact}
-          onDismiss={() => {
-            activeToastRef.current = null;
-            toastVisibleSecRef.current = 0;
-            setActiveToastFact(null);
-          }}
-        />
-      )}
-
       <GameMenuModal
         open={menuOpen}
         activeTab={menuTab}
@@ -3124,17 +3027,7 @@ export default function App() {
           closeMenu();
           jumpToPhase('title');
         }}
-        onOpenOutpostConsole={() => {
-          outpostConsoleRef.current = {
-            ...outpostConsoleRef.current,
-            planet: simRef.current.rover.planet,
-            open: true,
-          };
-          soundSynth.playClick();
-          syncUiNow();
-        }}
         onOpenFieldLedger={() => setFieldNotebookOpen(true)}
-        onOpenNasaModal={() => setNasaModalOpen(true)}
         onJumpToInspector={() => jumpToPhase('inspector')}
         onToggleSpeedScale={() => {
           soundSynth.playClick();
@@ -3335,54 +3228,6 @@ export default function App() {
         />
       )}
 
-      {outpostConsoleUi.open && (
-        <OutpostConsoleModal
-          state={outpostConsoleUi}
-          resources={resourcesUi}
-          carryover={carryoverUi}
-          dustPct={roverUi.dustAccumulationPct}
-          onClose={() => {
-            outpostConsoleRef.current = { ...outpostConsoleRef.current, open: false };
-            syncUiNow();
-          }}
-          onToggleAirlock={() => {
-            outpostConsoleRef.current = toggleOutpostAirlock(outpostConsoleRef.current);
-            soundSynth.playAirlockCycle();
-            syncUiNow();
-          }}
-          onSelectRoom={(room: OutpostInteriorRoom) => {
-            outpostConsoleRef.current = { ...outpostConsoleRef.current, activeRoom: room };
-            soundSynth.playClick();
-            syncUiNow();
-          }}
-          onSwitchPowerSource={(mode: PowerSourceMode) => {
-            outpostConsoleRef.current = switchOutpostPowerSource(outpostConsoleRef.current, mode);
-            simRef.current.kilopowerActive = outpostConsoleRef.current.kilopowerActive;
-            soundSynth.playClick();
-            syncUiNow();
-          }}
-          onAdvanceSol={() => {
-            const solNum = outpostConsoleRef.current.solNumber + 1;
-            const kilopower = outpostConsoleRef.current.powerSource === 'kilopower';
-            simRef.current.resources = {
-              power: clamp(
-                simRef.current.resources.power + (kilopower ? 25 : 15),
-                15,
-                100
-              ),
-              oxygen: clamp(simRef.current.resources.oxygen + 18, 15, 100),
-              shield: clamp(simRef.current.resources.shield + 14, 15, 100),
-            };
-            outpostConsoleRef.current = {
-              ...outpostConsoleRef.current,
-              solNumber: solNum,
-            };
-            soundSynth.playSuccess();
-            syncUiNow();
-          }}
-        />
-      )}
-
       {discoveryObjUi && (
         <OutcomeModal
           mode="discovery"
@@ -3428,13 +3273,6 @@ export default function App() {
           onBackToTitle={() => jumpToPhase('title')}
         />
       )}
-
-      <NasaDataModal
-        open={nasaModalOpen}
-        donki={donki}
-        osdr={osdr}
-        onClose={() => setNasaModalOpen(false)}
-      />
 
       <FieldNotebookModal
         open={fieldNotebookOpen}

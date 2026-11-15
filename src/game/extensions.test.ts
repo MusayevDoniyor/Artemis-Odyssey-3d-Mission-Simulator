@@ -37,13 +37,6 @@ import {
   stepDrillingConsole,
 } from './drilling';
 import {
-  buildSolSummaryReport,
-  createInitialOutpostConsoleState,
-  stepAirlockCycle,
-  switchOutpostPowerSource,
-  toggleOutpostAirlock,
-} from './outpost';
-import {
   clearMarsQueue,
   computeSafeRoverPath,
   createInitialMarsQueueState,
@@ -281,33 +274,6 @@ test('TRIDENT drilling console handles strata progression, overheating at >=95C,
   }
   assert.equal(drill.completed, true);
   assert.equal(drill.collectedStrata.length, 4);
-});
-
-test('Outpost airlock cycles cleanly, Kilopower switches bus, and Sol report summarizes trade-offs', () => {
-  let outpost = createInitialOutpostConsoleState('mars');
-  assert.equal(outpost.airlockStage, 'EXTERIOR_OPEN');
-  outpost = toggleOutpostAirlock(outpost);
-  assert.equal(outpost.airlockStage, 'REPRESSURIZING');
-
-  for (let i = 0; i < 25; i++) {
-    outpost = stepAirlockCycle(outpost, 0.1);
-  }
-  assert.equal(outpost.airlockStage, 'SEALED_INT');
-
-  outpost = switchOutpostPowerSource(outpost, 'kilopower');
-  assert.equal(outpost.kilopowerActive, true);
-
-  const report = buildSolSummaryReport(
-    'mars',
-    { power: 40, oxygen: 65, shield: 70 },
-    createInitialCampaignCarryover(),
-    'kilopower',
-    2,
-    45
-  );
-  assert.equal(report.solNumber, 2);
-  assert.ok(report.highlights.length >= 1);
-  assert.ok(report.recommendation.toLowerCase().includes('power'));
 });
 
 test('Mars waypoint batch queue clamps coords, transmits across lag, steers, and triggers arrival drill', () => {
