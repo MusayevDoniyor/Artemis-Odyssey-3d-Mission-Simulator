@@ -69,7 +69,7 @@ function ResourceGaugeStrip({ resources }: { resources: ResourceState }) {
   ];
 
   return (
-    <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl border border-cyan-500/20 bg-slate-950/80 p-3 text-left text-xs">
+    <div className="mt-4 grid grid-cols-3 gap-2.5 rounded-xl border border-cyan-500/20 bg-slate-950/95 p-3 text-left text-xs">
       {items.map((item) => (
         <div key={item.label}>
           <div className="mb-1 flex items-center justify-between gap-1">
@@ -106,7 +106,7 @@ export function OutcomeModal({
 }: OutcomeModalProps) {
   if (mode === 'discovery' && discoveryObjective) {
     return (
-      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/86 p-4 backdrop-blur-md">
+      <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
         <div className="hud-panel tactical-frame animate-modal-enter w-full max-w-lg rounded-2xl p-6">
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-cyan-500/20 pb-2.5">
             <span className="font-hud text-[11px] font-bold tracking-[0.16em] text-emerald-300 uppercase">
@@ -120,7 +120,7 @@ export function OutcomeModal({
             {discoveryObjective.rewardText}
           </p>
 
-          <div className="mt-3.5 rounded-xl border border-cyan-500/25 bg-slate-950/80 p-3.5 text-sm leading-relaxed text-slate-100">
+          <div className="mt-3.5 rounded-xl border border-cyan-500/25 bg-slate-950/95 p-3.5 text-sm leading-relaxed text-slate-100">
             {discoveryObjective.nasaFact}
           </div>
 
@@ -157,7 +157,7 @@ export function OutcomeModal({
           : 'ERR // LUNAR-EDL-IMPACT';
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/86 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
       <div className={`${panelClass} animate-modal-enter w-full max-w-xl rounded-2xl p-6`}>
         {mode === 'pause' && (
           <div className="text-center">
@@ -199,7 +199,7 @@ export function OutcomeModal({
             </div>
 
             {failTelemetry?.crashKind === 'landing' && (
-              <div className="mt-3.5 grid grid-cols-2 gap-2.5 rounded-xl border border-rose-500/25 bg-slate-950/75 p-3 text-xs">
+              <div className="mt-3.5 grid grid-cols-2 gap-2.5 rounded-xl border border-rose-500/25 bg-slate-950/95 p-3 text-xs">
                 <div>
                   <span className="block font-hud text-[10px] font-bold text-slate-400 uppercase">
                     Impact Sink Rate

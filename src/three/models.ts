@@ -111,8 +111,8 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   earthGroup.add(earthAtmo);
   group.add(earthGroup);
 
-  // 2. Displaced Dual-Planet Surface Terrain (520m x 520m covering ±140m corridors)
-  const terrainGeo = new THREE.PlaneGeometry(520, 520, 150, 150);
+  // 2. Displaced Dual-Planet Surface Terrain (780m x 780m covering ±260m corridors)
+  const terrainGeo = new THREE.PlaneGeometry(780, 780, 168, 168);
   terrainGeo.rotateX(-Math.PI / 2);
 
   const rebuildTerrainGeometry = (planet: SurfacePlanet) => {
@@ -418,10 +418,10 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
     metalness: 0.04,
   });
   [
-    { x: 78, z: -84, rTop: 11, rBot: 17, h: 12 },
-    { x: -88, z: -64, rTop: 9, rBot: 15, h: 11 },
-    { x: 92, z: 72, rTop: 10, rBot: 16, h: 10 },
-    { x: -82, z: 86, rTop: 12, rBot: 18, h: 13 },
+    { x: 142, z: -148, rTop: 15, rBot: 23, h: 15 },
+    { x: -156, z: -116, rTop: 14, rBot: 22, h: 14 },
+    { x: 152, z: 126, rTop: 13, rBot: 21, h: 12 },
+    { x: -142, z: 158, rTop: 16, rBot: 24, h: 16 },
   ].forEach((m) => {
     const mesa = new THREE.Mesh(new THREE.CylinderGeometry(m.rTop, m.rBot, m.h, 7), mesaMat);
     mesa.position.set(m.x, getSurfaceTerrainHeight('mars', m.x, m.z) + m.h * 0.4, m.z);
@@ -438,23 +438,23 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
   marsDecorGroup.add(phobos);
   group.add(marsDecorGroup);
 
-  // 5. Instanced Boulders (expanded across ±138m corridors, clean around all Moon & Mars waypoints)
+  // 5. Instanced Boulders (expanded across ±260m corridors, clean around all Moon & Mars waypoints)
   const allStations = [...MOON_OBJECTIVES, ...MARS_OBJECTIVES];
   const allLandingZones = [...MOON_LANDING_ZONES, ...MARS_LANDING_ZONES];
   const boulderSpecs: Array<{ x: number; yMoon: number; yMars: number; z: number; s: number; rot: number }> = [];
-  for (let i = 0; i < 96; i++) {
+  for (let i = 0; i < 136; i++) {
     const angle = i * 2.39996;
-    const dist = 20 + i * 1.42;
+    const dist = 22 + i * 1.68;
     const rx = Math.cos(angle) * dist;
     const rz = Math.sin(angle) * dist;
-    const nearObj = allStations.some((o) => Math.hypot(rx - o.x, rz - o.z) < 7.5);
-    const nearPad = allLandingZones.some((lz) => Math.hypot(rx - lz.x, rz - lz.z) < lz.radius + 3.5);
-    const nearHab = Math.hypot(rx + 15, rz + 13) < 13;
+    const nearObj = allStations.some((o) => Math.hypot(rx - o.x, rz - o.z) < 9.5);
+    const nearPad = allLandingZones.some((lz) => Math.hypot(rx - lz.x, rz - lz.z) < lz.radius + 4.0);
+    const nearHab = Math.hypot(rx + 15, rz + 13) < 14;
     if (nearObj || nearPad || nearHab) continue;
 
     const yMoon = getSurfaceTerrainHeight('moon', rx, rz);
     const yMars = getSurfaceTerrainHeight('mars', rx, rz);
-    const s = 0.48 + (i % 6) * 0.22;
+    const s = 0.52 + (i % 6) * 0.24;
     boulderSpecs.push({ x: rx, yMoon, yMars, z: rz, s, rot: i * 0.7 });
     const c: RoverCollider = { x: rx, z: rz, r: s * 1.05, type: 'rock', label: 'Surface Boulder' };
     moonColliders.push(c);
@@ -1083,6 +1083,9 @@ export interface ViperRoverHandles {
   panelMat: THREE.MeshStandardMaterial;
   strobeMesh: THREE.Mesh;
   headlight: THREE.SpotLight;
+  headlightBounce: THREE.PointLight;
+  headlightBeams: THREE.Group;
+  headlampLensMat: THREE.MeshBasicMaterial;
 }
 
 export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
@@ -1211,11 +1214,62 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
   });
   commsGroup.add(camHead);
 
-  const headlight = new THREE.SpotLight(0xe0f2fe, 2.2, 38, Math.PI / 4, 0.45, 1);
-  headlight.position.set(-0.34, 2.3, 0.92);
-  headlight.target.position.set(0, 0, 12);
+  const headlampLensMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+  [-0.36, 0.36].forEach((hx) => {
+    const lampHousing = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.1), darkMetal);
+    lampHousing.position.set(hx, 1.05, 0.96);
+    bodyGroup.add(lampHousing);
+    const lampLens = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.075, 0.04), headlampLensMat);
+    lampLens.position.set(hx, 1.05, 1.01);
+    bodyGroup.add(lampLens);
+  });
+
+  const headlight = new THREE.SpotLight(0xe0f2fe, 44, 74, Math.PI / 4, 0.45, 0.55);
+  headlight.position.set(0, 1.25, 1.05);
+  headlight.target.position.set(0, -0.8, 15);
   commsGroup.add(headlight);
   commsGroup.add(headlight.target);
+
+  const headlightBounce = new THREE.PointLight(0xfef9c3, 6.5, 20);
+  headlightBounce.position.set(0, 1.35, 2.6);
+  commsGroup.add(headlightBounce);
+
+  const headlightBeams = new THREE.Group();
+  const beamCoreMat = new THREE.MeshBasicMaterial({
+    color: 0xfef9c3,
+    transparent: true,
+    opacity: 0.11,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
+  const beamOuterMat = new THREE.MeshBasicMaterial({
+    color: 0xbae6fd,
+    transparent: true,
+    opacity: 0.055,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
+  [-0.36, 0.36].forEach((bx) => {
+    // Narrow aperture (0.07m) at the LED lamp lens (z=0), widening forward along +Z to 1.35m / 2.1m
+    const coreGeo = new THREE.CylinderGeometry(0.06, 1.15, 12.5, 20, 1, true);
+    coreGeo.rotateX(-Math.PI / 2);
+    coreGeo.translate(0, 0, 6.25);
+    const coreBeam = new THREE.Mesh(coreGeo, beamCoreMat);
+    coreBeam.position.set(bx, 1.05, 1.04);
+    coreBeam.rotation.x = 0.09;
+    headlightBeams.add(coreBeam);
+
+    const outerGeo = new THREE.CylinderGeometry(0.09, 2.05, 14.5, 20, 1, true);
+    outerGeo.rotateX(-Math.PI / 2);
+    outerGeo.translate(0, 0, 7.25);
+    const outerBeam = new THREE.Mesh(outerGeo, beamOuterMat);
+    outerBeam.position.set(bx, 1.05, 1.04);
+    outerBeam.rotation.x = 0.09;
+    headlightBeams.add(outerBeam);
+  });
+  bodyGroup.add(headlightBeams);
 
   // Rear High-Gain Parabolic Dish (tilted upward/aft) + Vertical Comms Whip Antenna
   const dish = new THREE.Mesh(
@@ -1240,18 +1294,18 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
   tagPart(commsGroup, 'rover-comms');
   bodyGroup.add(commsGroup);
 
-  // Forward 2-Segment Articulated TRIDENT Ice Drill Arm + Helical Auger Spiral Collars
+  // Forward 2-Segment Articulated TRIDENT Ice Drill Arm + Helical Auger Spiral Collars (stowed clearly off terrain)
   const drillArm = new THREE.Group();
-  drillArm.position.set(0.46, 0.88, 0.9);
+  drillArm.position.set(0.46, 0.98, 0.9);
   const boom1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.62), frameMat);
   boom1.position.set(0, 0.04, 0.3);
   drillArm.add(boom1);
 
   const housing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.085, 0.075, 0.64, 12),
+    new THREE.CylinderGeometry(0.085, 0.075, 0.56, 12),
     darkMetal
   );
-  housing.position.set(0, -0.26, 0.62);
+  housing.position.set(0, -0.22, 0.62);
   drillArm.add(housing);
 
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.1, 12), foilMat);
@@ -1357,7 +1411,21 @@ export function createViperRover(tex: ProceduralTextureSet): ViperRoverHandles {
     wheelModules.push({ pivot, spin, arm, knuckle, side, forward, baseY: 0.34 });
   });
 
-  return { group, bodyGroup, wheelModules, drillArm, drillBit, dish, camHead, panelMat, strobeMesh, headlight };
+  return {
+    group,
+    bodyGroup,
+    wheelModules,
+    drillArm,
+    drillBit,
+    dish,
+    camHead,
+    panelMat,
+    strobeMesh,
+    headlight,
+    headlightBounce,
+    headlightBeams,
+    headlampLensMat,
+  };
 }
 
 export interface LaunchComplexHandles {
@@ -1679,30 +1747,79 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
     g.add(fl);
   });
 
-  // LC-39B Deluge Water Tower & Spherical LH2 / LOX Cryo Storage Tanks
+  // LC-39B Deluge Water Tower (4-Leg X-Braced Truss + Catwalk Ring + Deluge Drum)
   const waterTower = new THREE.Group();
   waterTower.position.set(-34, 0, -14);
-  const wtLegs = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 2.2, 13, 8, 1, true), steelMat);
-  wtLegs.position.y = 6.5;
-  waterTower.add(wtLegs);
-  const wtBowl = new THREE.Mesh(new THREE.SphereGeometry(3.2, 18, 14), whiteTankMat);
-  wtBowl.scale.set(1, 0.78, 1);
-  wtBowl.position.y = 14.5;
-  wtBowl.castShadow = true;
-  waterTower.add(wtBowl);
+  const wtCorners: Array<[number, number]> = [
+    [-1.4, -1.4],
+    [1.4, -1.4],
+    [-1.4, 1.4],
+    [1.4, 1.4],
+  ];
+  wtCorners.forEach(([lx, lz]) => {
+    waterTower.add(
+      createStrutBetween(
+        new THREE.Vector3(lx * 1.45, 0, lz * 1.45),
+        new THREE.Vector3(lx * 0.85, 13.0, lz * 0.85),
+        0.14,
+        0.22,
+        steelMat
+      )
+    );
+  });
+  [4.4, 8.8].forEach((ry) => {
+    const s = 1.45 - (ry / 13.0) * 0.6;
+    waterTower.add(createStrutBetween(new THREE.Vector3(-1.4 * s, ry, -1.4 * s), new THREE.Vector3(1.4 * s, ry, -1.4 * s), 0.08, 0.08, steelMat));
+    waterTower.add(createStrutBetween(new THREE.Vector3(-1.4 * s, ry, 1.4 * s), new THREE.Vector3(1.4 * s, ry, 1.4 * s), 0.08, 0.08, steelMat));
+    waterTower.add(createStrutBetween(new THREE.Vector3(-1.4 * s, ry, -1.4 * s), new THREE.Vector3(-1.4 * s, ry, 1.4 * s), 0.08, 0.08, steelMat));
+    waterTower.add(createStrutBetween(new THREE.Vector3(1.4 * s, ry, -1.4 * s), new THREE.Vector3(1.4 * s, ry, 1.4 * s), 0.08, 0.08, steelMat));
+  });
+  const wtRiser = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 13.2, 12), whiteTankMat);
+  wtRiser.position.y = 6.6;
+  waterTower.add(wtRiser);
+  const wtCatwalk = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 0.24, 16), steelMat);
+  wtCatwalk.position.y = 13.0;
+  waterTower.add(wtCatwalk);
+  const wtDrum = new THREE.Mesh(new THREE.CylinderGeometry(2.85, 2.85, 4.2, 24), whiteTankMat);
+  wtDrum.position.y = 15.2;
+  wtDrum.castShadow = true;
+  waterTower.add(wtDrum);
+  const wtCap = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.4, 24), whiteTankMat);
+  wtCap.position.y = 18.0;
+  waterTower.add(wtCap);
   g.add(waterTower);
 
+  // Spherical LH2 & LOX Cryo Storage Vessels on Braced Ring Legs
   [
     [32, -16, 3.6],
     [38, -8, 2.8],
   ].forEach(([cx, cz, rad]) => {
-    const sphere = new THREE.Mesh(new THREE.SphereGeometry(rad, 20, 16), whiteTankMat);
-    sphere.position.set(cx, rad + 1.4, cz);
+    const cryo = new THREE.Group();
+    cryo.position.set(cx, 0, cz);
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(rad, 24, 18), whiteTankMat);
+    sphere.position.y = rad + 1.8;
     sphere.castShadow = true;
-    g.add(sphere);
-    const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.78, rad * 0.9, 1.6, 12), steelMat);
-    baseRing.position.set(cx, 0.8, cz);
-    g.add(baseRing);
+    cryo.add(sphere);
+    const eqRing = new THREE.Mesh(new THREE.TorusGeometry(rad * 1.01, 0.14, 8, 24), steelMat);
+    eqRing.rotation.x = Math.PI / 2;
+    eqRing.position.y = rad + 1.8;
+    cryo.add(eqRing);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      cryo.add(
+        createStrutBetween(
+          new THREE.Vector3(Math.cos(a) * rad * 0.96, 0, Math.sin(a) * rad * 0.96),
+          new THREE.Vector3(Math.cos(a) * rad * 0.96, rad + 1.8, Math.sin(a) * rad * 0.96),
+          0.14,
+          0.18,
+          steelMat
+        )
+      );
+    }
+    const ventStack = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 1.6, 10), steelMat);
+    ventStack.position.y = rad * 2 + 2.1;
+    cryo.add(ventStack);
+    g.add(cryo);
   });
 
   // Elevated Insulated LOX / LH2 Cryogenic Transfer Pipes connecting Spheres to Mobile Launcher
@@ -1771,41 +1888,30 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   vabGroup.add(vabStripe);
   g.add(vabGroup);
 
-  // S-Band Telemetry Tracking Dish Station
+  // S-Band Telemetry Tracking Dish Station (Lattice Pedestal + Elevation Yoke + Tripod Feedhorn)
   const dishBase = new THREE.Group();
   dishBase.position.set(42, 0, 28);
-  const dPedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.45, 5.2, 12), whiteTankMat);
-  dPedestal.position.y = 2.6;
+  const dFoot = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.2, 0.8, 12), steelMat);
+  dFoot.position.y = 0.4;
+  dishBase.add(dFoot);
+  const dPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 1.15, 4.4, 12), whiteTankMat);
+  dPedestal.position.y = 2.8;
   dishBase.add(dPedestal);
+  const dYoke = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.65, 1.1), steelMat);
+  dYoke.position.y = 5.1;
+  dishBase.add(dYoke);
   const dDish = new THREE.Mesh(
-    new THREE.SphereGeometry(2.8, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
-    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide })
+    new THREE.SphereGeometry(2.8, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.65, roughness: 0.26, side: THREE.DoubleSide })
   );
-  dDish.position.y = 5.6;
+  dDish.position.y = 6.2;
   dDish.rotation.x = Math.PI * 0.72;
   dishBase.add(dDish);
+  const dFeed = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 1.9, 8), steelMat);
+  dFeed.position.set(0, 6.7, -1.25);
+  dFeed.rotation.x = Math.PI * 0.22;
+  dishBase.add(dFeed);
   g.add(dishBase);
-
-  // Instanced Space Coast Palmetto Scrub Mounds outside Perimeter Road
-  const scrubGeo = new THREE.DodecahedronGeometry(1.4, 1);
-  const scrubMat = new THREE.MeshStandardMaterial({ color: 0x1e3a2f, roughness: 0.94, metalness: 0.02 });
-  const scrubMesh = new THREE.InstancedMesh(scrubGeo, scrubMat, 88);
-  const sd = new THREE.Object3D();
-  for (let i = 0; i < 88; i++) {
-    const ang = (i * 2.39996) % (Math.PI * 2);
-    const rad = 52 + ((i * 19.7) % 92);
-    const sx = Math.cos(ang) * rad;
-    const sz = Math.sin(ang) * rad;
-    if (sz < -105) continue;
-    sd.position.set(sx, 0.05, sz);
-    const sc = 0.7 + ((i * 7) % 10) * 0.14;
-    sd.scale.set(sc * 1.4, sc * 0.55, sc * 1.4);
-    sd.rotation.y = ang;
-    sd.updateMatrix();
-    scrubMesh.setMatrixAt(i, sd.matrix);
-  }
-  scrubMesh.instanceMatrix.needsUpdate = true;
-  g.add(scrubMesh);
 
   return g;
 }
@@ -2487,7 +2593,9 @@ export interface SolarSystemHandles {
   asteroidBelt: THREE.InstancedMesh;
   stormRing: THREE.Mesh;
   satellite: OrbitalSatelliteHandles;
+  relayStageRing: THREE.Group;
   gatewayGroup: THREE.Group;
+  marsPhobos: THREE.Mesh;
   planets: Record<SpaceTargetId, THREE.Mesh>;
   targetBeacon: THREE.Mesh;
   courseLine: THREE.Line;
@@ -2520,6 +2628,17 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   sunOuterGlow.position.copy(sunPos);
   group.add(sunOuterGlow);
 
+  // Solar Coronal Prominence Loops
+  [0.35, -0.55].forEach((rotY, idx) => {
+    const prom = new THREE.Mesh(
+      new THREE.TorusGeometry(12.2 + idx * 0.9, 0.22, 8, 42, Math.PI * 0.85),
+      new THREE.MeshBasicMaterial({ color: 0xfb923c, transparent: true, opacity: 0.55 })
+    );
+    prom.position.copy(sunPos);
+    prom.rotation.set(0.4 + idx * 0.6, rotY, idx * 1.1);
+    group.add(prom);
+  });
+
   const sunLight = new THREE.PointLight(0xfde68a, 4.2, 240);
   sunLight.position.copy(sunPos);
   group.add(sunLight);
@@ -2530,7 +2649,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     new THREE.MeshBasicMaterial({
       color: 0xf43f5e,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.34,
       side: THREE.DoubleSide,
     })
   );
@@ -2538,9 +2657,14 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   stormRing.position.set(sunPos.x, -0.5, sunPos.z);
   group.add(stormRing);
 
-  // Precision Ecliptic Navigation Grid
-  const grid = new THREE.GridHelper(220, 26, 0x06b6d4, 0x162238);
+  // Precision Ecliptic Navigation Grid (calm reference plane so trajectories & ships pop cleanly)
+  const grid = new THREE.GridHelper(220, 24, 0x1e293b, 0x0f172a);
   grid.position.y = -4.2;
+  const gridMats = Array.isArray(grid.material) ? grid.material : [grid.material];
+  gridMats.forEach((m) => {
+    m.transparent = true;
+    m.opacity = 0.36;
+  });
   group.add(grid);
 
   // Earth Departure World (-22, -2, 26) with Continents + Rotating Cloud Sphere + Atmospheric Rayleigh Halo
@@ -2575,8 +2699,51 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   earthGroup.add(earthAtmo);
   group.add(earthGroup);
 
+  // Dashed TLI & Mars Hohmann Transfer Trajectory Arcs
+  const buildTransferArc = (
+    p0: THREE.Vector3,
+    ctrl: THREE.Vector3,
+    p1: THREE.Vector3,
+    color: number
+  ) => {
+    const curve = new THREE.QuadraticBezierCurve3(p0, ctrl, p1);
+    const pts = curve.getPoints(48);
+    const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(
+      arcGeo,
+      new THREE.LineDashedMaterial({ color, dashSize: 1.6, gapSize: 0.9, transparent: true, opacity: 0.52 })
+    );
+    line.computeLineDistances();
+    return line;
+  };
+  group.add(
+    buildTransferArc(
+      new THREE.Vector3(-22, -0.5, 26),
+      new THREE.Vector3(2, -0.2, 8),
+      new THREE.Vector3(SOLAR_TARGETS.moon.x, 0, SOLAR_TARGETS.moon.z),
+      0x38bdf8
+    )
+  );
+  group.add(
+    buildTransferArc(
+      new THREE.Vector3(SOLAR_TARGETS.moon.x, 0, SOLAR_TARGETS.moon.z),
+      new THREE.Vector3(44, 0.2, -2),
+      new THREE.Vector3(SOLAR_TARGETS.gateway.x, 0, SOLAR_TARGETS.gateway.z),
+      0xfacc15
+    )
+  );
+  group.add(
+    buildTransferArc(
+      new THREE.Vector3(SOLAR_TARGETS.gateway.x, 0, SOLAR_TARGETS.gateway.z),
+      new THREE.Vector3(48, 0.8, -28),
+      new THREE.Vector3(SOLAR_TARGETS.mars.x, 0, SOLAR_TARGETS.mars.z),
+      0xf97316
+    )
+  );
+
   // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars
   const planets = {} as Record<SpaceTargetId, THREE.Mesh>;
+  let marsPhobos = new THREE.Mesh();
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
     const spec = SOLAR_TARGETS[id];
     const mat =
@@ -2608,15 +2775,14 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
             });
     const geom =
       id === 'relay-orbit'
-        ? new THREE.SphereGeometry(1.1, 16, 12)
+        ? new THREE.SphereGeometry(0.45, 12, 10)
         : new THREE.SphereGeometry(spec.radius, 36, 28);
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(spec.x, 0, spec.z);
-    if (id === 'gateway') mesh.visible = false;
+    if (id === 'gateway' || id === 'relay-orbit') mesh.visible = false;
     group.add(mesh);
     planets[id] = mesh;
 
-    // Dusty salmon CO2 atmosphere rim around Mars Sphere
     if (id === 'mars') {
       const marsAtmo = new THREE.Mesh(
         new THREE.SphereGeometry(spec.radius * 1.09, 28, 22),
@@ -2630,6 +2796,13 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       );
       marsAtmo.position.copy(mesh.position);
       group.add(marsAtmo);
+
+      marsPhobos = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.65, 1),
+        new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.88 })
+      );
+      marsPhobos.position.set(spec.x + 6.5, 0.9, spec.z);
+      group.add(marsPhobos);
     }
 
     const orbitDist = Math.hypot(spec.x - sunPos.x, spec.z - sunPos.z);
@@ -2638,7 +2811,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       new THREE.MeshBasicMaterial({
         color: id === 'mars' ? 0xf97316 : 0x22d3ee,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.18,
         side: THREE.DoubleSide,
       })
     );
@@ -2673,7 +2846,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   asteroidBelt.computeBoundingSphere();
   group.add(asteroidBelt);
 
-  // Lunar Gateway NRHO Multi-Module Station at gateway target coordinates
+  // Lunar Gateway NRHO Multi-Module Station (PPE + HALO + i-HAB + Twin Radiator/Solar Arrays)
   const gwSpec = SOLAR_TARGETS.gateway;
   const gatewayGroup = new THREE.Group();
   gatewayGroup.position.set(gwSpec.x, 0, gwSpec.z);
@@ -2684,17 +2857,46 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 2.6, 12), gwHull);
   halo.rotation.z = Math.PI / 2;
   halo.position.x = 2.4;
+  const iHab = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 2.1, 12), gwHull);
+  iHab.rotation.z = Math.PI / 2;
+  iHab.position.x = 4.65;
+  const dockNode = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.5, 10), gwHull);
+  dockNode.rotation.x = Math.PI / 2;
+  dockNode.position.set(3.1, 0, 0);
   const gwSolarL = new THREE.Mesh(
-    new THREE.BoxGeometry(0.9, 4.6, 0.08),
+    new THREE.BoxGeometry(0.95, 5.2, 0.08),
     new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.5, roughness: 0.2 })
   );
   gwSolarL.position.set(-0.2, 0, 0);
-  gatewayGroup.add(ppe, halo, gwSolarL);
+  const gwRad = new THREE.Mesh(new THREE.BoxGeometry(0.08, 3.2, 1.1), gwHull);
+  gwRad.position.set(2.4, 1.7, 0);
+  gatewayGroup.add(ppe, halo, iHab, dockNode, gwSolarL, gwRad);
   group.add(gatewayGroup);
 
-  // Modular Orbital Satellite deployed in HERMES Relay Orbit
+  // Orbital Staging Beacon Ring at HERMES Relay Orbit (visible before satellite deployment so sat doesn't appear prematurely)
+  const relayStageRing = new THREE.Group();
+  relayStageRing.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
+  const stageOuter = new THREE.Mesh(
+    new THREE.TorusGeometry(2.6, 0.09, 10, 36),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 })
+  );
+  stageOuter.rotation.x = Math.PI / 2;
+  const stageInner = new THREE.Mesh(
+    new THREE.TorusGeometry(1.4, 0.05, 8, 28),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 })
+  );
+  stageInner.rotation.x = Math.PI / 2;
+  const stageBeacon = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.42, 0),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true })
+  );
+  relayStageRing.add(stageOuter, stageInner, stageBeacon);
+  group.add(relayStageRing);
+
+  // Modular Orbital Satellite deployed from Orion bay in HERMES Relay Orbit
   const satellite = createOrbitalSatellite(tex);
   satellite.group.position.set(SOLAR_TARGETS['relay-orbit'].x, 0, SOLAR_TARGETS['relay-orbit'].z);
+  satellite.group.visible = false;
   group.add(satellite.group);
 
   // Target Selection Beacon Ring
@@ -2705,51 +2907,89 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   targetBeacon.rotation.x = Math.PI / 2;
   group.add(targetBeacon);
 
-  // 3D Orion / European Service Module Spacecraft
+  // 3D NASA Orion MPCV Crew Capsule + European Service Module (ESM) with Iconic Swept X-Wing Solar Arrays
   const shipGroup = new THREE.Group();
-  const hull = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.72, 2.1, 18),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.65, roughness: 0.25 })
-  );
-  hull.rotation.x = Math.PI / 2;
-  shipGroup.add(hull);
+  const silverHull = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.68, roughness: 0.24 });
+  const darkTrim = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
 
-  const esmBand = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.74, 0.74, 0.55, 16),
-    new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.85, roughness: 0.24 })
+  // European Service Module (ESM) cylindrical bus
+  const esmBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.86, 0.84, 1.35, 24),
+    silverHull
   );
-  esmBand.rotation.x = Math.PI / 2;
-  esmBand.position.z = -0.65;
-  shipGroup.add(esmBand);
+  esmBody.rotation.x = Math.PI / 2;
+  esmBody.position.z = -0.78;
+  shipGroup.add(esmBody);
+
+  const esmFoilBand = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.89, 0.89, 0.58, 24),
+    new THREE.MeshStandardMaterial({ map: tex.foilAlbedo, color: 0xffffff, metalness: 0.82, roughness: 0.26 })
+  );
+  esmFoilBand.rotation.x = Math.PI / 2;
+  esmFoilBand.position.z = -0.82;
+  shipGroup.add(esmFoilBand);
 
   const aj10Bell = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18, 0.42, 0.58, 16, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2, side: THREE.DoubleSide })
+    new THREE.CylinderGeometry(0.2, 0.48, 0.66, 18, 1, true),
+    darkTrim
   );
   aj10Bell.rotation.x = Math.PI / 2;
-  aj10Bell.position.z = -1.32;
+  aj10Bell.position.z = -1.78;
   shipGroup.add(aj10Bell);
 
-  const nose = new THREE.Mesh(
-    new THREE.ConeGeometry(0.56, 1.15, 18),
-    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, metalness: 0.4, roughness: 0.32 })
+  // Heatshield collar & Conical White-Tiled Orion Crew Module
+  const heatshield = new THREE.Mesh(new THREE.CylinderGeometry(0.94, 0.9, 0.18, 24), darkTrim);
+  heatshield.rotation.x = Math.PI / 2;
+  heatshield.position.z = 0.0;
+  shipGroup.add(heatshield);
+
+  const crewModule = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.94, 1.05, 24),
+    new THREE.MeshStandardMaterial({ map: tex.orionTile, color: 0xffffff, metalness: 0.36, roughness: 0.32 })
   );
-  nose.rotation.x = Math.PI / 2;
-  nose.position.z = 1.62;
-  shipGroup.add(nose);
+  crewModule.rotation.x = Math.PI / 2;
+  crewModule.position.z = 0.62;
+  shipGroup.add(crewModule);
 
+  // Glowing Crew Module Cockpit Windows + Forward Docking Collar
+  [-0.22, 0.22].forEach((wx, idx) => {
+    const cWin = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.22, 0.14),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    cWin.position.set(wx, 0.46, 0.82);
+    cWin.rotation.set(-0.56, 0, idx === 0 ? 0.18 : -0.18);
+    shipGroup.add(cWin);
+  });
+
+  const dockingCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.32, 16), silverHull);
+  dockingCollar.rotation.x = Math.PI / 2;
+  dockingCollar.position.z = 1.28;
+  shipGroup.add(dockingCollar);
+
+  // 4 ESM RCS Thruster Quads
+  [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4].forEach((ra) => {
+    const rcs = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.28), darkTrim);
+    rcs.position.set(Math.cos(ra) * 0.92, Math.sin(ra) * 0.92, -0.35);
+    shipGroup.add(rcs);
+  });
+
+  // 4 Swept X-Wing Orion ESM Solar Arrays
   const shipWingsGroup = new THREE.Group();
-  const wingMat = new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xffffff, metalness: 0.45, roughness: 0.2 });
-  [-1, 1].forEach((side) => {
-    const wTop = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.05, 0.7), wingMat);
-    wTop.position.set(side * 1.58, 0.24, -0.35);
-    wTop.rotation.z = side * 0.22;
-    shipWingsGroup.add(wTop);
-
-    const wBot = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.05, 0.7), wingMat);
-    wBot.position.set(side * 1.58, -0.24, -0.35);
-    wBot.rotation.z = -side * 0.22;
-    shipWingsGroup.add(wBot);
+  const wingMat = new THREE.MeshStandardMaterial({ map: tex.solarPanel, color: 0xe0f2fe, metalness: 0.48, roughness: 0.2 });
+  [0.52, -0.52, Math.PI - 0.52, Math.PI + 0.52].forEach((ang) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(Math.cos(ang) * 0.88, Math.sin(ang) * 0.88, -0.68);
+    pivot.rotation.z = ang;
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.6, 8), silverHull);
+    strut.rotation.z = Math.PI / 2;
+    strut.position.x = 0.28;
+    pivot.add(strut);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.05, 0.62), wingMat);
+    panel.position.set(1.65, 0, -0.22);
+    panel.rotation.y = 0.24; // Iconic aft sweep
+    pivot.add(panel);
+    shipWingsGroup.add(pivot);
   });
   shipGroup.add(shipWingsGroup);
 
@@ -2758,12 +2998,12 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9 })
   );
   shipFlame.rotation.x = -Math.PI / 2;
-  shipFlame.position.z = -2.35;
+  shipFlame.position.z = -2.85;
   shipFlame.visible = false;
   shipGroup.add(shipFlame);
 
   const shipShieldShell = new THREE.Mesh(
-    new THREE.SphereGeometry(2.35, 18, 16),
+    new THREE.SphereGeometry(2.55, 18, 16),
     new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22, wireframe: true })
   );
   shipShieldShell.visible = false;
@@ -2790,7 +3030,9 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     asteroidBelt,
     stormRing,
     satellite,
+    relayStageRing,
     gatewayGroup,
+    marsPhobos,
     planets,
     targetBeacon,
     courseLine,

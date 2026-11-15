@@ -33,75 +33,75 @@ export function getSurfaceTerrainHeight(planet: SurfacePlanet, x: number, z: num
   const blend = clamp((distPad - 15) / 14, 0, 1);
 
   if (planet === 'mars') {
-    // Jezero Crater sedimentary ripples + dry paleolake channel
+    // Jezero Crater sedimentary ripples + dry paleolake channel across ±260m arena
     let h =
-      Math.sin(x * 0.038 + 0.6) * Math.cos(z * 0.042) * 2.1 +
-      Math.sin(x * 0.095) * Math.cos(z * 0.08 + 1.2) * 0.85;
+      Math.sin(x * 0.028 + 0.6) * Math.cos(z * 0.03) * 2.5 +
+      Math.sin(x * 0.075) * Math.cos(z * 0.068 + 1.2) * 0.95;
 
-    // Ancient Delta Fan Terraces near (54, -58)
-    const dDelta = Math.hypot(x - 54, z + 58);
-    if (dDelta < 24) {
-      h += Math.cos((dDelta / 24) * (Math.PI / 2)) * 3.4;
+    // Ancient Delta Fan Terraces near (126, -134)
+    const dDelta = Math.hypot(x - 126, z + 134);
+    if (dDelta < 38) {
+      h += Math.cos((dDelta / 38) * (Math.PI / 2)) * 4.4;
     }
 
-    // Dry River Channel winding toward Base Delta
-    const channelDist = Math.abs(z + x * 0.65 - 12);
-    if (channelDist < 12 && distPad > 22) {
-      h -= Math.cos((channelDist / 12) * (Math.PI / 2)) * 2.1;
+    // Dry River Channel winding across Jezero floor
+    const channelDist = Math.abs(z + x * 0.58 - 22);
+    if (channelDist < 16 && distPad > 24) {
+      h -= Math.cos((channelDist / 16) * (Math.PI / 2)) * 2.4;
     }
 
-    // Máaz Basalt Ridge at (-66, -42)
-    const dMaaz = Math.hypot(x + 66, z + 42);
-    if (dMaaz < 24) {
-      h += Math.cos((dMaaz / 24) * (Math.PI / 2)) * 5.2;
+    // Máaz Basalt Ridge at (-148, -96)
+    const dMaaz = Math.hypot(x + 148, z + 96);
+    if (dMaaz < 42) {
+      h += Math.cos((dMaaz / 42) * (Math.PI / 2)) * 6.4;
     }
 
-    // Outer Jezero Crater Wall (bounded plateau ridge — never spikes above descent approach ring)
-    if (distPad > 142) {
-      const rimT = clamp((distPad - 142) / 56, 0, 1);
+    // Outer Jezero Crater Wall beyond ±260m playable rim
+    if (distPad > 265) {
+      const rimT = clamp((distPad - 265) / 72, 0, 1);
       const smoothRim = rimT * rimT * (3 - 2 * rimT);
-      h += smoothRim * 17.5 * (0.76 + 0.24 * Math.sin(Math.atan2(z, x) * 5));
+      h += smoothRim * 22.0 * (0.76 + 0.24 * Math.sin(Math.atan2(z, x) * 5));
     }
 
     return h * blend;
   }
 
-  // Moon South Pole: smooth undulating highlands + 4 named corridors across ±140m
+  // Moon South Pole: smooth undulating highlands + 4 named corridors across ±260m
   let h =
-    Math.sin(x * 0.042) * Math.cos(z * 0.042) * 2.3 +
-    Math.sin(x * 0.095 + 1.1) * Math.cos(z * 0.082) * 0.85;
+    Math.sin(x * 0.028) * Math.cos(z * 0.028) * 2.6 +
+    Math.sin(x * 0.072 + 1.1) * Math.cos(z * 0.064) * 0.95;
 
-  // Shackleton Cold Trap Crater at (56, -62)
-  const dIce = Math.hypot(x - 56, z + 62);
-  if (dIce < 18) {
-    h -= Math.cos((dIce / 18) * (Math.PI / 2)) * 4.1;
-  } else if (dIce < 25) {
-    h += Math.sin(((dIce - 18) / 7) * Math.PI) * 1.7;
+  // Shackleton Cold Trap Crater at (128, -142)
+  const dIce = Math.hypot(x - 128, z + 142);
+  if (dIce < 30) {
+    h -= Math.cos((dIce / 30) * (Math.PI / 2)) * 5.2;
+  } else if (dIce < 42) {
+    h += Math.sin(((dIce - 30) / 12) * Math.PI) * 2.2;
   }
 
-  // Cabeus Secondary Shadow Basin at (-54, 66)
-  const dCabeus = Math.hypot(x + 54, z - 66);
-  if (dCabeus < 16) {
-    h -= Math.cos((dCabeus / 16) * (Math.PI / 2)) * 3.2;
+  // Cabeus Secondary Shadow Basin at (-124, 152)
+  const dCabeus = Math.hypot(x + 124, z - 152);
+  if (dCabeus < 28) {
+    h -= Math.cos((dCabeus / 28) * (Math.PI / 2)) * 4.2;
   }
 
-  // Malapert Sunlit Ridge at (-64, -48)
-  const dRidge = Math.hypot(x + 64, z + 48);
-  if (dRidge < 24) {
-    h += Math.cos((dRidge / 24) * (Math.PI / 2)) * 4.8;
+  // Malapert Sunlit Ridge at (-148, -108)
+  const dRidge = Math.hypot(x + 148, z + 108);
+  if (dRidge < 40) {
+    h += Math.cos((dRidge / 40) * (Math.PI / 2)) * 6.2;
   }
 
-  // Nobile Highland Quarry Bench at (52, 58)
-  const dNobile = Math.hypot(x - 52, z - 58);
-  if (dNobile < 20) {
-    h += Math.cos((dNobile / 20) * (Math.PI / 2)) * 2.9;
+  // Nobile Highland Quarry Bench at (118, 134)
+  const dNobile = Math.hypot(x - 118, z - 134);
+  if (dNobile < 34) {
+    h += Math.cos((dNobile / 34) * (Math.PI / 2)) * 3.8;
   }
 
-  // Outer South Pole mountain rim outside expanded ±140m perimeter (bounded crest plateau)
-  if (distPad > 142) {
-    const rimT = clamp((distPad - 142) / 56, 0, 1);
+  // Outer South Pole mountain rim outside expanded ±260m perimeter
+  if (distPad > 265) {
+    const rimT = clamp((distPad - 265) / 72, 0, 1);
     const smoothRim = rimT * rimT * (3 - 2 * rimT);
-    h += smoothRim * 16.5 * (0.74 + 0.26 * Math.sin(Math.atan2(z, x) * 6));
+    h += smoothRim * 21.0 * (0.74 + 0.26 * Math.sin(Math.atan2(z, x) * 6));
   }
 
   return h * blend;
@@ -1046,22 +1046,22 @@ export function stepRoverPhysics(
 
   if (r.planet === 'mars') {
     // Signal tracks organic/clay delta & carbonate shelves; high wind near Máaz clears dust
-    const distDelta = Math.hypot(r.x - 54, r.z + 58);
-    const distCarb = Math.hypot(r.x - 48, r.z - 62);
+    const distDelta = Math.hypot(r.x - 126, r.z + 134);
+    const distCarb = Math.hypot(r.x - 112, r.z - 142);
     const nearestSig = Math.min(distDelta, distCarb);
-    r.hydrogenSignal = Math.round(Math.max(14, 220 * Math.exp(-nearestSig / 26)));
+    r.hydrogenSignal = Math.round(Math.max(14, 220 * Math.exp(-nearestSig / 52)));
 
-    const dMaaz = Math.hypot(r.x + 66, r.z + 42);
-    if (dMaaz < 22) {
+    const dMaaz = Math.hypot(r.x + 148, r.z + 96);
+    if (dMaaz < 34) {
       r.dustAccumulationPct = clamp(r.dustAccumulationPct - 6.5 * dt, 2, 65);
     } else if (Math.abs(r.speed) > 0.5) {
-      r.dustAccumulationPct = clamp(r.dustAccumulationPct + 0.45 * dt, 2, 65);
+      r.dustAccumulationPct = clamp(r.dustAccumulationPct + 0.42 * dt, 2, 65);
     }
   } else {
-    const distShack = Math.hypot(r.x - 56, r.z + 62);
-    const distCabeus = Math.hypot(r.x + 54, r.z - 66);
+    const distShack = Math.hypot(r.x - 128, r.z + 142);
+    const distCabeus = Math.hypot(r.x + 124, r.z - 152);
     const nearestIce = Math.min(distShack, distCabeus);
-    r.hydrogenSignal = Math.round(Math.max(12, 240 * Math.exp(-nearestIce / 26)));
+    r.hydrogenSignal = Math.round(Math.max(12, 240 * Math.exp(-nearestIce / 52)));
     r.dustAccumulationPct = 0;
   }
 

@@ -1,4 +1,4 @@
-import { BookOpen, Camera, CheckCircle2, Database, Pause, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Camera, CheckCircle2, Database, Pause, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import { getRoverMissionProgress } from '../game/missionProgress';
 import type {
   CameraMode,
@@ -10,7 +10,10 @@ import type {
   RoverObjective,
   RoverState,
 } from '../game/types';
+import { getRoverWarnings } from '../game/warnings';
+import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionWarningBanner } from './MissionWarningBanner';
 import { RoverSpeedometer } from './RoverSpeedometer';
 import { SurfaceMapPanel } from './SurfaceMapPanel';
 
@@ -22,6 +25,7 @@ interface RoverHUDProps {
   carryover: CampaignCarryoverState;
   activeAnomaly: MissionAnomaly | null;
   nearestObjective: RoverObjective | null;
+  donkiFlareActive: boolean;
   cameraMode: CameraMode;
   mapExpanded: boolean;
   muted: boolean;
@@ -35,6 +39,9 @@ interface RoverHUDProps {
   onResolveAnomaly: (anomalyId: string, choiceId: string) => void;
   onOpenNasaModal: () => void;
   onOpenNotebook: () => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
 }
 
 const DRIVE_MODES: Array<{ id: RoverDriveMode; keyHint: string; label: string }> = [
@@ -52,6 +59,7 @@ export function RoverHUD({
   carryover,
   activeAnomaly,
   nearestObjective,
+  donkiFlareActive,
   cameraMode,
   mapExpanded,
   muted,
@@ -65,17 +73,22 @@ export function RoverHUD({
   onResolveAnomaly,
   onOpenNasaModal,
   onOpenNotebook,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
 }: RoverHUDProps) {
   const isMars = rover.planet === 'mars';
   const missionProgress = getRoverMissionProgress(rover, objectives);
+  const atBaseCamp = Math.hypot(rover.x + 15, rover.z + 13) <= 22;
   const isMoving =
     roverInput.forward || roverInput.backward || roverInput.left || roverInput.right;
   const wheelGlowTone = roverInput.backward ? 'amber' : isMars ? 'orange' : 'cyan';
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2">
         <MissionProgressBar info={missionProgress} />
+        <MissionWarningBanner warnings={getRoverWarnings(rover, resources, donkiFlareActive)} />
 
         {/* Top Bar: Science Checklist + Interactive Topographic Map (Left) | Resources & Anomaly (Right) */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -98,8 +111,8 @@ export function RoverHUD({
                     key={obj.id}
                     className={`flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-xs ${
                       obj.completed
-                        ? 'bg-emerald-500/15 text-emerald-200'
-                        : 'bg-slate-900/80 text-slate-100'
+                        ? 'bg-emerald-950/90 text-emerald-200'
+                        : 'bg-slate-900/95 text-slate-100'
                     }`}
                   >
                     <span className="inline-flex items-center gap-2 font-hud font-semibold">
@@ -124,7 +137,7 @@ export function RoverHUD({
             </div>
           </div>
 
-          {/* Interactive Topographic Surface Map (±138m Moon / Mars) */}
+          {/* Interactive Topographic Surface Map (±260m Moon / Mars) */}
           <SurfaceMapPanel
             planet={rover.planet}
             rover={rover}
@@ -224,6 +237,24 @@ export function RoverHUD({
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {atBaseCamp && (
+              <div
+                data-testid="basecamp-shelter-badge"
+                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/70 bg-emerald-950/95 px-2.5 py-1 font-hud text-[10px] font-bold tracking-wider text-emerald-200 uppercase"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+                Sheltered at Base Camp (+PWR · +O₂ · +SHD)
+              </div>
+            )}
+            <CameraViewControls
+              compact
+              onSelectPreset={onSetCameraPreset}
+              onZoom={onZoomCamera}
+              onReset={onResetCamera}
+            />
+          </div>
+
           {/* Applied Knowledge Crisis Trade-Off Card */}
           {activeAnomaly && !activeAnomaly.resolvedChoiceId && (
             <div
@@ -248,7 +279,7 @@ export function RoverHUD({
                     key={choice.id}
                     type="button"
                     onClick={() => onResolveAnomaly(activeAnomaly.id, choice.id)}
-                    className="rounded-lg border border-cyan-500/25 bg-slate-950/85 px-3 py-1.5 text-left text-xs font-semibold text-slate-100 transition hover:border-amber-400"
+                    className="rounded-lg border border-cyan-500/25 bg-slate-950/95 px-3 py-1.5 text-left text-xs font-semibold text-slate-100 transition hover:border-amber-400"
                   >
                     {choice.label}
                   </button>
@@ -290,7 +321,7 @@ export function RoverHUD({
 
         <div className="hud-panel pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs">
           {/* 4 Rover/Walker Drive Modes */}
-          <div className="flex items-center gap-1 rounded-lg bg-slate-950/70 p-1">
+          <div className="flex items-center gap-1 rounded-lg bg-slate-950/95 p-1">
             {DRIVE_MODES.map((m) => (
               <button
                 key={m.id}
@@ -312,7 +343,7 @@ export function RoverHUD({
             data-testid="rover-wheel-glow-pod"
             data-moving={isMoving ? 'true' : 'false'}
             aria-label="Rover Wheel Torque Status"
-            className="relative flex items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-950/90 px-2.5 py-1"
+            className="relative flex items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-950/95 px-2.5 py-1"
           >
             <div className="relative grid grid-cols-2 gap-x-2.5 gap-y-1.5">
               {/* Central chassis crossbar */}

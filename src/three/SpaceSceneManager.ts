@@ -659,6 +659,7 @@ export class SpaceSceneManager {
       lc.srbRight.rotation.set(0, 0, 0);
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
+      lc.coreGroup.rotation.set(0, 0, 0);
       lc.abortTower.visible = true;
       lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
@@ -706,6 +707,7 @@ export class SpaceSceneManager {
       lc.srbRight.rotation.set(0, 0, 0);
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
+      lc.coreGroup.rotation.set(0, 0, 0);
       lc.abortTower.visible = true;
       lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
@@ -890,6 +892,7 @@ export class SpaceSceneManager {
         }
       }
     } else {
+      this.srbDetachedTime = -1;
       lc.srbLeft.visible = true;
       lc.srbRight.visible = true;
       lc.srbLeftBsm.visible = false;
@@ -908,6 +911,7 @@ export class SpaceSceneManager {
       lc.coreGroup.position.set(0, -tCore * tCore * 3.0, -tCore * 0.7);
       lc.coreGroup.rotation.z = tCore * 0.18;
     } else {
+      this.coreDetachedTime = -1;
       lc.coreGroup.visible = true;
       lc.coreGroup.position.set(0, 0, 0);
       lc.coreGroup.rotation.set(0, 0, 0);
@@ -922,6 +926,7 @@ export class SpaceSceneManager {
       lc.abortTower.position.set(tLas * 1.6, 23.02 + tLas * 19.0, tLas * 0.9);
       lc.abortTower.rotation.z = -tLas * 0.34;
     } else {
+      this.lasDetachedTime = -1;
       lc.abortTower.visible = true;
       lc.abortTower.position.set(0, 23.02, 0);
       lc.abortTower.rotation.set(0, 0, 0);
@@ -955,8 +960,13 @@ export class SpaceSceneManager {
     const ss = this.solarSystem;
     (this.scene.background as THREE.Color).setHex(0x020617);
 
+    const bankTarget = s.input.left ? 0.32 : s.input.right ? -0.32 : 0;
     ss.shipGroup.position.set(sp.shipX, 0, sp.shipZ);
-    ss.shipGroup.rotation.set(0, sp.headingRad, 0);
+    ss.shipGroup.rotation.y = sp.headingRad;
+    ss.shipGroup.rotation.x = 0;
+    if (!s.crashFx.active) {
+      ss.shipGroup.rotation.z += (bankTarget - ss.shipGroup.rotation.z) * Math.min(1, 8 * dt);
+    }
 
     const atSpaceTarget =
       (sp.targetId === 'relay-orbit' && (sp.inSatDeployZone || sp.orbitalSat.linkLocked)) ||
@@ -975,9 +985,14 @@ export class SpaceSceneManager {
       ss.shipShieldShell.rotation.y += dt * 1.4;
     }
 
-    // Sync Modular Orbital Satellite (Deployment, Solar Wing & Umbrella Reflectors Unfold, Dish Lock Beam)
+    // Sync Modular Orbital Satellite: keep hidden until Orion actually deploys it; show staging ring beforehand
     const satState = sp.orbitalSat;
-    ss.satellite.group.visible = satState.deployed || sp.targetId === 'relay-orbit';
+    ss.satellite.group.visible = satState.deployed;
+    ss.relayStageRing.visible = !satState.deployed;
+    if (ss.relayStageRing.visible) {
+      ss.relayStageRing.rotation.y += dt * 0.9;
+      ss.relayStageRing.scale.setScalar(1 + Math.sin(elapsedSec * 3.2) * 0.08);
+    }
     ss.satellite.group.position.set(satState.satX, 0, satState.satZ);
     ss.satellite.group.rotation.y = (satState.rotationErrorDeg * Math.PI) / 180 + elapsedSec * (satState.linkLocked ? 0.08 : 0.65);
     const wingUnfold = satState.deployed ? Math.max(0.18, satState.solarDeployedPct / 100) : 0.12;
@@ -992,6 +1007,12 @@ export class SpaceSceneManager {
       satState.linkLocked ? 0x34d399 : 0x38bdf8
     );
 
+    const marsSpec = SOLAR_TARGETS.mars;
+    ss.marsPhobos.position.set(
+      marsSpec.x + Math.cos(elapsedSec * 0.7) * 6.5,
+      0.9,
+      marsSpec.z + Math.sin(elapsedSec * 0.7) * 6.5
+    );
     ss.gatewayGroup.rotation.y += dt * 0.15;
     ss.earthClouds.rotation.y += dt * 0.04;
     ss.sunCorona.scale.setScalar(1 + Math.sin(elapsedSec * 2.2) * 0.025);
@@ -1392,8 +1413,11 @@ export class SpaceSceneManager {
       wm.arm.rotation.x = -wm.forward * (lift - clearanceLift * 0.45) * 0.85;
     });
 
-    // Headlight, Comms Dish Sweep, Mast Strobe Beacon & Mars Dust Shading on Solar Array
-    rm.headlight.intensity = r.headlightsOn ? 2.4 : 0;
+    // Headlight, Volumetric Beams, Comms Dish Sweep, Mast Strobe Beacon & Mars Dust Shading on Solar Array
+    rm.headlight.intensity = r.headlightsOn ? 44 : 0;
+    rm.headlightBounce.intensity = r.headlightsOn ? 6.5 : 0;
+    rm.headlightBeams.visible = r.headlightsOn;
+    rm.headlampLensMat.color.setHex(r.headlightsOn ? 0xfef9c3 : 0x475569);
     rm.dish.rotation.y = Math.sin(elapsedSec * 0.7) * 0.25;
     const pulse = 0.55 + 0.55 * Math.max(0, Math.sin(elapsedSec * 5.2));
     rm.strobeMesh.scale.setScalar(pulse);
@@ -1556,7 +1580,10 @@ export class SpaceSceneManager {
       const slump = Math.min(1, t * 2.6);
       this.roverModel.bodyGroup.position.y = -0.18 * slump;
       this.roverModel.bodyGroup.rotation.set(0.2 * slump, 0, 0.28 * slump);
-      this.roverModel.headlight.intensity = t % 0.22 < 0.11 ? 2.0 : 0.0;
+      const blink = t % 0.22 < 0.11;
+      this.roverModel.headlight.intensity = blink ? 22 : 0;
+      this.roverModel.headlightBounce.intensity = blink ? 4 : 0;
+      this.roverModel.headlightBeams.visible = blink;
     }
 
     // Smoke & incendiary ember particle plumes

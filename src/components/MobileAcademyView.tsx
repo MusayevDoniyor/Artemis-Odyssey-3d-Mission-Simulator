@@ -549,7 +549,7 @@ export function MobileAcademyView({
                       VIPER 4-Mode Mobility
                     </div>
                     <ul className="mt-1.5 space-y-1 text-xs text-slate-300">
-                      <li>• [1] Ackermann Drive (8.6 m/s transit)</li>
+                      <li>• [1] Ackermann Drive ({PHYSICS.ROVER_MAX_SPEED} m/s transit · ±{PHYSICS.SURFACE_BOUND_M}m)</li>
                       <li>• [2] All-Wheel Crab Strafe (pad alignment)</li>
                       <li>• [3] Zero-Radius Turn-in-Place Spin</li>
                       <li>• [4] Walker Gait + [F] High Clearance slopes</li>

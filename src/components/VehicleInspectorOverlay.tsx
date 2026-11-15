@@ -1,6 +1,7 @@
 import { ArrowLeft, BookOpen, CheckCircle2, Play } from 'lucide-react';
 import { VEHICLE_CATALOG } from '../game/constants';
 import type { VehicleShowcaseId } from '../game/types';
+import { CameraViewControls } from './CameraViewControls';
 
 interface VehicleInspectorOverlayProps {
   showcase: VehicleShowcaseId;
@@ -8,6 +9,9 @@ interface VehicleInspectorOverlayProps {
   unlockedNotes: string[];
   onSelectVehicle: (v: VehicleShowcaseId) => void;
   onSelectPart: (partId: string | null) => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
   onBackTitle: () => void;
   onStartMission: () => void;
   onOpenNotebook: () => void;
@@ -27,6 +31,9 @@ export function VehicleInspectorOverlay({
   unlockedNotes,
   onSelectVehicle,
   onSelectPart,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
   onBackTitle,
   onStartMission,
   onOpenNotebook,
@@ -70,10 +77,13 @@ export function VehicleInspectorOverlay({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <div className="hud-panel hidden rounded-lg px-3 py-2 font-mono-tech text-[11px] text-slate-300 xl:block">
-            Drag 360° · Scroll Zoom
-          </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <CameraViewControls
+            compact
+            onSelectPreset={onSetCameraPreset}
+            onZoom={onZoomCamera}
+            onReset={onResetCamera}
+          />
 
           <button
             type="button"
@@ -123,7 +133,7 @@ export function VehicleInspectorOverlay({
                     className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left font-hud text-xs font-bold transition ${
                       active
                         ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                        : 'border-slate-700/80 bg-slate-900/70 text-slate-200 hover:border-cyan-500/40'
+                        : 'border-slate-700/80 bg-slate-900/95 text-slate-200 hover:border-cyan-500/40'
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -144,7 +154,7 @@ export function VehicleInspectorOverlay({
               })}
             </div>
 
-            <div className="flex flex-col justify-between rounded-lg border border-cyan-500/30 bg-slate-950/80 p-3.5">
+            <div className="flex flex-col justify-between rounded-lg border border-cyan-500/30 bg-slate-950/95 p-3.5">
               <div>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-display text-sm font-bold text-amber-300 uppercase">

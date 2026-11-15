@@ -122,7 +122,7 @@ test('getRoverSpeedometerTelemetry computes real m/s, km/h, gauge percentage, an
   const fwdInfo = getRoverSpeedometerTelemetry(fullFwd);
   assert.equal(fwdInfo.gearLabel, 'FWD');
   assert.equal(fwdInfo.gaugePct, 100);
-  assert.ok(Math.abs(fwdInfo.speedKmh - 30.96) < 0.05);
+  assert.ok(Math.abs(fwdInfo.speedKmh - PHYSICS.ROVER_MAX_SPEED * 3.6) < 0.05);
   assert.equal(fwdInfo.isHighSpeed, true);
 
   const revWalker = { ...rover, driveMode: 'WALKER' as const, speed: -2.1 };

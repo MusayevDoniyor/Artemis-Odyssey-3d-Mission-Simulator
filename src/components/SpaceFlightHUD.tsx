@@ -9,7 +9,10 @@ import type {
   SpaceFlightState,
   SpaceTargetId,
 } from '../game/types';
+import { getSpaceWarnings } from '../game/warnings';
+import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionWarningBanner } from './MissionWarningBanner';
 
 interface SpaceFlightHUDProps {
   space: SpaceFlightState;
@@ -17,6 +20,7 @@ interface SpaceFlightHUDProps {
   campaignMission: CampaignMissionId;
   carryover: CampaignCarryoverState;
   activeAnomaly: MissionAnomaly | null;
+  donkiFlareActive: boolean;
   muted: boolean;
   onToggleMute: () => void;
   onPause: () => void;
@@ -29,28 +33,36 @@ interface SpaceFlightHUDProps {
   onEnterMarsOrbit: () => void;
   onResolveAnomaly: (anomalyId: string, choiceId: string) => void;
   onOpenNotebook: () => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
 }
 
 function toRadar(x: number, z: number): { rx: number; ry: number } {
-  const rx = 58 + (x / 62) * 48;
-  const ry = 42 + (z / 44) * 32;
+  // Maps 3D solar system span x in [-72, 58], z in [-66, 40] cleanly onto 120x84 radar
+  const rx = 8 + ((x + 72) / 130) * 104;
+  const ry = 8 + ((z + 66) / 106) * 68;
   return {
-    rx: Math.max(8, Math.min(112, rx)),
-    ry: Math.max(8, Math.min(76, ry)),
+    rx: Math.max(6, Math.min(114, rx)),
+    ry: Math.max(6, Math.min(78, ry)),
   };
 }
 
 function EclipticMiniRadar({
   space,
   satLocked,
+  donkiFlareActive,
 }: {
   space: SpaceFlightState;
   satLocked: boolean;
+  donkiFlareActive: boolean;
 }) {
   const shipPt = toRadar(space.shipX, space.shipZ);
-  const sunPt = toRadar(0, 0);
+  const sunPt = toRadar(-48, -36);
+  const earthPt = toRadar(-22, 26);
   const tgt = SOLAR_TARGETS[space.targetId];
   const tgtPt = toRadar(tgt.x, tgt.z);
+  const stormR = donkiFlareActive ? 34 : 23;
 
   return (
     <svg
@@ -60,9 +72,23 @@ function EclipticMiniRadar({
       className="shrink-0 rounded-lg border border-cyan-500/25 bg-slate-950"
       aria-label="Solar System Radar"
     >
-      <circle cx={sunPt.rx} cy={sunPt.ry} r="28" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+      {/* Sun & Radiation Storm Ring */}
+      <circle
+        cx={sunPt.rx}
+        cy={sunPt.ry}
+        r={stormR}
+        fill={donkiFlareActive ? 'rgba(244,63,94,0.12)' : 'none'}
+        stroke="#f43f5e"
+        strokeWidth="0.7"
+        strokeDasharray="2 2"
+        opacity="0.65"
+      />
       <circle cx={sunPt.rx} cy={sunPt.ry} r="44" fill="none" stroke="#1e293b" strokeWidth="0.8" />
-      <circle cx={sunPt.rx} cy={sunPt.ry} r="5" fill="#fbbf24" />
+      <circle cx={sunPt.rx} cy={sunPt.ry} r="6" fill="#f97316" opacity="0.28" />
+      <circle cx={sunPt.rx} cy={sunPt.ry} r="4.2" fill="#fbbf24" />
+
+      {/* Earth Departure Blip */}
+      <circle cx={earthPt.rx} cy={earthPt.ry} r="3.4" fill="#0284c7" stroke="#38bdf8" strokeWidth="0.8" />
 
       {/* Target Vector Line */}
       <line
@@ -73,7 +99,7 @@ function EclipticMiniRadar({
         stroke="#22d3ee"
         strokeWidth="1"
         strokeDasharray="3 2"
-        opacity="0.7"
+        opacity="0.75"
       />
 
       {(Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).map((id) => {
@@ -85,12 +111,12 @@ function EclipticMiniRadar({
         return (
           <g key={id}>
             {isTarget && (
-              <circle cx={pt.rx} cy={pt.ry} r="6.5" fill="none" stroke="#22d3ee" strokeWidth="1" />
+              <circle cx={pt.rx} cy={pt.ry} r="6.2" fill="none" stroke="#22d3ee" strokeWidth="1" />
             )}
             <circle
               cx={pt.rx}
               cy={pt.ry}
-              r="3.2"
+              r="3"
               fill={done ? '#10b981' : hex}
               stroke="#020617"
               strokeWidth="0.8"
@@ -111,6 +137,7 @@ export function SpaceFlightHUD({
   campaignMission,
   carryover,
   activeAnomaly,
+  donkiFlareActive,
   muted,
   onToggleMute,
   onPause,
@@ -123,6 +150,9 @@ export function SpaceFlightHUD({
   onEnterMarsOrbit,
   onResolveAnomaly,
   onOpenNotebook,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
 }: SpaceFlightHUDProps) {
   const activeTarget = SOLAR_TARGETS[space.targetId];
   const distToTarget = Math.hypot(activeTarget.x - space.shipX, activeTarget.z - space.shipZ);
@@ -132,13 +162,18 @@ export function SpaceFlightHUD({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2">
         <MissionProgressBar info={missionProgress} />
+        <MissionWarningBanner warnings={getSpaceWarnings(space, resources, donkiFlareActive)} />
 
         {/* Top Bar: Destination Selector + Ecliptic Radar + Resources */}
         <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="hud-panel pointer-events-auto flex items-center gap-3 rounded-xl p-2.5">
-          <EclipticMiniRadar space={space} satLocked={sat.linkLocked} />
+          <EclipticMiniRadar
+            space={space}
+            satLocked={sat.linkLocked}
+            donkiFlareActive={donkiFlareActive}
+          />
 
           <div>
             <div className="mb-1.5 flex items-center gap-1.5 font-hud text-[10px] font-bold tracking-wider text-cyan-300 uppercase">
@@ -233,6 +268,13 @@ export function SpaceFlightHUD({
             </button>
           </div>
 
+          <CameraViewControls
+            compact
+            onSelectPreset={onSetCameraPreset}
+            onZoom={onZoomCamera}
+            onReset={onResetCamera}
+          />
+
           {/* Non-Landing Orbital Relay Satellite Telemetry Card */}
           {(space.targetId === 'relay-orbit' || space.inSatDeployZone || sat.deployed) && (
             <div
@@ -324,7 +366,7 @@ export function SpaceFlightHUD({
                     key={c.id}
                     type="button"
                     onClick={() => onResolveAnomaly(activeAnomaly.id, c.id)}
-                    className="rounded-lg border border-cyan-500/25 bg-slate-950/85 px-2.5 py-1.5 text-left text-xs font-semibold text-slate-100 transition hover:border-amber-400"
+                    className="rounded-lg border border-cyan-500/25 bg-slate-950/95 px-2.5 py-1.5 text-left text-xs font-semibold text-slate-100 transition hover:border-amber-400"
                   >
                     {c.label}
                   </button>

@@ -275,7 +275,7 @@ export function BriefingOverlay({
             </div>
 
             {/* Visual Mission Profile Arc */}
-            <div className="rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1">
+            <div className="rounded-lg border border-slate-800 bg-slate-950/95 px-2 py-1">
               <MissionProfileDiagram missionId={mission.id} planet={mission.planet} />
             </div>
 
@@ -285,7 +285,7 @@ export function BriefingOverlay({
           </div>
 
           {/* Carryover Flow Diagram */}
-          <div className="flex flex-col justify-between rounded-xl border border-emerald-400/30 bg-emerald-500/8 p-3 text-xs">
+          <div className="flex flex-col justify-between rounded-xl border border-emerald-400/30 bg-slate-900/95 p-3 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-hud text-[11px] font-bold tracking-wider text-emerald-300 uppercase">
                 Campaign Carryover Link
@@ -300,8 +300,8 @@ export function BriefingOverlay({
               <div
                 className={`rounded-lg border px-2 py-2 ${
                   carryover.relaySatelliteOnline
-                    ? 'border-emerald-400/50 bg-emerald-500/15'
-                    : 'border-slate-700 bg-slate-950/75'
+                    ? 'border-emerald-400/50 bg-emerald-950/90'
+                    : 'border-slate-700 bg-slate-950/95'
                 }`}
               >
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
@@ -316,7 +316,7 @@ export function BriefingOverlay({
                 </span>
               </div>
 
-              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/75 px-2 py-2">
+              <div className="rounded-lg border border-cyan-500/25 bg-slate-950/95 px-2 py-2">
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
                   ISRU H₂O / Fuel
                 </span>
@@ -325,7 +325,7 @@ export function BriefingOverlay({
                 </span>
               </div>
 
-              <div className="rounded-lg border border-amber-500/25 bg-slate-950/75 px-2 py-2">
+              <div className="rounded-lg border border-amber-500/25 bg-slate-950/95 px-2 py-2">
                 <span className="block font-hud text-[9px] font-bold text-slate-400 uppercase">
                   Crew Dose
                 </span>
@@ -365,7 +365,7 @@ export function BriefingOverlay({
           ].map((r) => (
             <div
               key={r.label}
-              className="rounded-xl border border-cyan-500/20 bg-slate-900/80 p-2.5"
+              className="rounded-xl border border-cyan-500/20 bg-slate-900/95 p-2.5"
             >
               <div className="mb-1 flex items-center justify-between text-xs font-semibold">
                 <span className="font-hud text-slate-200 uppercase">{r.label}</span>

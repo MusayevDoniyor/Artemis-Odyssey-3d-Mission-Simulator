@@ -6,7 +6,7 @@ interface RoverSpeedometerProps {
   rover: RoverState;
 }
 
-const DIAL_MAX_MS = 9.0;
+const DIAL_MAX_MS = 14.0;
 const CX = 76;
 const CY = 74;
 const RADIUS = 54;
@@ -30,7 +30,7 @@ export function RoverSpeedometer({ rover }: RoverSpeedometerProps) {
   const tel = getRoverSpeedometerTelemetry(rover);
   const isMars = rover.planet === 'mars';
 
-  // Gauge sweeps from -180 deg (left, 0 m/s) to 0 deg (right, 9.0 m/s)
+  // Gauge sweeps from -180 deg (left, 0 m/s) to 0 deg (right, 14.0 m/s)
   const clampedRatio = Math.max(0, Math.min(1, tel.absSpeedMs / DIAL_MAX_MS));
   const needleAngleDeg = -180 + clampedRatio * 180;
   const walkerCapAngleDeg = -180 + (PHYSICS.ROVER_WALKER_SPEED / DIAL_MAX_MS) * 180;
@@ -55,7 +55,7 @@ export function RoverSpeedometer({ rover }: RoverSpeedometerProps) {
           ? 'text-cyan-300 border-cyan-400/50 bg-cyan-500/15'
           : 'text-slate-300 border-slate-600 bg-slate-900';
 
-  const ticks = [0, 2, 4, 6, 8];
+  const ticks = [0, 3, 6, 9, 12];
 
   return (
     <section

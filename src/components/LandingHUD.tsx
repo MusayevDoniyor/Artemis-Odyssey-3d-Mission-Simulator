@@ -2,11 +2,15 @@ import { Camera, Compass, Flame, Pause, Volume2, VolumeX } from 'lucide-react';
 import { PHYSICS, getLandingZones } from '../game/constants';
 import { getLandingMissionProgress } from '../game/missionProgress';
 import { getSurfaceTerrainHeight } from '../game/physics';
-import type { CameraMode, LandingGuidanceMode, LandingState } from '../game/types';
+import type { CameraMode, LandingGuidanceMode, LandingState, ResourceState } from '../game/types';
+import { getLandingWarnings } from '../game/warnings';
+import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionWarningBanner } from './MissionWarningBanner';
 
 interface LandingHUDProps {
   landing: LandingState;
+  resources: ResourceState;
   isruFuelBonusPct: number;
   cameraMode: CameraMode;
   muted: boolean;
@@ -19,10 +23,14 @@ interface LandingHUDProps {
   onCutoffEngine: () => void;
   onMatchHover: () => void;
   onToggleAutoCutoff: () => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
 }
 
 export function LandingHUD({
   landing,
+  resources,
   isruFuelBonusPct,
   cameraMode,
   muted,
@@ -35,6 +43,9 @@ export function LandingHUD({
   onCutoffEngine,
   onMatchHover,
   onToggleAutoCutoff,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
 }: LandingHUDProps) {
   const zones = getLandingZones(landing.planet);
   const groundH = getSurfaceTerrainHeight(landing.planet, landing.x, landing.z);
@@ -75,8 +86,9 @@ export function LandingHUD({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-4">
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2">
         <MissionProgressBar info={missionProgress} />
+        <MissionWarningBanner warnings={getLandingWarnings(landing, resources)} />
 
         {/* Top Perimeter Telemetry + Zone Selector */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -158,82 +170,91 @@ export function LandingHUD({
           </div>
 
           {/* Landing Zones + Predictive Impact Radar + Utility Buttons */}
-          <div className="flex items-start gap-2.5">
-            <div className="hud-panel pointer-events-auto flex items-center gap-2 rounded-xl p-2">
-              <div
-                className="relative h-12 w-12 shrink-0 rounded-full border border-cyan-400/50 bg-slate-950"
-                title="Target Pad (Center) · Amber = Lander · Yellow Ring = Predicted Impact"
-              >
-                <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/70" />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-start gap-2.5">
+              <div className="hud-panel pointer-events-auto flex items-center gap-2 rounded-xl p-2">
                 <div
-                  className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-yellow-300 bg-yellow-300/20"
-                  style={{
-                    left: `${50 + (predRelX / 45) * 42}%`,
-                    top: `${50 + (predRelZ / 45) * 42}%`,
-                  }}
-                />
-                <div
-                  className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400"
-                  style={{
-                    left: `${50 + (relX / 45) * 42}%`,
-                    top: `${50 + (relZ / 45) * 42}%`,
-                  }}
-                />
+                  className="relative h-12 w-12 shrink-0 rounded-full border border-cyan-400/50 bg-slate-950"
+                  title="Target Pad (Center) · Amber = Lander · Yellow Ring = Predicted Impact"
+                >
+                  <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/70" />
+                  <div
+                    className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-yellow-300 bg-yellow-300/20"
+                    style={{
+                      left: `${50 + (predRelX / 45) * 42}%`,
+                      top: `${50 + (predRelZ / 45) * 42}%`,
+                    }}
+                  />
+                  <div
+                    className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400"
+                    style={{
+                      left: `${50 + (relX / 45) * 42}%`,
+                      top: `${50 + (relZ / 45) * 42}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1 font-hud text-[10px] font-bold text-cyan-300 uppercase">
+                    <Compass className="h-3 w-3" />
+                    {activeZone.name} ({Math.round(landing.distToPad)}m)
+                  </div>
+                  <div className="flex gap-1">
+                    {zones.map((z) => (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => onSelectZone(z.id)}
+                        className={`rounded px-2 py-1 font-hud text-[11px] font-bold whitespace-nowrap transition ${
+                          landing.targetZoneId === z.id
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-slate-900 text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        [{z.id + 1}] {z.code.replace('PAD ', '').replace('ZONE ', '')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1 font-hud text-[10px] font-bold text-cyan-300 uppercase">
-                  <Compass className="h-3 w-3" />
-                  {activeZone.name} ({Math.round(landing.distToPad)}m)
-                </div>
-                <div className="flex gap-1">
-                  {zones.map((z) => (
-                    <button
-                      key={z.id}
-                      type="button"
-                      onClick={() => onSelectZone(z.id)}
-                      className={`rounded px-2 py-1 font-hud text-[11px] font-bold whitespace-nowrap transition ${
-                        landing.targetZoneId === z.id
-                          ? 'bg-amber-500 text-slate-950'
-                          : 'bg-slate-900 text-slate-200 hover:bg-slate-800'
-                      }`}
-                    >
-                      [{z.id + 1}] {z.code.replace('PAD ', '').replace('ZONE ', '')}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={onCycleCamera}
+                className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-200 hover:border-cyan-400"
+              >
+                <Camera className="h-4 w-4 text-cyan-300" />
+                <span className="capitalize">{cameraMode}</span>
+                <span className="keycap">C</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleMute}
+                className="hud-panel pointer-events-auto rounded-lg p-2 text-slate-200 hover:border-cyan-400"
+              >
+                {muted ? (
+                  <VolumeX className="h-4 w-4 text-slate-400" />
+                ) : (
+                  <Volume2 className="h-4 w-4 text-cyan-300" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onPause}
+                className="hud-panel pointer-events-auto rounded-lg p-2 text-slate-200 hover:border-cyan-400"
+              >
+                <Pause className="h-4 w-4" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onCycleCamera}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold whitespace-nowrap text-slate-200 hover:border-cyan-400"
-            >
-              <Camera className="h-4 w-4 text-cyan-300" />
-              <span className="capitalize">{cameraMode}</span>
-              <span className="keycap">C</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleMute}
-              className="hud-panel pointer-events-auto rounded-lg p-2 text-slate-200 hover:border-cyan-400"
-            >
-              {muted ? (
-                <VolumeX className="h-4 w-4 text-slate-400" />
-              ) : (
-                <Volume2 className="h-4 w-4 text-cyan-300" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={onPause}
-              className="hud-panel pointer-events-auto rounded-lg p-2 text-slate-200 hover:border-cyan-400"
-            >
-              <Pause className="h-4 w-4" />
-            </button>
+            <CameraViewControls
+              compact
+              onSelectPreset={onSetCameraPreset}
+              onZoom={onZoomCamera}
+              onReset={onResetCamera}
+            />
           </div>
         </div>
       </div>

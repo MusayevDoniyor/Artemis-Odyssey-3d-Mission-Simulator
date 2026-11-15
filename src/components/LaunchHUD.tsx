@@ -15,7 +15,10 @@ import {
 import { LAUNCH_PART_DETAILS, PHYSICS } from '../game/constants';
 import { getLaunchMissionProgress } from '../game/missionProgress';
 import type { GamePhase, LaunchState, ResourceState } from '../game/types';
+import { getLaunchWarnings } from '../game/warnings';
+import { CameraViewControls } from './CameraViewControls';
 import { MissionProgressBar } from './MissionProgressBar';
+import { MissionWarningBanner } from './MissionWarningBanner';
 import { NASAInsignia } from './NASAInsignia';
 
 interface LaunchHUDProps {
@@ -34,6 +37,9 @@ interface LaunchHUDProps {
   onSkipToSpace: () => void;
   onJumpToPhase: (phase: GamePhase) => void;
   onOpenNasaModal: () => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
 }
 
 const STAGE_TABS: Array<{ id: GamePhase; label: string }> = [
@@ -113,6 +119,9 @@ export function LaunchHUD({
   onSkipToSpace,
   onJumpToPhase,
   onOpenNasaModal,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
 }: LaunchHUDProps) {
   const inspectedPart = selectedPartId ? LAUNCH_PART_DETAILS[selectedPartId] || null : null;
   const speedTotal = Math.round(Math.hypot(launch.verticalSpeedMs, launch.horizontalSpeedMs));
@@ -271,6 +280,7 @@ export function LaunchHUD({
         </header>
 
         <MissionProgressBar info={missionProgress} />
+        <MissionWarningBanner warnings={getLaunchWarnings(launch, resources)} />
       </div>
 
       {/* MIDDLE ROW */}
@@ -595,6 +605,14 @@ export function LaunchHUD({
               </div>
             </div>
           </section>
+
+          <CameraViewControls
+            compact
+            onSelectPreset={onSetCameraPreset}
+            onZoom={onZoomCamera}
+            onReset={onResetCamera}
+            className="w-full justify-between"
+          />
         </aside>
       </div>
 

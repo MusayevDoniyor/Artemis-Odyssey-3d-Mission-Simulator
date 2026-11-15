@@ -46,14 +46,29 @@ export const PHYSICS = {
   LANDER_PERFECT_TILT: 12,
   LANDER_HARD_TILT: 24,
 
-  // Rover Mobility Parameters (Expanded ±138m Moon & Mars Traversable Worlds)
-  ROVER_MAX_SPEED: 8.6,
-  ROVER_WALKER_SPEED: 4.2,
-  ROVER_ACCEL: 5.6,
-  ROVER_TURN_RATE: 1.38,
+  // Rover Mobility Parameters (Expanded ±260m Moon & Mars Traversable Worlds)
+  ROVER_MAX_SPEED: 13.2,
+  ROVER_WALKER_SPEED: 6.4,
+  ROVER_ACCEL: 8.2,
+  ROVER_TURN_RATE: 1.45,
   ROVER_WHEELBASE: 2.1,
-  SURFACE_BOUND_M: 138,
+  SURFACE_BOUND_M: 260,
 } as const;
+
+export type CameraViewPresetId = 'iso' | 'front' | 'side' | 'top' | 'rear';
+
+export const CAMERA_VIEW_PRESETS: ReadonlyArray<{
+  id: CameraViewPresetId;
+  label: string;
+  yaw: number;
+  pitch: number;
+}> = [
+  { id: 'iso', label: '3/4', yaw: 0.68, pitch: 0.28 },
+  { id: 'front', label: 'Front', yaw: 0.0, pitch: 0.14 },
+  { id: 'side', label: 'Side', yaw: Math.PI / 2, pitch: 0.14 },
+  { id: 'top', label: 'Top', yaw: 0.02, pitch: 1.24 },
+  { id: 'rear', label: 'Rear', yaw: Math.PI, pitch: 0.18 },
+];
 
 export const CAMPAIGN_MISSIONS: Record<CampaignMissionId, CampaignMissionSpec> = {
   'artemis-2': {
@@ -217,8 +232,8 @@ export const SOLAR_TARGETS: Record<SpaceTargetId, SolarPlanetSpec> = {
   mars: {
     id: 'mars',
     name: 'Mars · Jezero',
-    x: -46,
-    z: -34,
+    x: 24,
+    z: -56,
     radius: 4.3,
     realDistanceLabel: '225,000,000 km',
     nominalDays: 210,
@@ -309,7 +324,7 @@ export function getLandingZones(planet: SurfacePlanet): LandingZone[] {
   return planet === 'mars' ? MARS_LANDING_ZONES : MOON_LANDING_ZONES;
 }
 
-// Expanded Lunar South Pole Objectives across ±138m arena
+// Expanded Lunar South Pole Objectives across ±260m arena
 export const MOON_OBJECTIVES: RoverObjective[] = [
   {
     id: 'moon-shackleton-ice',
@@ -317,8 +332,8 @@ export const MOON_OBJECTIVES: RoverObjective[] = [
     title: 'Shackleton Cold Trap Ice',
     siteName: 'Shackleton Ice',
     instrument: 'TRIDENT 1m Drill',
-    x: 56,
-    z: -62,
+    x: 128,
+    z: -142,
     color: 0x38bdf8,
     durationSec: 2.4,
     progress: 0,
@@ -337,8 +352,8 @@ export const MOON_OBJECTIVES: RoverObjective[] = [
     title: 'Malapert Solar Ridge',
     siteName: 'Malapert Ridge',
     instrument: 'PV Relay Bus',
-    x: -64,
-    z: -48,
+    x: -148,
+    z: -108,
     color: 0xfacc15,
     durationSec: 2.1,
     progress: 0,
@@ -356,8 +371,8 @@ export const MOON_OBJECTIVES: RoverObjective[] = [
     title: 'Nobile Regolith Berm',
     siteName: 'Nobile Quarry',
     instrument: 'OSDR Berm Probe',
-    x: 52,
-    z: 58,
+    x: 118,
+    z: 134,
     color: 0x34d399,
     durationSec: 2.4,
     progress: 0,
@@ -375,8 +390,8 @@ export const MOON_OBJECTIVES: RoverObjective[] = [
     title: 'Cabeus Hydrogen Scan',
     siteName: 'Cabeus Basin',
     instrument: 'Neutron Spectrometer',
-    x: -54,
-    z: 66,
+    x: -124,
+    z: 152,
     color: 0xc084fc,
     durationSec: 2.2,
     progress: 0,
@@ -390,7 +405,7 @@ export const MOON_OBJECTIVES: RoverObjective[] = [
   },
 ];
 
-// Mars Jezero Crater Objectives across ±138m arena
+// Mars Jezero Crater Objectives across ±260m arena
 export const MARS_OBJECTIVES: RoverObjective[] = [
   {
     id: 'mars-jezero-delta',
@@ -398,8 +413,8 @@ export const MARS_OBJECTIVES: RoverObjective[] = [
     title: 'Jezero River Delta Core',
     siteName: 'Jezero Delta',
     instrument: 'SHERLOC Corer',
-    x: 54,
-    z: -58,
+    x: 126,
+    z: -134,
     color: 0x38bdf8,
     durationSec: 2.4,
     progress: 0,
@@ -417,8 +432,8 @@ export const MARS_OBJECTIVES: RoverObjective[] = [
     title: 'Máaz Basalt Ridge',
     siteName: 'Máaz Ridge',
     instrument: 'SuperCam & Walker',
-    x: -66,
-    z: -42,
+    x: -148,
+    z: -96,
     color: 0xfacc15,
     durationSec: 2.2,
     progress: 0,
@@ -436,8 +451,8 @@ export const MARS_OBJECTIVES: RoverObjective[] = [
     title: 'Carbonate Lake Margin',
     siteName: 'Carbonate Shelf',
     instrument: 'PIXL + RAD Dosimeter',
-    x: 48,
-    z: 62,
+    x: 112,
+    z: 142,
     color: 0x34d399,
     durationSec: 2.4,
     progress: 0,
@@ -455,8 +470,8 @@ export const MARS_OBJECTIVES: RoverObjective[] = [
     title: 'MOXIE O₂ & Fuel Cache',
     siteName: 'MOXIE Depot',
     instrument: 'CO₂ Electrolysis',
-    x: -50,
-    z: 56,
+    x: -118,
+    z: 128,
     color: 0xf97316,
     durationSec: 2.2,
     progress: 0,

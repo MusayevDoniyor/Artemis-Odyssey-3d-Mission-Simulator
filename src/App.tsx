@@ -583,8 +583,8 @@ export default function App() {
           scoreRef.current += s.landing.score;
           soundSynth.playSuccess();
 
-          const startX = clamp(s.landing.x + 5, -120, 120);
-          const startZ = clamp(s.landing.z + 5, -120, 120);
+          const startX = clamp(s.landing.x + 5, -240, 240);
+          const startZ = clamp(s.landing.z + 5, -240, 240);
           s.planet = s.landing.planet;
           s.cameraMode = 'chase';
           s.userOrbitActive = false;
@@ -618,18 +618,28 @@ export default function App() {
           }
         }
 
-        // Survival trade-offs: regolith berm cuts shield drain; Mars dust shades solar output
+        // Survival trade-offs rebalanced for ±260m exploration:
+        // Regolith berm cuts shield drain; Mars dust shades solar output; Base Camp (-15,-13) shelters & trickle-recharges
         const bermFactor = Math.max(0.45, 1 - carryoverRef.current.regolithShieldLevel * 0.25);
-        const flareDrain = (s.donkiFlareActive ? 0.42 : 0.18) * bermFactor;
-        const dustPenalty = s.rover.planet === 'mars' ? (s.rover.dustAccumulationPct / 100) * 0.35 : 0;
+        const atBaseCamp = Math.hypot(s.rover.x + 15, s.rover.z + 13) <= 22;
+        const flareDrain =
+          (s.donkiFlareActive ? 0.28 : 0.11) * bermFactor * (atBaseCamp ? 0.25 : 1);
+        const dustPenalty =
+          s.rover.planet === 'mars' ? (s.rover.dustAccumulationPct / 100) * 0.24 : 0;
 
-        s.resources.oxygen = clamp(s.resources.oxygen - 0.48 * dt, 0, 100);
-        s.resources.power = clamp(
-          s.resources.power - ((s.rover.headlightsOn ? 0.38 : 0.24) + dustPenalty) * dt,
-          0,
-          100
-        );
-        s.resources.shield = clamp(s.resources.shield - flareDrain * dt, 0, 100);
+        if (atBaseCamp) {
+          s.resources.oxygen = clamp(s.resources.oxygen + 2.0 * dt, 0, 100);
+          s.resources.power = clamp(s.resources.power + 2.2 * dt, 0, 100);
+          s.resources.shield = clamp(s.resources.shield + (2.8 - flareDrain) * dt, 0, 100);
+        } else {
+          s.resources.oxygen = clamp(s.resources.oxygen - 0.24 * dt, 0, 100);
+          s.resources.power = clamp(
+            s.resources.power - ((s.rover.headlightsOn ? 0.22 : 0.14) + dustPenalty) * dt,
+            0,
+            100
+          );
+          s.resources.shield = clamp(s.resources.shield - flareDrain * dt, 0, 100);
+        }
 
         // Science Drilling / Coring Check
         const nearest = s.objectives.find(
@@ -1057,6 +1067,110 @@ export default function App() {
     s.orbitDistance = clamp(s.orbitDistance + e.deltaY * 0.022, minD, maxD);
   };
 
+  const handleSetCameraPreset = useCallback(
+    (yaw: number, pitch: number) => {
+      const s = simRef.current;
+      s.orbitYaw = yaw;
+      s.orbitPitch = clamp(pitch, -1.25, 1.38);
+      s.userOrbitActive = true;
+      if (s.phase === 'landing' || s.phase === 'rover') {
+        s.cameraMode = 'orbit';
+      }
+      soundSynth.init();
+      soundSynth.playClick();
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleZoomCamera = useCallback(
+    (delta: number) => {
+      const s = simRef.current;
+      const minD =
+        s.phase === 'launch'
+          ? 9
+          : s.phase === 'space'
+            ? 4.5
+            : s.phase === 'landing'
+              ? 5.5
+              : s.phase === 'title' || s.phase === 'inspector'
+                ? s.showcase === 'rover' || s.showcase === 'satellite'
+                  ? 3.8
+                  : 8
+                : 3.2;
+      const maxD =
+        s.phase === 'launch' || s.phase === 'space'
+          ? 88
+          : s.phase === 'landing'
+            ? 80
+            : 65;
+      s.userOrbitActive = true;
+      if (s.phase === 'landing' || s.phase === 'rover') {
+        s.cameraMode = 'orbit';
+      }
+      s.orbitDistance = clamp(s.orbitDistance + delta, minD, maxD);
+      syncUiNow();
+    },
+    [syncUiNow]
+  );
+
+  const handleResetCamera = useCallback(() => {
+    const s = simRef.current;
+    s.cameraMode = 'chase';
+    if (s.phase === 'launch') {
+      s.userOrbitActive = false;
+      s.orbitYaw = 0.52;
+      s.orbitPitch = 0.12;
+      s.orbitDistance = 38;
+    } else if (s.phase === 'space') {
+      s.userOrbitActive = false;
+      s.orbitYaw = 0.55;
+      s.orbitPitch = 0.48;
+      s.orbitDistance = 22;
+    } else if (s.phase === 'landing') {
+      s.userOrbitActive = false;
+      s.orbitYaw = 0.54;
+      s.orbitPitch = 0.26;
+      s.orbitDistance = 28;
+    } else if (s.phase === 'rover') {
+      s.userOrbitActive = false;
+      s.orbitYaw = 0.6;
+      s.orbitPitch = 0.26;
+      s.orbitDistance = 11;
+    } else if (s.phase === 'inspector') {
+      s.userOrbitActive = true;
+      s.orbitYaw = 0.65;
+      s.orbitPitch = 0.18;
+      s.orbitDistance =
+        s.showcase === 'rocket'
+          ? 35
+          : s.showcase === 'outpost'
+            ? 24
+            : s.showcase === 'rover'
+              ? 7.5
+              : s.showcase === 'satellite'
+                ? 7.8
+                : 11;
+    } else {
+      s.userOrbitActive = false;
+      s.orbitYaw = 0.63;
+      s.orbitPitch = 0.25;
+      s.orbitDistance =
+        s.showcase === 'rocket'
+          ? 35
+          : s.showcase === 'outpost'
+            ? 24
+            : s.showcase === 'rover'
+              ? 7.5
+              : s.showcase === 'satellite'
+                ? 7.8
+                : 11;
+    }
+    soundSynth.init();
+    soundSynth.playClick();
+    syncUiNow();
+  }, [syncUiNow]);
+
   const toggleMute = () => {
     const next = soundSynth.toggleMute();
     setMuted(next);
@@ -1148,6 +1262,9 @@ export default function App() {
               v === 'rocket' ? 35 : v === 'outpost' ? 24 : v === 'rover' ? 7.5 : v === 'satellite' ? 7.8 : 11;
             setShowcase(v);
           }}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
           onSelectCampaignMission={selectCampaignMission}
           onStartMission={() => jumpToPhase('briefing')}
           onJumpToPhase={(p) => jumpToPhase(p)}
@@ -1181,6 +1298,9 @@ export default function App() {
             setHighlightedPart(id);
             syncUiNow();
           }}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
           onBackTitle={() => jumpToPhase('title')}
           onStartMission={() => jumpToPhase('briefing')}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
@@ -1279,6 +1399,9 @@ export default function App() {
           onSkipToSpace={() => jumpToPhase('space')}
           onJumpToPhase={(p) => jumpToPhase(p)}
           onOpenNasaModal={() => setNasaModalOpen(true)}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
         />
       )}
 
@@ -1289,6 +1412,7 @@ export default function App() {
           campaignMission={carryoverUi.activeMission}
           carryover={carryoverUi}
           activeAnomaly={activeAnomalyUi}
+          donkiFlareActive={Boolean(/M|X/i.test(donki.classType || ''))}
           muted={muted}
           onToggleMute={toggleMute}
           onPause={() => {
@@ -1327,12 +1451,16 @@ export default function App() {
           onEnterMarsOrbit={() => jumpToPhase('landing', 'mars')}
           onResolveAnomaly={handleResolveAnomaly}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
         />
       )}
 
       {phase === 'landing' && (
         <LandingHUD
           landing={landingUi}
+          resources={resourcesUi}
           isruFuelBonusPct={carryoverUi.isruFuelBonusPct}
           cameraMode={cameraMode}
           muted={muted}
@@ -1380,6 +1508,9 @@ export default function App() {
             simRef.current.landing.autoCutoff = !simRef.current.landing.autoCutoff;
             syncUiNow();
           }}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
         />
       )}
 
@@ -1392,6 +1523,7 @@ export default function App() {
           carryover={carryoverUi}
           activeAnomaly={activeAnomalyUi}
           nearestObjective={nearestObjective}
+          donkiFlareActive={Boolean(/M|X/i.test(donki.classType || ''))}
           cameraMode={cameraMode}
           mapExpanded={mapExpanded}
           muted={muted}
@@ -1423,6 +1555,9 @@ export default function App() {
           onResolveAnomaly={handleResolveAnomaly}
           onOpenNasaModal={() => setNasaModalOpen(true)}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
+          onSetCameraPreset={handleSetCameraPreset}
+          onZoomCamera={handleZoomCamera}
+          onResetCamera={handleResetCamera}
         />
       )}
 

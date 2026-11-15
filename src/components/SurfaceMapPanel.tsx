@@ -1,5 +1,5 @@
-import { Compass, Map, Maximize2, Minimize2, Satellite } from 'lucide-react';
-import { getLandingZones } from '../game/constants';
+import { Compass, Map, Maximize2, Minimize2, Satellite, Sun } from 'lucide-react';
+import { PHYSICS, getLandingZones } from '../game/constants';
 import type { RoverObjective, RoverState, SurfacePlanet } from '../game/types';
 
 interface SurfaceMapPanelProps {
@@ -11,7 +11,7 @@ interface SurfaceMapPanelProps {
   onToggleExpand: () => void;
 }
 
-const MAP_BOUND = 140;
+const MAP_BOUND = PHYSICS.SURFACE_BOUND_M + 10;
 
 function toSvg(x: number, z: number): { sx: number; sy: number } {
   const sx = ((x + MAP_BOUND) / (MAP_BOUND * 2)) * 240;
@@ -30,11 +30,12 @@ export function SurfaceMapPanel({
   const zones = getLandingZones(planet);
   const rovPt = toSvg(rover.x, rover.z);
   const headingDeg = (rover.headingRad * 180) / Math.PI;
-  const basePt = toSvg(0, -24);
+  const basePt = toSvg(-15, -13);
   const padPt = toSvg(0, 0);
 
   const isMars = planet === 'mars';
-  const sizePx = expanded ? 288 : 168;
+  const sizePx = expanded ? 288 : 176;
+  const scale100mPx = (100 / (MAP_BOUND * 2)) * 240;
 
   return (
     <div
@@ -69,13 +70,13 @@ export function SurfaceMapPanel({
           }`}
         >
           <Satellite className="h-3 w-3" />
-          {relayOnline ? 'HERMES High-Res Contours' : 'Coarse Wireframe (No Relay)'}
+          {relayOnline ? 'HERMES High-Res Contours' : 'Coarse Survey Grid'}
         </span>
-        <span className="font-mono-tech text-slate-400">±138m</span>
+        <span className="font-mono-tech text-slate-300">±{PHYSICS.SURFACE_BOUND_M}m</span>
       </div>
 
       {/* SVG Topographic Arena */}
-      <div className="relative overflow-hidden rounded-lg border border-slate-700/80 bg-slate-950">
+      <div className="relative overflow-hidden rounded-lg border border-slate-700/90 bg-slate-950">
         <svg
           width={sizePx}
           height={sizePx}
@@ -89,123 +90,167 @@ export function SurfaceMapPanel({
             y="0"
             width="240"
             height="240"
-            fill={isMars ? '#1e100a' : '#09101d'}
+            fill={isMars ? '#1e100a' : '#080f1d'}
           />
 
-          {/* Grid Lines */}
+          {/* Outer Arena Boundary Ring */}
+          <rect
+            x={toSvg(-PHYSICS.SURFACE_BOUND_M, -PHYSICS.SURFACE_BOUND_M).sx}
+            y={toSvg(-PHYSICS.SURFACE_BOUND_M, -PHYSICS.SURFACE_BOUND_M).sy}
+            width={
+              toSvg(PHYSICS.SURFACE_BOUND_M, 0).sx -
+              toSvg(-PHYSICS.SURFACE_BOUND_M, 0).sx
+            }
+            height={
+              toSvg(0, PHYSICS.SURFACE_BOUND_M).sy -
+              toSvg(0, -PHYSICS.SURFACE_BOUND_M).sy
+            }
+            fill="none"
+            stroke="#334155"
+            strokeWidth="0.9"
+            strokeDasharray="4 3"
+          />
+
+          {/* Polar / Coordinate Grid Lines */}
           {[60, 120, 180].map((g) => (
-            <g key={g} opacity="0.22">
+            <g key={g} opacity="0.24">
               <line x1={g} y1="0" x2={g} y2="240" stroke="#64748b" strokeWidth="0.7" />
               <line x1="0" y1={g} x2="240" y2={g} stroke="#64748b" strokeWidth="0.7" />
             </g>
           ))}
 
-          {/* High-Res Satellite Topographic Contours (unlocked via Mission 1 HERMES Relay) */}
-          {relayOnline ? (
-            isMars ? (
-              <g>
-                {/* Jezero Dry Paleolake Channel */}
-                <path
-                  d="M 10 198 Q 92 150 154 96 T 230 34"
-                  fill="none"
-                  stroke="#f97316"
-                  strokeWidth="12"
-                  strokeOpacity="0.18"
-                  strokeLinecap="round"
+          {/* Permanently Shadowed Regions (PSRs) & Topographic Elevation Contours */}
+          {isMars ? (
+            <g>
+              {/* Jezero Paleolake Channel */}
+              <path
+                d={`M 8 206 Q 94 148 ${toSvg(126, -134).sx} ${toSvg(126, -134).sy}`}
+                fill="none"
+                stroke="#f97316"
+                strokeWidth="10"
+                strokeOpacity={relayOnline ? 0.22 : 0.1}
+                strokeLinecap="round"
+              />
+              <path
+                d={`M 8 206 Q 94 148 ${toSvg(126, -134).sx} ${toSvg(126, -134).sy}`}
+                fill="none"
+                stroke="#fb923c"
+                strokeWidth="1.2"
+                strokeDasharray="4 3"
+                opacity={relayOnline ? 0.75 : 0.35}
+              />
+              {/* Jezero River Delta Fan Contours (126, -134) */}
+              {(relayOnline ? [26, 18, 10] : [18]).map((r, i) => (
+                <circle
+                  key={`delta-${i}`}
+                  cx={toSvg(126, -134).sx}
+                  cy={toSvg(126, -134).sy}
+                  r={r}
+                  fill="#38bdf8"
+                  fillOpacity="0.08"
+                  stroke="#38bdf8"
+                  strokeWidth="0.9"
+                  strokeOpacity={relayOnline ? 0.65 : 0.32}
                 />
-                <path
-                  d="M 10 198 Q 92 150 154 96 T 230 34"
-                  fill="none"
-                  stroke="#fb923c"
-                  strokeWidth="1.2"
-                  strokeDasharray="4 3"
-                  opacity="0.65"
+              ))}
+              {/* Máaz Wind-Swept Volcanic Ridge (-148, -96) */}
+              {(relayOnline ? [28, 19, 10] : [20]).map((r, i) => (
+                <circle
+                  key={`maaz-${i}`}
+                  cx={toSvg(-148, -96).sx}
+                  cy={toSvg(-148, -96).sy}
+                  r={r}
+                  fill="#facc15"
+                  fillOpacity="0.08"
+                  stroke="#facc15"
+                  strokeWidth="0.9"
+                  strokeOpacity={relayOnline ? 0.65 : 0.32}
                 />
-                {/* Ancient River Delta Contours (54, -58) */}
-                {[28, 20, 12].map((r, i) => (
+              ))}
+              {/* Carbonate Shore & MOXIE Depot contours */}
+              {relayOnline && (
+                <>
                   <circle
-                    key={`delta-${i}`}
-                    cx={toSvg(54, -58).sx}
-                    cy={toSvg(54, -58).sy}
-                    r={r}
-                    fill="#38bdf8"
+                    cx={toSvg(112, 142).sx}
+                    cy={toSvg(112, 142).sy}
+                    r={16}
+                    fill="#34d399"
                     fillOpacity="0.06"
-                    stroke="#38bdf8"
-                    strokeWidth="0.9"
-                    strokeOpacity="0.55"
-                  />
-                ))}
-                {/* Máaz Volcanic Ridge Contours (-66, -42) */}
-                {[30, 20, 11].map((r, i) => (
-                  <circle
-                    key={`maaz-${i}`}
-                    cx={toSvg(-66, -42).sx}
-                    cy={toSvg(-66, -42).sy}
-                    r={r}
-                    fill="#facc15"
-                    fillOpacity="0.06"
-                    stroke="#facc15"
-                    strokeWidth="0.9"
-                    strokeOpacity="0.6"
-                  />
-                ))}
-              </g>
-            ) : (
-              <g>
-                {/* Shackleton Cold Trap Crater (56, -62) */}
-                {[26, 17, 9].map((r, i) => (
-                  <circle
-                    key={`shack-${i}`}
-                    cx={toSvg(56, -62).sx}
-                    cy={toSvg(56, -62).sy}
-                    r={r}
-                    fill="#38bdf8"
-                    fillOpacity="0.08"
-                    stroke="#38bdf8"
-                    strokeWidth="0.9"
-                    strokeOpacity="0.6"
-                  />
-                ))}
-                {/* Cabeus Shadow Basin (-54, 66) */}
-                {[22, 13].map((r, i) => (
-                  <circle
-                    key={`cab-${i}`}
-                    cx={toSvg(-54, 66).sx}
-                    cy={toSvg(-54, 66).sy}
-                    r={r}
-                    fill="#c084fc"
-                    fillOpacity="0.07"
-                    stroke="#c084fc"
-                    strokeWidth="0.9"
+                    stroke="#34d399"
+                    strokeWidth="0.8"
                     strokeOpacity="0.5"
                   />
-                ))}
-                {/* Malapert Sunlit Ridge (-64, -48) */}
-                {[28, 18, 9].map((r, i) => (
                   <circle
-                    key={`mal-${i}`}
-                    cx={toSvg(-64, -48).sx}
-                    cy={toSvg(-64, -48).sy}
-                    r={r}
-                    fill="#facc15"
+                    cx={toSvg(-118, 128).sx}
+                    cy={toSvg(-118, 128).sy}
+                    r={16}
+                    fill="#fb923c"
                     fillOpacity="0.06"
-                    stroke="#facc15"
-                    strokeWidth="0.9"
-                    strokeOpacity="0.6"
+                    stroke="#fb923c"
+                    strokeWidth="0.8"
+                    strokeOpacity="0.5"
                   />
-                ))}
-              </g>
-            )
+                </>
+              )}
+            </g>
           ) : (
-            <circle
-              cx="120"
-              cy="120"
-              r="98"
-              fill="none"
-              stroke="#475569"
-              strokeWidth="1"
-              strokeDasharray="3 4"
-            />
+            <g>
+              {/* Shackleton Cold Trap PSR Crater (128, -142) */}
+              {(relayOnline ? [26, 17, 9] : [18]).map((r, i) => (
+                <circle
+                  key={`shack-${i}`}
+                  cx={toSvg(128, -142).sx}
+                  cy={toSvg(128, -142).sy}
+                  r={r}
+                  fill={i === 0 ? '#020617' : '#38bdf8'}
+                  fillOpacity={i === 0 ? 0.55 : 0.12}
+                  stroke="#38bdf8"
+                  strokeWidth="0.9"
+                  strokeOpacity={relayOnline ? 0.68 : 0.34}
+                />
+              ))}
+              {/* Cabeus Shadow PSR Basin (-124, 152) */}
+              {(relayOnline ? [24, 14] : [16]).map((r, i) => (
+                <circle
+                  key={`cab-${i}`}
+                  cx={toSvg(-124, 152).sx}
+                  cy={toSvg(-124, 152).sy}
+                  r={r}
+                  fill={i === 0 ? '#020617' : '#c084fc'}
+                  fillOpacity={i === 0 ? 0.52 : 0.1}
+                  stroke="#c084fc"
+                  strokeWidth="0.9"
+                  strokeOpacity={relayOnline ? 0.6 : 0.3}
+                />
+              ))}
+              {/* Malapert Sunlit Ridge (-148, -108) */}
+              {(relayOnline ? [28, 18, 9] : [19]).map((r, i) => (
+                <circle
+                  key={`mal-${i}`}
+                  cx={toSvg(-148, -108).sx}
+                  cy={toSvg(-148, -108).sy}
+                  r={r}
+                  fill="#facc15"
+                  fillOpacity="0.09"
+                  stroke="#facc15"
+                  strokeWidth="0.9"
+                  strokeOpacity={relayOnline ? 0.68 : 0.34}
+                />
+              ))}
+              {/* Nobile Quarry Bench (118, 134) */}
+              {relayOnline && (
+                <circle
+                  cx={toSvg(118, 134).sx}
+                  cy={toSvg(118, 134).sy}
+                  r={18}
+                  fill="#34d399"
+                  fillOpacity="0.07"
+                  stroke="#34d399"
+                  strokeWidth="0.85"
+                  strokeOpacity="0.55"
+                />
+              )}
+            </g>
           )}
 
           {/* Landing Pads / Zones */}
@@ -216,7 +261,7 @@ export function SurfaceMapPanel({
                 key={z.id}
                 cx={pt.sx}
                 cy={pt.sy}
-                r={z.id === 0 ? 7 : 5}
+                r={z.id === 0 ? 6.5 : 4.5}
                 fill="none"
                 stroke="#64748b"
                 strokeWidth="0.9"
@@ -225,18 +270,28 @@ export function SurfaceMapPanel({
             );
           })}
 
-          {/* Base Camp + Landing Pad Alpha/Delta */}
-          <rect
-            x={basePt.sx - 6}
-            y={basePt.sy - 5}
-            width="12"
-            height="10"
-            rx="2"
-            fill="#1e293b"
-            stroke="#94a3b8"
-            strokeWidth="1"
+          {/* Base Camp (-15, -13) Shelter Zone & Landing Pad Alpha/Delta (0, 0) */}
+          <circle
+            cx={basePt.sx}
+            cy={basePt.sy}
+            r={(22 / (MAP_BOUND * 2)) * 240}
+            fill="#10b981"
+            fillOpacity="0.08"
+            stroke="#34d399"
+            strokeWidth="0.8"
+            strokeDasharray="2 2"
           />
-          <circle cx={padPt.sx} cy={padPt.sy} r="3.5" fill="#38bdf8" opacity="0.65" />
+          <rect
+            x={basePt.sx - 5.5}
+            y={basePt.sy - 4.5}
+            width="11"
+            height="9"
+            rx="2"
+            fill="#0f172a"
+            stroke="#34d399"
+            strokeWidth="1.2"
+          />
+          <circle cx={padPt.sx} cy={padPt.sy} r="3.2" fill="#38bdf8" opacity="0.75" />
 
           {/* 4 Science Objectives */}
           {objectives.map((obj, idx) => {
@@ -253,13 +308,13 @@ export function SurfaceMapPanel({
                     stroke={hex}
                     strokeWidth="0.7"
                     strokeDasharray="2 3"
-                    opacity="0.35"
+                    opacity="0.38"
                   />
                 )}
                 <circle
                   cx={pt.sx}
                   cy={pt.sy}
-                  r={obj.completed ? 4.5 : 6}
+                  r={obj.completed ? 4.2 : 5.6}
                   fill={obj.completed ? '#10b981' : hex}
                   fillOpacity={obj.completed ? 0.35 : 0.28}
                   stroke={obj.completed ? '#34d399' : hex}
@@ -267,11 +322,12 @@ export function SurfaceMapPanel({
                 />
                 {expanded && (
                   <text
-                    x={pt.sx + 7}
+                    x={pt.sx > 168 ? pt.sx - 8 : pt.sx + 7}
                     y={pt.sy + 3}
+                    textAnchor={pt.sx > 168 ? 'end' : 'start'}
                     fontSize="8"
                     fontWeight="bold"
-                    fill="#e2e8f0"
+                    fill="#f1f5f9"
                   >
                     {idx + 1}. {obj.siteName.split(' ')[0]}
                   </text>
@@ -280,8 +336,9 @@ export function SurfaceMapPanel({
             );
           })}
 
-          {/* Live Rover Heading Arrow & Position */}
+          {/* Live Rover Heading Arrow + Sensor FOV Wedge */}
           <g transform={`translate(${rovPt.sx}, ${rovPt.sy}) rotate(${-headingDeg})`}>
+            <path d="M 0 0 L -9 20 A 22 22 0 0 0 9 20 Z" fill="#38bdf8" fillOpacity="0.18" />
             <polygon
               points="0,8 -4.5,-5 0,-2.5 4.5,-5"
               fill="#f8fafc"
@@ -289,7 +346,47 @@ export function SurfaceMapPanel({
               strokeWidth="1.2"
             />
           </g>
+
+          {/* Compass Cardinal Markers N / E / S / W */}
+          <text x="120" y="10" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#94a3b8">
+            N
+          </text>
+          <text x="120" y="235" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#94a3b8">
+            S
+          </text>
+          <text x="8" y="123" textAnchor="start" fontSize="8" fontWeight="bold" fill="#94a3b8">
+            W
+          </text>
+          <text x="232" y="123" textAnchor="end" fontSize="8" fontWeight="bold" fill="#94a3b8">
+            E
+          </text>
+
+          {/* 100m Calibration Scale Bar */}
+          <g transform="translate(10, 224)">
+            <line x1="0" y1="4" x2={scale100mPx} y2="4" stroke="#cbd5e1" strokeWidth="1.4" />
+            <line x1="0" y1="1" x2="0" y2="7" stroke="#cbd5e1" strokeWidth="1.4" />
+            <line
+              x1={scale100mPx}
+              y1="1"
+              x2={scale100mPx}
+              y2="7"
+              stroke="#cbd5e1"
+              strokeWidth="1.4"
+            />
+            <text x={scale100mPx + 4} y="6.5" fontSize="7.5" fontWeight="bold" fill="#cbd5e1">
+              100m
+            </text>
+          </g>
         </svg>
+
+        {/* Sun Angle Grazing Indicator */}
+        <div
+          className="pointer-events-none absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded bg-slate-950/90 px-1.5 py-0.5 font-mono-tech text-[9px] text-amber-300"
+          title="Low-angle solar illumination vector"
+        >
+          <Sun className="h-2.5 w-2.5" />
+          SUN NW
+        </div>
       </div>
 
       {/* Live Coordinates & Next Waypoint */}

@@ -14,7 +14,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
   const dosePct = Math.min(100, Math.round((carryover.radiationDoseMsv / 150) * 100));
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
       <div className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl p-6">
         <div className="mb-4 flex shrink-0 items-center justify-between border-b border-cyan-500/20 pb-3">
           <div className="flex items-center gap-2.5">
@@ -137,7 +137,7 @@ export function FieldNotebookModal({ open, carryover, onClose }: FieldNotebookMo
                   className={`rounded-xl border p-3 ${
                     unlocked
                       ? 'border-emerald-400/45 bg-slate-900/95'
-                      : 'border-slate-800 bg-slate-900/90 opacity-80'
+                      : 'border-slate-800 bg-slate-950/95'
                   }`}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">

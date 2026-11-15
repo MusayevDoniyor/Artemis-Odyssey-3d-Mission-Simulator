@@ -199,21 +199,21 @@ test('Moon and Mars AUTOLAND both touch down softly and Mars ISRU bonus adds des
   assert.equal(manualLander.targetThrottle, 0, 'cutoff commands engine shutdown (0%)');
 });
 
-test('Expanded Moon & Mars Rover conforms to terrain up to ±138m and tracks Mars dust/Walker gait', () => {
+test('Expanded Moon & Mars Rover conforms to terrain up to ±260m and tracks Mars dust/Walker gait', () => {
   assert.equal(getLunarTerrainHeight(0, 0), 0);
   assert.equal(getSurfaceTerrainHeight('mars', 0, 0), 0);
 
-  let moonRover = createInitialRoverState(118, 0, 'moon');
-  for (let i = 0; i < 100; i++) {
+  let moonRover = createInitialRoverState(185, 0, 'moon');
+  for (let i = 0; i < 80; i++) {
     moonRover = stepRoverPhysics(moonRover, { forward: false, backward: false, left: true, right: false }, [], 0.05);
   }
-  // Drive outward past old 115m limit -> must allow reaching > 118m up to 138m
-  let outward = createInitialRoverState(110, 0, 'moon');
+  // Drive outward past 200m -> must allow reaching > 205m up to 260m
+  let outward = createInitialRoverState(200, 0, 'moon');
   outward.headingRad = Math.PI / 2;
   for (let i = 0; i < 60; i++) {
     outward = stepRoverPhysics(outward, { forward: true, backward: false, left: false, right: false }, [], 0.05);
   }
-  assert.ok(outward.x > 116 && outward.x <= 138, 'Rover must traverse expanded ±138m corridors');
+  assert.ok(outward.x > 206 && outward.x <= 260, 'Rover must traverse expanded ±260m corridors');
 
   let marsRover = createInitialRoverState(0, 0, 'mars');
   marsRover.driveMode = 'WALKER';
@@ -272,9 +272,9 @@ test('RATE_ASSIST lateral damping, killDrift [B] braking, Contact Light autoCuto
   assert.equal(Math.round(getSurfaceSlopeDeg('mars', 0, 0) * 10) / 10, 0);
   // Check sloped terrain away from pad flat circle (e.g. crater/ridge flank)
   const roughSlope = Math.max(
-    getSurfaceSlopeDeg('moon', 48, 38),
-    getSurfaceSlopeDeg('moon', -52, 42),
-    getSurfaceSlopeDeg('mars', 55, -45)
+    getSurfaceSlopeDeg('moon', 120, -135),
+    getSurfaceSlopeDeg('moon', -138, -100),
+    getSurfaceSlopeDeg('mars', -135, -90)
   );
   assert.ok(roughSlope > 0.5, `Off-pad lunar/mars flank should have non-zero terrain slope (got ${roughSlope})`);
 

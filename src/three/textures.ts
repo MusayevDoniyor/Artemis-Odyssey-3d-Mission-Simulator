@@ -294,7 +294,7 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   oCtx.arc(256, 174, 22, 0, Math.PI * 2);
   oCtx.fill();
 
-  // 8. NASA Meatball Insignia Decal Texture
+  // 8. NASA Meatball Insignia Decal Texture (vector fallback + crisp transparent PNG overlay)
   const nasaCanvas = document.createElement('canvas');
   nasaCanvas.width = 256;
   nasaCanvas.height = 256;
@@ -315,6 +315,17 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   nCtx.font = 'bold 52px Georgia, serif';
   nCtx.textAlign = 'center';
   nCtx.fillText('NASA', 128, 146);
+
+  const nasaDecal = finalizeColorTex(nasaCanvas, maxAnisotropy);
+  if (typeof Image !== 'undefined') {
+    const nasaImg = new Image();
+    nasaImg.onload = () => {
+      nCtx.clearRect(0, 0, 256, 256);
+      nCtx.drawImage(nasaImg, 12, 12, 232, 232);
+      nasaDecal.needsUpdate = true;
+    };
+    nasaImg.src = '/assets/nasa-meatball.png';
+  }
 
   // 9. KSC Ground Coastal Plain, Palmetto Scrub & Dune Silt (no flat square CAD grid)
   const kscCanvas = document.createElement('canvas');
@@ -617,7 +628,7 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
     slsCore: finalizeColorTex(coreCanvas, maxAnisotropy),
     slsSrb: finalizeColorTex(srbCanvas, maxAnisotropy),
     orionTile: finalizeColorTex(orionCanvas, maxAnisotropy),
-    nasaDecal: finalizeColorTex(nasaCanvas, maxAnisotropy),
+    nasaDecal,
     kscGround: finalizeColorTex(kscCanvas, maxAnisotropy, 16, 16),
     duskSky: finalizeColorTex(skyCanvas, maxAnisotropy),
     cloudPuff: finalizeColorTex(puffCanvas, maxAnisotropy),

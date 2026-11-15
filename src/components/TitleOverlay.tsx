@@ -7,12 +7,16 @@ import type {
   GamePhase,
   VehicleShowcaseId,
 } from '../game/types';
+import { CameraViewControls } from './CameraViewControls';
 import { NASAInsignia } from './NASAInsignia';
 
 interface TitleOverlayProps {
   showcase: VehicleShowcaseId;
   carryover: CampaignCarryoverState;
   onSelectShowcase: (v: VehicleShowcaseId) => void;
+  onSetCameraPreset: (yaw: number, pitch: number) => void;
+  onZoomCamera: (delta: number) => void;
+  onResetCamera: () => void;
   onSelectCampaignMission: (id: CampaignMissionId) => void;
   onStartMission: () => void;
   onJumpToPhase: (phase: GamePhase) => void;
@@ -49,6 +53,9 @@ export function TitleOverlay({
   showcase,
   carryover,
   onSelectShowcase,
+  onSetCameraPreset,
+  onZoomCamera,
+  onResetCamera,
   onSelectCampaignMission,
   onStartMission,
   onJumpToPhase,
@@ -169,7 +176,7 @@ export function TitleOverlay({
               );
             })}
           </div>
-          <div className="mt-2 max-w-lg rounded-lg border border-cyan-500/20 bg-slate-950/80 px-3 py-2 text-[11px]">
+          <div className="mt-2 max-w-lg rounded-lg border border-cyan-500/20 bg-slate-950/95 px-3 py-2 text-[11px]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-hud font-bold tracking-wide text-amber-300 uppercase">
                 {activeMission.code}
@@ -240,24 +247,33 @@ export function TitleOverlay({
           </span>
         </div>
 
-        <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg p-1.5">
-          <span className="px-2 font-hud text-[11px] font-bold text-slate-400 uppercase">
-            3D Model
-          </span>
-          {SHOWCASE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => onSelectShowcase(opt.id)}
-              className={`rounded-md px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap transition ${
-                showcase === opt.id
-                  ? 'bg-cyan-400 text-slate-950'
-                  : 'text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-2">
+          <CameraViewControls
+            compact
+            onSelectPreset={onSetCameraPreset}
+            onZoom={onZoomCamera}
+            onReset={onResetCamera}
+          />
+
+          <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-lg p-1.5">
+            <span className="px-2 font-hud text-[11px] font-bold text-slate-400 uppercase">
+              3D Model
+            </span>
+            {SHOWCASE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onSelectShowcase(opt.id)}
+                className={`rounded-md px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap transition ${
+                  showcase === opt.id
+                    ? 'bg-cyan-400 text-slate-950'
+                    : 'text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -64,7 +64,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/96 p-4">
       <div className="hud-panel tactical-frame animate-modal-enter flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl p-6">
         <div className="mb-4 flex shrink-0 items-center justify-between border-b border-cyan-500/20 pb-3">
           <div>
@@ -105,7 +105,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
         </div>
 
         {/* 2. NASA OSDR Live Radiation & Biology Studies */}
-        <div className="mb-4 rounded-xl border border-emerald-400/35 bg-slate-900/80 p-4">
+        <div className="mb-4 rounded-xl border border-emerald-400/35 bg-slate-900/95 p-4">
           <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-emerald-200 uppercase">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
@@ -122,7 +122,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                 href={study.uri}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-lg border border-cyan-500/20 bg-slate-950/80 p-3 text-left transition hover:border-emerald-400/60"
+                className="rounded-lg border border-cyan-500/20 bg-slate-950/95 p-3 text-left transition hover:border-emerald-400/60"
               >
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="font-mono-tech text-xs font-bold text-emerald-300">
@@ -143,7 +143,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
         </div>
 
         {/* 3. Live Google Search Grounded NASA Mission Brief */}
-        <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/80 p-4">
+        <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/95 p-4">
           <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-white uppercase">
               <Globe className="h-4 w-4 text-cyan-300" />
@@ -202,7 +202,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
         </div>
 
         {/* 4. Google Maps Grounded NASA Launch & Analog Sites */}
-        <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/80 p-4">
+        <div className="mb-4 rounded-xl border border-cyan-500/25 bg-slate-900/95 p-4">
           <div className="mb-2 flex items-center gap-2 font-display text-sm font-bold text-white uppercase">
             <MapPin className="h-4 w-4 text-emerald-400" />
             NASA Launch &amp; Analog Facilities
@@ -217,7 +217,7 @@ export function NasaDataModal({ open, donki, osdr, onClose }: NasaDataModalProps
                 href={place.uri}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-start justify-between gap-2 rounded-lg border border-cyan-500/20 bg-slate-950/70 p-2.5 text-xs hover:border-emerald-400/60"
+                className="flex items-start justify-between gap-2 rounded-lg border border-cyan-500/20 bg-slate-950/95 p-2.5 text-xs hover:border-emerald-400/60"
               >
                 <div>
                   <div className="font-hud font-bold text-emerald-200">{place.title}</div>
