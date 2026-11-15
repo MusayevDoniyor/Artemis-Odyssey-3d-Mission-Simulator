@@ -121,6 +121,7 @@ export class SpaceSceneManager {
   private lastTrackX = 9999;
   private lastTrackZ = 9999;
   private appliedQuality: QualityPreset = 'high';
+  private lastSolarScaleMode: SolarScaleMode = 'exploration';
 
   private sunLight: THREE.DirectionalLight;
   private ambientLight: THREE.HemisphereLight;
@@ -556,12 +557,13 @@ export class SpaceSceneManager {
   }
 
   private getSolarVisualRadius(bodyId: string): number {
-    if (bodyId === 'sun') return 9.8;
-    if (bodyId === 'earth') return 3.6;
-    if (bodyId === 'moon') return 1.65;
-    if (bodyId === 'mars') return 2.4;
+    const isSci = this.lastSolarScaleMode === 'scientific';
+    if (bodyId === 'sun') return isSci ? 4.4 : 9.8;
+    if (bodyId === 'earth') return isSci ? 1.85 : 3.6;
+    if (bodyId === 'moon') return isSci ? 0.85 : 1.65;
+    if (bodyId === 'mars') return isSci ? 1.45 : 2.5;
     const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
-    return spec ? spec.explorationBodySize : 4.2;
+    return (spec ? spec.explorationBodySize : 4.2) * (isSci ? 0.58 : 1.0);
   }
 
   getSelectedSolarBodyScreenPos(
@@ -1000,6 +1002,12 @@ export class SpaceSceneManager {
     kind: 'satellite' | 'jwst' | 'voyager'
   ) {
     (this.scene.background as THREE.Color).setHex(0x020617);
+    this.ambientLight.color.setHex(0x93c5fd);
+    this.ambientLight.groundColor.setHex(0x1e293b);
+    this.ambientLight.intensity = 0.55;
+    this.sunLight.color.setHex(0xfffbeb);
+    this.sunLight.position.set(90, 72, 60);
+    this.sunLight.intensity = 2.75;
     if (kind === 'satellite') {
       const sat = this.showcaseSatellite;
       sat.group.position.set(0, 0, 0);
@@ -1040,6 +1048,12 @@ export class SpaceSceneManager {
   private syncLaunchScene(s: SceneSimulationBridge, dt: number, elapsedSec: number) {
     const L = s.launch;
     const lc = this.launchComplex;
+    this.ambientLight.color.setHex(0x93c5fd);
+    this.ambientLight.groundColor.setHex(0x1e293b);
+    this.ambientLight.intensity = 0.55;
+    this.sunLight.color.setHex(0xfffbeb);
+    this.sunLight.position.set(90, 72, 60);
+    this.sunLight.intensity = 2.75;
 
     // Gentle horizon cloud drift
     lc.cloudLayer.rotation.y = Math.sin(elapsedSec * 0.03) * 0.05;
@@ -1364,6 +1378,13 @@ export class SpaceSceneManager {
     const sp = s.space;
     const ss = this.solarSystem;
     (this.scene.background as THREE.Color).setHex(0x020617);
+    // Let the Solar PointLight drive planetary day/night terminators while preserving subtle starlight fill
+    this.ambientLight.color.setHex(0x64748b);
+    this.ambientLight.groundColor.setHex(0x0f172a);
+    this.ambientLight.intensity = 0.34;
+    this.sunLight.color.setHex(0x93c5fd);
+    this.sunLight.position.set(110, 85, 80);
+    this.sunLight.intensity = 0.38;
 
     const bankTarget = s.input.left ? 0.32 : s.input.right ? -0.32 : 0;
     ss.shipGroup.position.set(sp.shipX, 0, sp.shipZ);
@@ -1413,6 +1434,8 @@ export class SpaceSceneManager {
     );
 
     const scaleMode: SolarScaleMode = s.solarScaleMode ?? 'exploration';
+    this.lastSolarScaleMode = scaleMode;
+    const isSci = scaleMode === 'scientific';
     const epochYears = s.solarEpochYears ?? 0;
 
     const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
@@ -1426,13 +1449,16 @@ export class SpaceSceneManager {
     if (ss.extraBodies.earth) {
       ss.extraBodies.earth.position.set(earthPos.x, 0, earthPos.z);
     }
+    ss.earthBodyGroup.scale.setScalar(isSci ? 0.48 : 1.0);
     ss.lunarOrbitRing.scale.setScalar(
-      scaleMode === 'scientific'
+      isSci
         ? moonSpec.scientificScaleRadius / moonSpec.explorationRadiusUnits
         : 1.0
     );
     ss.planets.moon.position.set(moonPos.x, 0, moonPos.z);
+    ss.planets.moon.scale.setScalar(isSci ? 0.45 : 1.0);
     ss.planets.mars.position.set(marsPos.x, 0, marsPos.z);
+    ss.planets.mars.scale.setScalar(isSci ? 0.55 : 1.0);
     if (ss.extraBodies.mars) {
       ss.extraBodies.mars.position.set(marsPos.x, 0, marsPos.z);
     }
@@ -1495,14 +1521,20 @@ export class SpaceSceneManager {
       marsPos.z
     );
 
+    const phobosDist = isSci ? 2.4 : 4.2;
     ss.marsPhobos.position.set(
-      marsPos.x + Math.cos(elapsedSec * 0.7) * 4.2,
+      marsPos.x + Math.cos(elapsedSec * 0.7) * phobosDist,
       0.55,
-      marsPos.z + Math.sin(elapsedSec * 0.7) * 4.2
+      marsPos.z + Math.sin(elapsedSec * 0.7) * phobosDist
     );
     ss.gatewayGroup.rotation.y += dt * 0.15;
     ss.earthClouds.rotation.y += dt * 0.04;
-    ss.sunCorona.scale.setScalar(1 + Math.sin(elapsedSec * 2.2) * 0.025);
+    const sunScale = isSci ? 0.38 : 1.0;
+    ss.sun.scale.setScalar(sunScale);
+    ss.sunCorona.scale.setScalar(sunScale * (1 + Math.sin(elapsedSec * 2.2) * 0.025));
+    ss.sunOuterGlow.scale.set(isSci ? 18 : 42, isSci ? 18 : 42, 1);
+    ss.asteroidBelt.scale.setScalar(isSci ? 37.0 / 67.0 : 1.0);
+    ss.kuiperBelt.scale.setScalar(isSci ? 180.0 / 160.0 : 1.0);
     ss.asteroidBelt.rotation.y += dt * 0.015;
 
     // Pulse solar storm ring gently; intensify only during active solar flare
@@ -1559,11 +1591,17 @@ export class SpaceSceneManager {
       if (ring) {
         const refRad = Math.max(2, b.explorationRadiusUnits);
         ring.scale.setScalar((scaleMode === 'scientific' ? b.scientificScaleRadius : b.explorationRadiusUnits) / refRad);
+        const rMat = ring.material as THREE.MeshBasicMaterial;
+        const baseOp = typeof ring.userData.baseOpacity === 'number' ? ring.userData.baseOpacity : 0.28;
+        rMat.opacity = s.focusedSolarBodyId === b.id ? Math.min(0.72, baseOp + 0.32) : baseOp;
       }
+      (ss.lunarOrbitRing.material as THREE.MeshBasicMaterial).opacity =
+        s.focusedSolarBodyId === 'moon' || s.focusedSolarBodyId === 'earth' ? 0.68 : 0.4;
       const bodyObj = ss.extraBodies[b.id];
       if (bodyObj) {
         if (b.id !== 'earth' && b.id !== 'mars') {
           bodyObj.position.set(pos.x, 0, pos.z);
+          bodyObj.scale.setScalar(isSci ? 0.55 : 1.0);
           bodyObj.rotation.y += dt * 0.25;
         }
         if (b.id === 'halley') {
@@ -1597,11 +1635,7 @@ export class SpaceSceneManager {
         Math.max(2.2, this.scratchFocusVec.y + Math.sin(s.orbitPitch) * dist + 1.5),
         this.scratchFocusVec.z + Math.cos(s.orbitYaw) * Math.cos(s.orbitPitch) * dist
       );
-      this.camLookTarget.set(
-        this.scratchFocusVec.x + (SOLAR_SUN_ORIGIN_X - this.scratchFocusVec.x) * 0.16,
-        this.scratchFocusVec.y,
-        this.scratchFocusVec.z + (SOLAR_SUN_ORIGIN_Z - this.scratchFocusVec.z) * 0.16
-      );
+      this.camLookTarget.copy(this.scratchFocusVec);
     } else if (s.userOrbitActive) {
       const anchor = hasFocus
         ? this.scratchFocusVec
@@ -1712,10 +1746,11 @@ export class SpaceSceneManager {
       }
 
       if (s.phase === 'title' && !s.userOrbitActive) {
-        const angle = elapsedSec * 0.16;
-        const rad = s.showcase === 'outpost' ? 24 : s.showcase === 'rover' ? 7.5 : 11;
+        const isOutpost = s.showcase === 'outpost';
+        const angle = isOutpost ? 0.42 + Math.sin(elapsedSec * 0.14) * 0.12 : elapsedSec * 0.16;
+        const rad = isOutpost ? 24.5 : s.showcase === 'rover' ? 7.5 : 11;
         const camX = focusX + Math.sin(angle) * rad;
-        const camY = focusY + (s.showcase === 'outpost' ? 7 : 3.2);
+        const camY = focusY + (isOutpost ? 3.2 : 3.2);
         const camZ = focusZ + Math.cos(angle) * rad;
         this.camera.position.set(camX, camY, camZ);
         const toCamX = camX - focusX;
@@ -1723,8 +1758,12 @@ export class SpaceSceneManager {
         const len = Math.max(0.01, Math.hypot(toCamX, toCamZ));
         const rightX = toCamZ / len;
         const rightZ = -toCamX / len;
-        const leftShift = s.showcase === 'outpost' ? 5.0 : s.showcase === 'rover' ? 1.8 : 2.8;
-        this.camera.lookAt(focusX - rightX * leftShift, focusY, focusZ - rightZ * leftShift);
+        const leftShift = isOutpost ? 5.2 : s.showcase === 'rover' ? 1.8 : 2.8;
+        this.camera.lookAt(
+          focusX - rightX * leftShift,
+          focusY + (isOutpost ? 0.65 : 0),
+          focusZ - rightZ * leftShift
+        );
       } else {
         const dist = Math.min(68, Math.max(3.2, s.orbitDistance));
         const camX = focusX + Math.sin(s.orbitYaw) * Math.cos(s.orbitPitch) * dist;

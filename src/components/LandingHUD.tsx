@@ -79,17 +79,17 @@ export function LandingHUD({
           <div className="flex items-center gap-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
             <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
               <path d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z" fill="#FFFFFF" />
-              <path d="M7 22C12 18 20 15 28 16.5" stroke="#F59E0B" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M7 22C12 18 20 15 28 16.5" stroke="#22D3EE" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
             <div className="leading-none">
-              <span className="block text-base font-extrabold tracking-widest text-white">ARTEMIS</span>
-              <span className="block text-base font-extrabold tracking-widest text-white">ODYSSEY</span>
+              <span className="block font-display text-sm font-extrabold tracking-widest text-white">ARTEMIS</span>
+              <span className="block font-display text-sm font-extrabold tracking-widest text-cyan-300">ODYSSEY</span>
             </div>
           </div>
 
           <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
-            <div className="flex items-center gap-2 text-base font-bold text-amber-400">
-              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
+            <div className="flex items-center gap-2 text-base font-bold text-cyan-300">
+              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-cyan-400" />
               <span>{isMars ? 'Mars Powered Descent' : 'Lunar Powered Descent'}</span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4">
@@ -231,7 +231,7 @@ export function LandingHUD({
                 type="button"
                 data-testid="skip-unstow-btn"
                 onClick={onSkipUnstow}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan inline-flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold"
               >
                 <FastForward className="h-4 w-4" />
                 Deploy Now
@@ -244,7 +244,7 @@ export function LandingHUD({
                   data-testid="mars-edl-banner"
                   className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2 text-sm"
                 >
-                  <span className="font-bold text-amber-300">
+                  <span className="font-bold text-cyan-300">
                     7-Min EDL · {activeEdlSpec.title}
                   </span>
                   {marsEdl.commsBlackout && (
@@ -256,7 +256,7 @@ export function LandingHUD({
                     type="button"
                     data-testid="fast-forward-edl-btn"
                     onClick={onFastForwardEdl}
-                    className="rounded-lg bg-amber-500 px-3 py-1 font-bold text-slate-950 hover:bg-amber-400"
+                    className="hud-cta-cyan rounded-lg px-3 py-1 font-bold"
                   >
                     Skip to Terminal
                   </button>
@@ -309,8 +309,8 @@ export function LandingHUD({
                     }
                     className={`rounded-lg px-3 py-1 text-sm font-bold ${
                       landing.guidanceMode === 'AUTOLAND'
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'border border-sky-400/25 bg-slate-900/75 text-slate-100 hover:border-amber-400'
+                        ? 'bg-cyan-400 text-slate-950'
+                        : 'border border-sky-400/25 bg-slate-900/75 text-slate-100 hover:border-cyan-400'
                     }`}
                   >
                     Auto-Land

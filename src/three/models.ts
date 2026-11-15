@@ -246,48 +246,60 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
 
   // Multi-deck Warm Interior Core visible inside Geodesic Dome
   const deck1 = new THREE.Mesh(
-    new THREE.CylinderGeometry(4.4, 4.8, 0.22, 16),
-    new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xf59e0b, emissiveIntensity: 0.35 })
+    new THREE.CylinderGeometry(4.5, 4.9, 0.28, 18),
+    new THREE.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xf59e0b, emissiveIntensity: 0.55 })
   );
-  deck1.position.y = 2.3;
+  deck1.position.y = 2.32;
   const deck2 = new THREE.Mesh(
-    new THREE.CylinderGeometry(3.2, 3.5, 0.2, 16),
-    new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x38bdf8, emissiveIntensity: 0.3 })
+    new THREE.CylinderGeometry(3.25, 3.6, 0.22, 18),
+    new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x38bdf8, emissiveIntensity: 0.42 })
   );
-  deck2.position.y = 4.0;
+  deck2.position.y = 4.05;
   const centerCore = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.85, 1.0, 4.4, 12),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xfbbf24, emissiveIntensity: 0.22 })
+    new THREE.CylinderGeometry(0.9, 1.08, 4.5, 14),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xfbbf24, emissiveIntensity: 0.35 })
   );
-  centerCore.position.y = 3.8;
-  habCore.add(deck1, deck2, centerCore);
+  centerCore.position.y = 3.85;
+  const warmCoreLight = new THREE.PointLight(0xfbbf24, 3.4, 22, 1.4);
+  warmCoreLight.position.set(0, 3.6, 0);
+  const airlockCoolLight = new THREE.PointLight(0x38bdf8, 1.8, 18, 1.5);
+  airlockCoolLight.position.set(9.6, 2.2, 0);
+  habCore.add(deck1, deck2, centerCore, warmCoreLight, airlockCoolLight);
 
   // Geodesic Glass Dome + Titanium Geodesic Rib Frame
   const habDome = new THREE.Mesh(
-    new THREE.SphereGeometry(5.6, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.SphereGeometry(5.6, 22, 16, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.MeshStandardMaterial({
       color: 0x7dd3fc,
       transparent: true,
-      opacity: 0.42,
-      metalness: 0.3,
-      roughness: 0.12,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.25,
+      opacity: 0.34,
+      metalness: 0.45,
+      roughness: 0.08,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 0.2,
     })
   );
   habDome.position.y = 2.1;
   habCore.add(habDome);
 
   const domeCage = new THREE.Mesh(
-    new THREE.SphereGeometry(5.65, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0xcbd5e1, wireframe: true, metalness: 0.75, roughness: 0.25 })
+    new THREE.SphereGeometry(5.66, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xe2e8f0, wireframe: true, metalness: 0.85, roughness: 0.22 })
   );
   domeCage.position.y = 2.1;
   habCore.add(domeCage);
 
-  // Apex cupola ring on dome top
+  // Illuminated Cyan Equatorial Ring + Apex Cupola
+  const eqGlowRing = new THREE.Mesh(
+    new THREE.TorusGeometry(6.05, 0.07, 8, 36),
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+  );
+  eqGlowRing.rotation.x = Math.PI / 2;
+  eqGlowRing.position.y = 2.18;
+  habCore.add(eqGlowRing);
+
   const cupola = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.1, 0.65, 12), hullWhite);
-  cupola.position.y = 6.95;
+  cupola.position.y = 7.0;
   habCore.add(cupola);
 
   // 4 Radial Pressurized Modules (Front Airlock, Lab, Storage, Rover Garage)
@@ -330,6 +342,26 @@ export function createLunarEnvironment(tex: ProceduralTextureSet): LunarEnvironm
 
     habCore.add(mod);
   });
+
+  // Exterior Cryo Supply Canisters & Equipment Crates beside Airlock
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.55, metalness: 0.45 });
+  const cryoBlueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.25, metalness: 0.65 });
+  const cratePositions: Array<[number, number, number]> = [
+    [6.8, 0.36, 4.6],
+    [7.7, 0.36, 4.9],
+    [4.6, 0.36, 7.6],
+  ];
+  cratePositions.forEach(([cx, cy, cz], i) => {
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.72, 0.85), crateMat);
+    crate.position.set(cx, cy, cz);
+    crate.rotation.y = 0.28 + i * 0.4;
+    crate.castShadow = true;
+    habCore.add(crate);
+  });
+  const cryoCan = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.55, 14), cryoBlueMat);
+  cryoCan.position.set(7.9, 0.78, 3.6);
+  cryoCan.castShadow = true;
+  habCore.add(cryoCan);
 
   tagPart(habCore, 'base-habitat');
   habGroup.add(habCore);
@@ -2926,10 +2958,12 @@ export function createOrbitalSatellite(tex: ProceduralTextureSet): OrbitalSatell
 export interface SolarSystemHandles {
   group: THREE.Group;
   sun: THREE.Mesh;
+  sunOuterGlow: THREE.Sprite;
   shipGroup: THREE.Group;
   shipFlame: THREE.Mesh;
   shipShieldShell: THREE.Mesh;
   shipWingsGroup: THREE.Group;
+  earthBodyGroup: THREE.Group;
   earthClouds: THREE.Mesh;
   sunCorona: THREE.Mesh;
   asteroidBelt: THREE.InstancedMesh;
@@ -3207,7 +3241,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     group.add(prom);
   });
 
-  const sunLight = new THREE.PointLight(0xfde68a, 4.6, 520, 0.65);
+  const sunLight = new THREE.PointLight(0xfff3d6, 3.45, 560, 0.28);
   sunLight.position.copy(sunPos);
   group.add(sunLight);
 
@@ -3230,36 +3264,46 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const moonSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
   const earth0 = computeKeplerBodyPosition(earthSpec, 0, 'exploration', SOLAR_SUN_ORIGIN_X, SOLAR_SUN_ORIGIN_Z);
 
-  // Earth Departure World anchored dynamically onto Earth's true 36u Kepler orbit
+  // Earth Departure World anchored dynamically onto Earth's true 38.5u Kepler orbit
   const earthGroup = new THREE.Group();
   earthGroup.position.set(earth0.x, 0, earth0.z);
+  const earthBodyGroup = new THREE.Group();
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize, 36, 28),
-    new THREE.MeshStandardMaterial({ map: tex.earthAlbedo, color: 0xffffff, roughness: 0.45, metalness: 0.08 })
+    new THREE.SphereGeometry(earthSpec.explorationBodySize, 40, 32),
+    new THREE.MeshStandardMaterial({
+      map: tex.earthAlbedo,
+      color: 0xffffff,
+      roughness: 0.36,
+      metalness: 0.14,
+      emissive: 0x082f49,
+      emissiveIntensity: 0.16,
+    })
   );
-  earthGroup.add(earth);
+  earthBodyGroup.add(earth);
   const earthClouds = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.12, 32, 24),
+    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.11, 36, 28),
     new THREE.MeshStandardMaterial({
       map: tex.earthClouds,
       transparent: true,
-      opacity: 0.74,
-      roughness: 0.85,
+      opacity: 0.72,
+      roughness: 0.88,
       depthWrite: false,
     })
   );
-  earthGroup.add(earthClouds);
+  earthBodyGroup.add(earthClouds);
   const earthAtmo = new THREE.Mesh(
-    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.42, 28, 22),
+    new THREE.SphereGeometry(earthSpec.explorationBodySize + 0.38, 32, 24),
     new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
       depthWrite: false,
     })
   );
-  earthGroup.add(earthAtmo);
+  earthBodyGroup.add(earthAtmo);
+  earthGroup.add(earthBodyGroup);
 
   // Lunar Orbit Ring centered on Earth so Moon always visibly orbits Earth!
   const lunarOrbitRing = new THREE.Mesh(
@@ -3267,7 +3311,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     new THREE.MeshBasicMaterial({
       color: 0x94a3b8,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.42,
       side: THREE.DoubleSide,
       depthWrite: false,
     })
@@ -3321,6 +3365,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   };
 
   // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars
+  const marsSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
   const planets = {} as Record<SpaceTargetId, THREE.Mesh>;
   let marsPhobos = new THREE.Mesh();
   (Object.keys(SOLAR_TARGETS) as SpaceTargetId[]).forEach((id) => {
@@ -3352,10 +3397,16 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
               metalness: 0.65,
               wireframe: id === 'relay-orbit',
             });
+    const visualBodyRadius =
+      id === 'moon'
+        ? moonSpec.explorationBodySize
+        : id === 'mars'
+          ? marsSpec.explorationBodySize
+          : spec.radius;
     const geom =
       id === 'relay-orbit'
         ? new THREE.SphereGeometry(0.45, 12, 10)
-        : new THREE.SphereGeometry(spec.radius, 36, 28);
+        : new THREE.SphereGeometry(visualBodyRadius, 36, 28);
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(spec.x, 0, spec.z);
     if (id === 'gateway' || id === 'relay-orbit') mesh.visible = false;
@@ -3367,7 +3418,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     if (id === 'mars') {
       // Attach Mars atmosphere directly to Mars mesh so it moves cleanly in all orbital scales
       const marsAtmo = new THREE.Mesh(
-        new THREE.SphereGeometry(spec.radius * 1.1, 28, 22),
+        new THREE.SphereGeometry(visualBodyRadius * 1.1, 28, 22),
         new THREE.MeshBasicMaterial({
           color: 0xfb923c,
           transparent: true,
@@ -3387,11 +3438,16 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     }
   });
 
-  // Main Asteroid Belt Ring (240 tinted rocky asteroids cleanly between Mars 51u and Jupiter 82u)
+  // Main Asteroid Belt Ring (240 natural stony asteroids cleanly between Mars 54u and Jupiter 84u)
   const beltCount = 240;
   const asteroidBelt = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.42, 0),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0.12 }),
+    new THREE.DodecahedronGeometry(0.22, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.94,
+      metalness: 0.04,
+      envMapIntensity: 0.16,
+    }),
     beltCount
   );
   asteroidBelt.position.copy(sunPos);
@@ -3399,18 +3455,18 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   const astTint = new THREE.Color();
   for (let i = 0; i < beltCount; i++) {
     const angle = (i / beltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.16;
-    const rad = 58 + Math.random() * 11;
+    const rad = 60.5 + Math.random() * 11.5;
     dummy.position.set(
       Math.cos(angle) * rad,
-      (Math.random() - 0.5) * 2.8,
+      (Math.random() - 0.5) * 2.2,
       Math.sin(angle) * rad
     );
     dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    dummy.scale.set(0.55 + Math.random() * 1.15, 0.42 + Math.random() * 0.72, 0.55 + Math.random() * 1.05);
+    dummy.scale.set(0.5 + Math.random() * 0.95, 0.38 + Math.random() * 0.62, 0.5 + Math.random() * 0.9);
     dummy.updateMatrix();
     asteroidBelt.setMatrixAt(i, dummy.matrix);
-    const shade = 0.42 + (i % 5) * 0.08;
-    astTint.setRGB(shade * 1.08, shade * 0.96, shade * 0.86);
+    const shade = 0.22 + (i % 5) * 0.045;
+    astTint.setRGB(shade * 1.12, shade * 0.98, shade * 0.84);
     asteroidBelt.setColorAt(i, astTint);
   }
   asteroidBelt.instanceMatrix.needsUpdate = true;
@@ -3628,14 +3684,42 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       const mapTex = textureForBody(b.id);
       const sphMat = new THREE.MeshStandardMaterial({
         map: mapTex,
+        bumpMap: b.id === 'mercury' || b.id === 'ceres' || b.id === 'eris' ? tex.moonBump : undefined,
+        bumpScale: b.id === 'mercury' ? 0.09 : 0.06,
         color: mapTex ? 0xffffff : b.color,
-        emissive: b.category === 'comet' ? b.color : 0x0f172a,
-        emissiveIntensity: b.category === 'comet' ? 0.5 : 0.14,
-        roughness: b.id === 'jupiter' || b.id === 'saturn' ? 0.58 : 0.72,
-        metalness: 0.05,
+        emissive: b.category === 'comet' ? b.color : b.id === 'venus' ? 0x451a03 : b.id === 'neptune' ? 0x0f172a : 0x090f1d,
+        emissiveIntensity: b.category === 'comet' ? 0.5 : 0.18,
+        roughness: b.id === 'jupiter' || b.id === 'saturn' || b.id === 'venus' ? 0.52 : b.id === 'uranus' || b.id === 'neptune' ? 0.44 : 0.76,
+        metalness: b.id === 'uranus' || b.id === 'neptune' ? 0.1 : 0.04,
       });
-      const sph = new THREE.Mesh(new THREE.SphereGeometry(b.explorationBodySize, 28, 22), sphMat);
+      const sph = new THREE.Mesh(new THREE.SphereGeometry(b.explorationBodySize, 34, 26), sphMat);
       bg.add(sph);
+
+      // Distinctive planetary atmospheric halos
+      const atmoColor =
+        b.id === 'venus'
+          ? 0xfde047
+          : b.id === 'jupiter'
+            ? 0xfdba74
+            : b.id === 'uranus'
+              ? 0x67e8f9
+              : b.id === 'neptune'
+                ? 0x3b82f6
+                : null;
+      if (atmoColor) {
+        const halo = new THREE.Mesh(
+          new THREE.SphereGeometry(b.explorationBodySize * 1.11, 28, 22),
+          new THREE.MeshBasicMaterial({
+            color: atmoColor,
+            transparent: true,
+            opacity: b.id === 'neptune' || b.id === 'venus' ? 0.22 : 0.15,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            depthWrite: false,
+          })
+        );
+        bg.add(halo);
+      }
 
       if (b.id === 'saturn') {
         const rings = new THREE.Mesh(
@@ -3644,7 +3728,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
             map: tex.saturnRingAlbedo,
             color: 0xffffff,
             transparent: true,
-            opacity: 0.92,
+            opacity: 0.94,
             side: THREE.DoubleSide,
             depthWrite: false,
           })
@@ -3654,15 +3738,22 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
         bg.add(rings);
       } else if (b.id === 'uranus') {
         const uRing = new THREE.Mesh(
-          new THREE.RingGeometry(b.explorationBodySize * 1.4, b.explorationBodySize * 1.72, 42),
-          new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.46, side: THREE.DoubleSide })
+          new THREE.RingGeometry(b.explorationBodySize * 1.38, b.explorationBodySize * 1.72, 48),
+          new THREE.MeshBasicMaterial({
+            color: 0xa5f3fc,
+            transparent: true,
+            opacity: 0.52,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
         );
+        uRing.rotation.z = 1.42;
         uRing.rotation.y = 0.25;
         bg.add(uRing);
       } else if (b.id === 'jupiter') {
         for (let m = 0; m < 4; m++) {
           const jMoon = new THREE.Mesh(
-            new THREE.SphereGeometry(0.28, 8, 8),
+            new THREE.SphereGeometry(0.28, 10, 8),
             new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 })
           );
           const ang = (m / 4) * Math.PI * 2;
@@ -3696,7 +3787,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
     }
 
     const rRing = new THREE.Mesh(
-      new THREE.RingGeometry(Math.max(2, b.explorationRadiusUnits - 0.11), b.explorationRadiusUnits + 0.11, 128),
+      new THREE.RingGeometry(Math.max(2, b.explorationRadiusUnits - 0.1), b.explorationRadiusUnits + 0.1, 144),
       new THREE.MeshBasicMaterial({
         color:
           b.id === 'earth'
@@ -3706,14 +3797,15 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
               : b.category === 'comet'
                 ? 0x38bdf8
                 : b.category === 'dwarf'
-                  ? 0x475569
-                  : 0x64748b,
+                  ? 0x64748b
+                  : 0x7dd3fc,
         transparent: true,
-        opacity: b.id === 'earth' || b.id === 'mars' ? 0.34 : b.category === 'planet' ? 0.24 : 0.15,
+        opacity: b.id === 'earth' || b.id === 'mars' ? 0.44 : b.category === 'planet' ? 0.3 : 0.18,
         side: THREE.DoubleSide,
         depthWrite: false,
       })
     );
+    rRing.userData.baseOpacity = b.id === 'earth' || b.id === 'mars' ? 0.44 : b.category === 'planet' ? 0.3 : 0.18;
     rRing.rotation.x = -Math.PI / 2;
     rRing.position.set(sunPos.x, -0.04, sunPos.z);
     group.add(rRing);
@@ -3772,7 +3864,7 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
       new THREE.PointsMaterial({ color: colHex, size: spherical ? 1.4 : 1.1, transparent: true, opacity: 0.42, sizeAttenuation: false })
     );
   };
-  const kuiperBelt = makeBeltPoints(380, 148, 184, false, 0x93c5fd);
+  const kuiperBelt = makeBeltPoints(380, 150, 186, false, 0x93c5fd);
   kuiperBelt.position.copy(sunPos);
   group.add(kuiperBelt);
 
@@ -3783,10 +3875,12 @@ export function createSolarSystemScene(tex: ProceduralTextureSet): SolarSystemHa
   return {
     group,
     sun,
+    sunOuterGlow,
     shipGroup,
     shipFlame,
     shipShieldShell,
     shipWingsGroup,
+    earthBodyGroup,
     earthClouds,
     sunCorona,
     asteroidBelt,

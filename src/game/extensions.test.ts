@@ -5,10 +5,14 @@ import {
   HARDWARE_ORDER,
 } from './hardwareCatalog';
 import {
+  PRIMARY_SOLAR_BAR_IDS,
   SOLAR_SYSTEM_BODIES,
+  SOLAR_SUN_ORIGIN_X,
+  SOLAR_SUN_ORIGIN_Z,
   computeKeplerBodyPosition,
   computeWeightOnBodyKg,
   getLiveSolarTargetPosition,
+  getShipSpawnForMission,
 } from './solarSystemData';
 import { getLearnModuleForObjective } from './learningModules';
 import {
@@ -101,22 +105,44 @@ test('solar system catalog covers Sun through Eris/Halley with Moon orbiting Ear
     }
   }
 
-  // Moon stays tightly bound to Earth across arbitrary orbital epochs
+  // Moon stays tightly bound to Earth and inside Venus..Mars corridor across arbitrary orbital epochs
+  const venus = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'venus')!;
   const earth = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
   const moon = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
+  const mars = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'mars')!;
   for (const epoch of [0, 0.25, 0.75, 2.4]) {
+    const vExp = computeKeplerBodyPosition(venus, epoch, 'exploration');
     const eExp = computeKeplerBodyPosition(earth, epoch, 'exploration');
     const mExp = computeKeplerBodyPosition(moon, epoch, 'exploration');
+    const maExp = computeKeplerBodyPosition(mars, epoch, 'exploration');
     assert.ok(Math.abs(Math.hypot(mExp.x - eExp.x, mExp.z - eExp.z) - 10.5) < 0.05);
+    const moonSunExp = Math.hypot(mExp.x - SOLAR_SUN_ORIGIN_X, mExp.z - SOLAR_SUN_ORIGIN_Z);
+    assert.ok(moonSunExp > vExp.orbitalRadius && moonSunExp < maExp.orbitalRadius);
 
+    const vSci = computeKeplerBodyPosition(venus, epoch, 'scientific');
     const eSci = computeKeplerBodyPosition(earth, epoch, 'scientific');
     const mSci = computeKeplerBodyPosition(moon, epoch, 'scientific');
+    const maSci = computeKeplerBodyPosition(mars, epoch, 'scientific');
     assert.ok(Math.abs(Math.hypot(mSci.x - eSci.x, mSci.z - eSci.z) - 4.2) < 0.05);
+    const moonSunSci = Math.hypot(mSci.x - SOLAR_SUN_ORIGIN_X, mSci.z - SOLAR_SUN_ORIGIN_Z);
+    assert.ok(moonSunSci > vSci.orbitalRadius && moonSunSci < maSci.orbitalRadius);
   }
 
   const liveMoon = getLiveSolarTargetPosition('moon', 0, 'exploration');
   const liveEarth = computeKeplerBodyPosition(earth, 0, 'exploration');
   assert.ok(Math.hypot(liveMoon.x - liveEarth.x, liveMoon.z - liveEarth.z) < 11.0);
+
+  // Mission spawns place Orion/SLS near Earth (Artemis II) or Moon (Artemis IV)
+  const spawnA2 = getShipSpawnForMission('artemis-2', 0, 'exploration');
+  assert.ok(Math.hypot(spawnA2.x - liveEarth.x, spawnA2.z - liveEarth.z) <= 6.0);
+  const spawnA4 = getShipSpawnForMission('artemis-4', 0, 'exploration');
+  assert.ok(Math.hypot(spawnA4.x - liveMoon.x, spawnA4.z - liveMoon.z) <= 6.0);
+
+  // Primary selector bar keeps Moon right after Earth between Venus and Mars
+  const barIds = PRIMARY_SOLAR_BAR_IDS as readonly string[];
+  assert.equal(barIds.indexOf('moon'), barIds.indexOf('earth') + 1);
+  assert.ok(barIds.indexOf('venus') < barIds.indexOf('moon'));
+  assert.ok(barIds.indexOf('moon') < barIds.indexOf('mars'));
 
   assert.equal(computeWeightOnBodyKg(35, 0.165), 5.8);
   assert.equal(computeWeightOnBodyKg(35, 0.38), 13.3);

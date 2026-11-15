@@ -43,9 +43,9 @@ export function WorldTargetPins({
                   type="button"
                   data-testid={isBase ? 'world-basecamp-interact' : `world-interact-${p.id}`}
                   onClick={() => (isBase ? onOpenOutpost() : onInteractObjective(p.id))}
-                  className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-xl border-amber-400/70 px-3.5 py-2 text-base font-semibold text-white shadow-lg transition hover:border-amber-300"
+                  className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-xl border-cyan-400/75 px-3.5 py-2 text-base font-semibold text-white shadow-lg transition hover:border-cyan-300"
                 >
-                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-amber-400 px-1.5 text-sm font-bold text-stone-950">
+                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-cyan-400 px-1.5 text-sm font-bold text-slate-950">
                     E
                   </span>
                   <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -56,13 +56,13 @@ export function WorldTargetPins({
                       </>
                     ) : (
                       <>
-                        <BookOpen className="h-4 w-4 text-amber-300" />
+                        <BookOpen className="h-4 w-4 text-cyan-300" />
                         Learn &amp; Sample {p.title}
                       </>
                     )}
                   </span>
                   {!isBase && p.progress > 0 && (
-                    <span className="text-sm font-bold text-amber-300">
+                    <span className="text-sm font-bold text-cyan-300">
                       {Math.round(p.progress * 100)}%
                     </span>
                   )}

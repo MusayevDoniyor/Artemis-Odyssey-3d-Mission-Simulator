@@ -128,7 +128,7 @@ function PayloadBlueprintIcon({ id, active }: { id: PayloadId; active: boolean }
     <div
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition ${
         active
-          ? 'border-amber-400/70 bg-amber-500/15 text-amber-300'
+          ? 'border-cyan-400/75 bg-cyan-500/15 text-cyan-300'
           : 'border-sky-400/25 bg-slate-950/75 text-sky-300'
       }`}
     >
@@ -147,7 +147,7 @@ function MassPips({ massMultiplier }: { massMultiplier: number }) {
           <span
             key={idx}
             className={`h-1.5 w-3 rounded-sm ${
-              idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-sky-400') : 'bg-slate-800'
+              idx <= pips ? (pips === 4 ? 'bg-amber-400' : 'bg-cyan-400') : 'bg-slate-800'
             }`}
           />
         ))}
@@ -207,7 +207,7 @@ export function BriefingOverlay({
             </button>
             <div
               data-testid="briefing-mission-patch"
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-amber-400/55 bg-[#050811] shadow-[0_0_16px_rgba(245,158,11,0.2)]"
+              className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_16px_rgba(34,211,238,0.22)]"
             >
               <img
                 src={missionPatchImg}
@@ -389,8 +389,8 @@ export function BriefingOverlay({
                 onClick={() => onSelectPayload(p.id)}
                 className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
                   active
-                    ? 'border-amber-400/80 bg-amber-500/18 shadow-[0_0_24px_rgba(245,158,11,0.18)]'
-                    : 'border-sky-400/20 bg-slate-900/65 hover:border-sky-400/55'
+                    ? 'border-cyan-400/80 bg-cyan-500/16 shadow-[0_0_24px_rgba(34,211,238,0.18)]'
+                    : 'border-sky-400/20 bg-slate-900/65 hover:border-cyan-400/55'
                 }`}
               >
                 <PayloadBlueprintIcon id={p.id} active={active} />
@@ -434,7 +434,7 @@ export function BriefingOverlay({
         {/* Clean Action Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="font-mono-tech text-xs text-slate-300">
-            LOADOUT: <span className="font-bold text-amber-300">{chosen.name}</span> ·{' '}
+            LOADOUT: <span className="font-bold text-cyan-300">{chosen.name}</span> ·{' '}
             {chosen.massMultiplier.toFixed(2)}× Mass
           </div>
 
@@ -442,7 +442,7 @@ export function BriefingOverlay({
             type="button"
             data-testid="briefing-launch-btn"
             onClick={onLaunch}
-            className="inline-flex items-center gap-2.5 rounded-xl bg-amber-500 px-6 py-3 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-amber-400"
+            className="hud-cta-cyan inline-flex items-center gap-2.5 rounded-xl px-6 py-3 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition"
           >
             <Rocket className="h-4 w-4" />
             {launchCtaLabel}

@@ -119,7 +119,7 @@ export function VehicleInspectorOverlay({
                     }}
                     className={`rounded-lg px-2.5 py-1.5 font-hud text-xs font-bold whitespace-nowrap transition ${
                       showcase === id
-                        ? 'bg-sky-400 text-slate-950'
+                        ? 'bg-cyan-400 text-slate-950'
                         : 'text-slate-200 hover:bg-slate-800'
                     }`}
                   >
@@ -141,16 +141,16 @@ export function VehicleInspectorOverlay({
             <button
               type="button"
               onClick={onOpenNotebook}
-              className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold whitespace-nowrap text-amber-200 uppercase hover:border-amber-400"
+              className="hud-btn-glass pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-hud text-xs font-bold whitespace-nowrap text-cyan-200 uppercase"
             >
-              <BookOpen className="h-3.5 w-3.5 text-amber-300" />
+              <BookOpen className="h-3.5 w-3.5 text-cyan-300" />
               Ledger ({unlockedNotes.length})
             </button>
 
             <button
               type="button"
               onClick={onStartMission}
-              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase hover:bg-amber-400"
+              className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase"
             >
               <Play className="h-3.5 w-3.5 fill-slate-950" />
               Briefing
@@ -222,7 +222,7 @@ export function VehicleInspectorOverlay({
             {/* Explode Slider + Toggles */}
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <label className="flex items-center gap-2 rounded-lg border border-sky-400/20 bg-slate-900/75 px-2.5 py-1">
-                <Layers className="h-3.5 w-3.5 text-amber-300" />
+                <Layers className="h-3.5 w-3.5 text-cyan-300" />
                 <span className="font-hud font-bold text-slate-200 uppercase">Explode</span>
                 <input
                   type="range"
@@ -232,9 +232,9 @@ export function VehicleInspectorOverlay({
                   max={100}
                   value={inspectorUi.explodePct}
                   onChange={(e) => onUpdateInspectorUi({ explodePct: Number(e.target.value) })}
-                  className="w-20 accent-amber-400"
+                  className="w-20 accent-cyan-400"
                 />
-                <span className="w-8 text-right font-mono-tech font-bold text-amber-300">
+                <span className="w-8 text-right font-mono-tech font-bold text-cyan-300">
                   {inspectorUi.explodePct}%
                 </span>
               </label>
@@ -323,14 +323,14 @@ export function VehicleInspectorOverlay({
                     onClick={() => onSelectPart(part.id)}
                     className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left font-hud text-xs font-bold transition ${
                       active
-                        ? 'border-sky-400 bg-sky-500/20 text-white'
-                        : 'border-sky-400/15 bg-slate-900/65 text-slate-200 hover:border-sky-400/45'
+                        ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                        : 'border-sky-400/15 bg-slate-900/65 text-slate-200 hover:border-cyan-400/45'
                     }`}
                   >
                     <span className="inline-flex items-center gap-2 truncate">
                       <span
                         className={`font-mono-tech text-[10px] ${
-                          active ? 'text-sky-300' : 'text-slate-500'
+                          active ? 'text-cyan-300' : 'text-slate-500'
                         }`}
                       >
                         0{idx + 1}
@@ -348,7 +348,7 @@ export function VehicleInspectorOverlay({
             <div className="flex flex-col justify-between rounded-xl border border-sky-400/20 bg-slate-950/70 p-3">
               <div>
                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-display text-sm font-bold text-amber-300 uppercase">
+                  <span className="font-display text-sm font-bold text-cyan-300 uppercase">
                     {activePart.name}
                   </span>
                   <div className="flex items-center gap-1.5">

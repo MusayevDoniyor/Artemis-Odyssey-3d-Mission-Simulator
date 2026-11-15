@@ -167,24 +167,24 @@ export function RoverHUD({
               <path d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z" fill="#FFFFFF" />
               <path
                 d="M7 22C12 18 20 15 28 16.5"
-                stroke="#F59E0B"
+                stroke="#22D3EE"
                 strokeWidth="2.4"
                 strokeLinecap="round"
               />
             </svg>
             <div className="leading-none">
-              <span className="block text-base font-extrabold tracking-widest text-white">
+              <span className="block font-display text-sm font-extrabold tracking-widest text-white">
                 ARTEMIS
               </span>
-              <span className="block text-base font-extrabold tracking-widest text-white">
+              <span className="block font-display text-sm font-extrabold tracking-widest text-cyan-300">
                 ODYSSEY
               </span>
             </div>
           </div>
 
           <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
-            <div className="flex items-center gap-2 text-base font-bold text-amber-400">
-              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
+            <div className="flex items-center gap-2 text-base font-bold text-cyan-300">
+              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-cyan-400" />
               <span>
                 {isMars ? 'Mars Mission' : freeExploreMode ? 'Free Explore' : 'Mission Objective'}
               </span>
@@ -370,7 +370,7 @@ export function RoverHUD({
               type="button"
               data-testid="open-drill-console-btn"
               onClick={() => onOpenDrillConsole(nearestObjective)}
-              className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-2xl border-amber-400/60 px-4 py-2 text-base font-bold text-amber-300 hover:border-amber-300"
+              className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-base font-bold"
             >
               <BookOpen className="h-4 w-4" />
               Learn &amp; Sample ({nearestObjective.siteName})
@@ -389,7 +389,7 @@ export function RoverHUD({
                 type="button"
                 aria-label="Undo last waypoint"
                 onClick={onUndoMarsQueue}
-                className="rounded-lg border border-sky-400/20 bg-slate-900/80 p-1.5 text-slate-200 hover:border-amber-400"
+                className="rounded-lg border border-sky-400/20 bg-slate-900/80 p-1.5 text-slate-200 hover:border-cyan-400"
               >
                 <Undo2 className="h-4 w-4" />
               </button>
@@ -405,7 +405,7 @@ export function RoverHUD({
                 type="button"
                 data-testid="send-mars-batch-btn"
                 onClick={onTransmitMarsQueue}
-                className="rounded-xl bg-amber-500 px-4 py-1.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan rounded-xl px-4 py-1.5 text-base font-bold"
               >
                 Send Batch
               </button>

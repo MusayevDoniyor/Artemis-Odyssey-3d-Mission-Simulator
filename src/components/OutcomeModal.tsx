@@ -128,7 +128,7 @@ export function OutcomeModal({
             <button
               type="button"
               onClick={onResume}
-              className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-sky-300"
+              className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition"
             >
               <Play className="h-4 w-4 fill-slate-950" />
               Resume
@@ -299,7 +299,7 @@ export function OutcomeModal({
             <button
               type="button"
               onClick={onResume}
-              className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-sky-300"
+              className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition"
             >
               <Play className="h-4 w-4 fill-slate-950" />
               Resume
@@ -320,7 +320,11 @@ export function OutcomeModal({
             type="button"
             data-start={mode === 'victory' || mode === 'gameover' ? 'true' : undefined}
             onClick={onRetry}
-            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase transition hover:bg-amber-400"
+            className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-display text-xs font-bold tracking-wider whitespace-nowrap uppercase transition ${
+              mode === 'gameover' || (mode === 'victory' && (!onNextMission || !nextMissionLabel))
+                ? 'hud-cta-cyan'
+                : 'hud-btn-glass'
+            }`}
           >
             <RotateCcw className="h-4 w-4" />
             {mode === 'pause' ? 'Restart Stage' : 'Replay Mission'}

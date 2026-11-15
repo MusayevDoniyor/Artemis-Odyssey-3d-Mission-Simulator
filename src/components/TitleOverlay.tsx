@@ -1,21 +1,47 @@
-import { BookOpen, Compass, Database, Play, Volume2, VolumeX } from 'lucide-react';
+import {
+  ArrowRight,
+  Battery,
+  BookOpen,
+  Box,
+  ChevronRight,
+  Compass,
+  Globe,
+  Mouse,
+  Orbit,
+  Play,
+  Rocket,
+  Settings,
+  Sliders,
+  Thermometer,
+  Trophy,
+  Volume2,
+  VolumeX,
+  Wrench,
+} from 'lucide-react';
+import { useState } from 'react';
 import missionPatchImg from '../assets/images/artemis_mission_patch_v2_1794686358129.jpg';
 import { CAMPAIGN_MISSIONS, CAMPAIGN_ORDER } from '../game/constants';
+import { SOLAR_SYSTEM_BODIES } from '../game/solarSystemData';
 import type {
   AudioSettings,
   CampaignCarryoverState,
   CampaignMissionId,
+  DonkiStatus,
+  GameMenuTab,
   GamePhase,
+  OsdrStatus,
   QualityPreset,
   VehicleShowcaseId,
 } from '../game/types';
 import { AudioQualityPopover } from './AudioQualityPopover';
-import { CameraViewControls } from './CameraViewControls';
 import { NASAInsignia } from './NASAInsignia';
+import { GatewayStationThumb, PlanetThumb } from './PlanetThumb';
 
 interface TitleOverlayProps {
   showcase: VehicleShowcaseId;
   carryover: CampaignCarryoverState;
+  donki: DonkiStatus;
+  osdr: OsdrStatus;
   audioSettings: AudioSettings;
   qualityPreset: QualityPreset;
   onUpdateAudio: (partial: Partial<AudioSettings>) => void;
@@ -27,9 +53,12 @@ interface TitleOverlayProps {
   onSelectCampaignMission: (id: CampaignMissionId) => void;
   onStartMission: () => void;
   onStartFreeExplore: () => void;
+  onExploreWorld: (bodyId: string) => void;
   onJumpToPhase: (phase: GamePhase) => void;
+  onOpenBriefing: () => void;
   onOpenNotebook: () => void;
   onOpenNasaModal: () => void;
+  onOpenMenuTab: (tab: GameMenuTab) => void;
   muted: boolean;
   onToggleMute: () => void;
 }
@@ -52,88 +81,295 @@ const QUICK_STAGES: Array<{ phase: GamePhase; label: string }> = [
   { phase: 'rover', label: 'Rover' },
 ];
 
-const MISSION_ROUTE_BADGE: Record<CampaignMissionId, string> = {
-  'artemis-2': 'SLS Launch -> HERMES Sat -> Link Lock',
-  'artemis-3': '0.165g Land -> 4 Crater Sites -> ISRU',
-  'artemis-4': 'Lunar Orbit -> NRHO Gateway -> Storm Shield',
-  'mars-pathfinder': '0.38g EDL -> Jezero Delta -> MOXIE O₂',
+const CAMPAIGN_CARD_META: Record<
+  CampaignMissionId,
+  { num: number; name: string; destination: string; planetThumb?: string }
+> = {
+  'artemis-2': {
+    num: 1,
+    name: 'Artemis II',
+    destination: 'Earth → LLO',
+    planetThumb: 'earth',
+  },
+  'artemis-3': {
+    num: 2,
+    name: 'Artemis III',
+    destination: 'Moon South Pole',
+    planetThumb: 'moon',
+  },
+  'artemis-4': {
+    num: 3,
+    name: 'Artemis IV',
+    destination: 'Lunar Gateway',
+  },
+  'mars-pathfinder': {
+    num: 4,
+    name: 'Mars Expedition',
+    destination: 'Jezero Crater',
+    planetThumb: 'mars',
+  },
 };
+
+const CAMPAIGN_DESTINATION_BODY: Record<CampaignMissionId, string> = {
+  'artemis-2': 'earth',
+  'artemis-3': 'moon',
+  'artemis-4': 'moon',
+  'mars-pathfinder': 'mars',
+};
+
+const CAROUSEL_PAGE_ONE = ['earth', 'moon', 'mars', 'jupiter', 'saturn'];
+const CAROUSEL_PAGE_TWO = ['sun', 'mercury', 'venus', 'uranus', 'neptune', 'pluto'];
 
 export function TitleOverlay({
   showcase,
   carryover,
+  donki,
+  osdr,
   audioSettings,
   qualityPreset,
   onUpdateAudio,
   onChangeQuality,
   onSelectShowcase,
-  onSetCameraPreset,
-  onZoomCamera,
-  onResetCamera,
   onSelectCampaignMission,
   onStartMission,
   onStartFreeExplore,
+  onExploreWorld,
   onJumpToPhase,
+  onOpenBriefing,
   onOpenNotebook,
   onOpenNasaModal,
+  onOpenMenuTab,
   muted,
   onToggleMute,
 }: TitleOverlayProps) {
+  const [selectedPlanetId, setSelectedPlanetId] = useState<string>('moon');
+  const [carouselPage, setCarouselPage] = useState<0 | 1>(0);
+  const [quickToolsOpen, setQuickToolsOpen] = useState(false);
+
   const activeMission = CAMPAIGN_MISSIONS[carryover.activeMission];
+  const nasaLive = donki.isLive || osdr.isLive;
+  const visibleCarouselIds = carouselPage === 0 ? CAROUSEL_PAGE_ONE : CAROUSEL_PAGE_TWO;
+  const selectedPlanet =
+    SOLAR_SYSTEM_BODIES.find((b) => b.id === selectedPlanetId) ??
+    SOLAR_SYSTEM_BODIES.find((b) => b.id === 'moon')!;
+
+  const handleCycleCarousel = () => {
+    const nextPage = carouselPage === 0 ? 1 : 0;
+    setCarouselPage(nextPage);
+    const nextList = nextPage === 0 ? CAROUSEL_PAGE_ONE : CAROUSEL_PAGE_TWO;
+    if (!nextList.includes(selectedPlanetId)) {
+      setSelectedPlanetId(nextList[0]);
+    }
+  };
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between">
-      {/* Left calm scrim protecting typography contrast over the live 3D showcase */}
+      {/* Subtle Left + Edge Scrim leaving Moon Base & Earthrise vivid */}
       <div className="title-scrim pointer-events-none absolute inset-0" />
 
-      {/* Top right utility buttons */}
-      <div className="relative z-20 flex items-center justify-end gap-2 px-6 pt-5">
-        <button
-          type="button"
-          onClick={onOpenNotebook}
-          className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold tracking-wide whitespace-nowrap text-amber-200 uppercase transition hover:border-amber-400/70"
-        >
-          <BookOpen className="h-3.5 w-3.5 text-amber-300" />
-          Ledger ({carryover.unlockedFieldNotes.length})
-        </button>
+      {/* TOP BAR + LUNAR ENVIRONMENTAL READOUT */}
+      <div className="relative z-20 flex flex-col gap-2 px-5 pt-4 lg:px-7">
+        <header className="flex items-center justify-between gap-3">
+          {/* Left: NASA Insignia + ARTEMIS ODYSSEY Wordmark */}
+          <div className="pointer-events-auto flex items-center gap-3 drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)]">
+            <NASAInsignia size={38} className="shrink-0" />
+            <div className="leading-none">
+              <span className="block font-display text-sm font-extrabold tracking-[0.16em] text-white">
+                ARTEMIS
+              </span>
+              <span className="mt-0.5 block font-display text-sm font-extrabold tracking-[0.16em] text-cyan-300">
+                ODYSSEY
+              </span>
+            </div>
+          </div>
 
-        <button
-          type="button"
-          onClick={onOpenNasaModal}
-          className="hud-panel pointer-events-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-hud text-xs font-bold tracking-wide whitespace-nowrap text-emerald-300 uppercase transition hover:border-emerald-400/70"
-        >
-          <Database className="h-3.5 w-3.5" />
-          NASA OSDR &amp; DONKI
-        </button>
+          {/* Center: Single-Row Midnight Glass Navigation */}
+          <nav
+            aria-label="Primary Navigation"
+            className="hud-soft pointer-events-auto flex items-center gap-0.5 rounded-2xl p-1"
+          >
+            <button
+              type="button"
+              onClick={onStartFreeExplore}
+              className="hud-nav-active inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition lg:text-sm"
+            >
+              <Globe className="h-4 w-4 text-cyan-300" />
+              Solar System
+            </button>
 
-        <AudioQualityPopover
-          audio={audioSettings}
-          quality={qualityPreset}
-          onUpdateAudio={onUpdateAudio}
-          onChangeQuality={onChangeQuality}
-        />
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
 
-        <button
-          type="button"
-          onClick={onToggleMute}
-          title="Toggle Sound [M]"
-          className="hud-panel pointer-events-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-sky-400/60"
-        >
-          {muted ? (
-            <VolumeX className="h-4 w-4 text-slate-400" />
-          ) : (
-            <Volume2 className="h-4 w-4 text-sky-300" />
-          )}
-          <span className="keycap">M</span>
-        </button>
+            <button
+              type="button"
+              onClick={onOpenBriefing}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <Rocket className="h-4 w-4 text-sky-300" />
+              Missions
+            </button>
+
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
+
+            <button
+              type="button"
+              onClick={() => onJumpToPhase('inspector')}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <Box className="h-4 w-4 text-sky-300" />
+              Hardware Bay
+            </button>
+
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
+
+            <button
+              type="button"
+              onClick={onOpenNotebook}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <BookOpen className="h-4 w-4 text-sky-300" />
+              Astronaut Notebook
+              {carryover.unlockedFieldNotes.length > 0 && (
+                <span className="rounded-md bg-cyan-500/20 px-1.5 py-0.5 font-mono-tech text-[10px] font-bold text-cyan-200">
+                  {carryover.unlockedFieldNotes.length}
+                </span>
+              )}
+            </button>
+
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
+
+            <button
+              type="button"
+              onClick={() => onOpenMenuTab('achievements')}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <Trophy className="h-4 w-4 text-cyan-300" />
+              Achievements
+            </button>
+
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
+
+            <button
+              type="button"
+              onClick={() => onOpenMenuTab('settings')}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <Settings className="h-4 w-4 text-slate-300" />
+              Settings
+            </button>
+          </nav>
+
+          {/* Right: Live NASA Data Status + Mute */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenNasaModal}
+              className="hud-soft inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-100 transition hover:border-cyan-400/70"
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  nasaLive
+                    ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                    : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
+                }`}
+              />
+              <span className={nasaLive ? 'text-emerald-200' : 'text-amber-200'}>
+                {nasaLive ? 'NASA Data Connected' : 'NASA Data Archived'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleMute}
+              title="Toggle Sound [M]"
+              className="hud-soft inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/60"
+            >
+              {muted ? (
+                <VolumeX className="h-4 w-4 text-slate-400" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-cyan-300" />
+              )}
+              <span className="keycap">M</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Sub-Top Right Lunar Base Reference Spec Chip */}
+        <div className="flex justify-end">
+          <div className="hud-soft pointer-events-auto inline-flex items-center divide-x divide-sky-400/20 rounded-full px-4 py-1.5 font-mono-tech text-xs font-semibold text-slate-100 tabular-nums">
+            <span
+              className="inline-flex items-center gap-1.5 pr-3"
+              title="Nominal Outpost Power Bus Readiness"
+            >
+              <Battery className="h-3.5 w-3.5 text-emerald-400" />
+              <span>100%</span>
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 px-3"
+              title="Lunar South Pole Night / Crater Average"
+            >
+              <Thermometer className="h-3.5 w-3.5 text-cyan-300" />
+              <span>-173°C</span>
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 pl-3"
+              title="Mean Earth–Moon Orbital Distance"
+            >
+              <Orbit className="h-3.5 w-3.5 text-sky-300" />
+              <span>384,400 km</span>
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Left-aligned NASA Emblem + Mission Patch + Title Lockup & Campaign */}
-      <div className="relative z-10 max-w-xl px-6 md:px-10">
-        <div className="mb-3 flex items-center gap-3.5">
+      {/* LEFT HERO COLUMN */}
+      <div className="relative z-10 max-w-[495px] px-6 lg:px-9">
+        {/* Eyebrow */}
+        <div className="mb-1.5 flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+          <p className="font-hud text-[11px] font-bold tracking-[0.26em] text-cyan-300 uppercase">
+            NASA Flight Operations Simulator
+          </p>
+        </div>
+
+        {/* Title Lockup with Cyan Orbital Swoosh + Official Mission Patch */}
+        <div className="relative mb-3 flex items-center gap-3.5">
+          <svg
+            width="64"
+            height="68"
+            viewBox="0 0 64 68"
+            fill="none"
+            aria-hidden="true"
+            className="pointer-events-none -ml-2 shrink-0"
+          >
+            <path
+              d="M52 12C24 14 8 31 12 49C15 61 31 64 46 57"
+              stroke="#22d3ee"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+            />
+            <path
+              d="M16 42C24 27 40 19 56 17"
+              stroke="#38bdf8"
+              strokeWidth="1.4"
+              strokeOpacity="0.65"
+              strokeLinecap="round"
+            />
+            <circle cx="15" cy="40" r="2.8" fill="#67e8f9" />
+            <circle cx="49" cy="14" r="2.2" fill="#e0f2fe" />
+          </svg>
+
+          <div className="-ml-5 min-w-0 flex-1 leading-[0.95]">
+            <h1 className="font-display text-4xl font-extrabold tracking-[0.04em] text-white uppercase drop-shadow-[0_4px_24px_rgba(34,211,238,0.28)] xl:text-[46px]">
+              ARTEMIS
+              <span className="mt-0.5 block bg-gradient-to-r from-cyan-300 via-sky-300 to-cyan-500 bg-clip-text text-transparent">
+                ODYSSEY
+              </span>
+            </h1>
+          </div>
+
           <div
             data-testid="title-mission-patch"
-            className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-amber-400/60 bg-[#050811] shadow-[0_0_24px_rgba(34,211,238,0.22)]"
+            className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-cyan-400/55 bg-[#050811] shadow-[0_0_24px_rgba(34,211,238,0.28)]"
           >
             <img
               src={missionPatchImg}
@@ -142,173 +378,295 @@ export function TitleOverlay({
               className="h-full w-full scale-[1.18] object-cover"
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <NASAInsignia size={22} className="shrink-0" />
-              <p className="font-hud text-[11px] font-bold tracking-[0.24em] text-sky-300 uppercase">
-                NASA Flight Operations Simulator
-              </p>
-            </div>
-            <h1 className="font-display text-4xl font-extrabold tracking-wide text-white uppercase md:text-5xl">
-              ARTEMIS ODYSSEY
-            </h1>
-          </div>
         </div>
 
-        <p className="mb-4 max-w-md text-sm text-slate-200">
-          Launch SLS Block 1, explore every Solar System world, land on Moon &amp; Mars, and run your polar outpost.
+        <p className="mb-4 max-w-[430px] text-sm leading-relaxed text-slate-200/95">
+          Launch SLS, explore the Moon and Mars, and experience the next chapter of space exploration.
         </p>
 
-        {/* 4-Stage Campaign Selector */}
-        <div className="pointer-events-auto mb-4">
-          <div className="mb-1.5 flex items-center justify-between font-hud text-[11px] font-bold tracking-wider text-sky-300 uppercase">
-            <span>Campaign Manifest</span>
+        {/* CAMPAIGN MISSIONS 2×2 Interactive Card Panel */}
+        <section className="hud-soft pointer-events-auto mb-3.5 rounded-2xl p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
+            <div className="flex items-center gap-2 font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-200 uppercase">
+              <span className="inline-block h-2 w-2 rotate-45 rounded-[1px] bg-cyan-400" />
+              <span>Campaign Missions</span>
+            </div>
             {carryover.completedMissions.length > 0 && (
-              <span className="font-mono-tech text-emerald-300">
+              <span className="font-mono-tech text-[10px] font-bold text-emerald-300">
                 {carryover.completedMissions.length}/4 CLEARED · {carryover.isruWaterKg}kg H₂O
               </span>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-1.5 sm:max-w-lg">
+
+          <div className="grid grid-cols-2 gap-2">
             {CAMPAIGN_ORDER.map((id) => {
-              const m = CAMPAIGN_MISSIONS[id];
+              const meta = CAMPAIGN_CARD_META[id];
               const active = carryover.activeMission === id;
               const done = carryover.completedMissions.includes(id);
+
               return (
                 <button
                   key={id}
                   type="button"
                   data-testid={`campaign-btn-${id}`}
-                  onClick={() => onSelectCampaignMission(id)}
-                  className={`rounded-xl border px-3 py-2 text-left text-xs transition ${
+                  onClick={() => {
+                    onSelectCampaignMission(id);
+                    const destBody = CAMPAIGN_DESTINATION_BODY[id];
+                    if (destBody) {
+                      setSelectedPlanetId(destBody);
+                      setCarouselPage(0);
+                    }
+                  }}
+                  className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
                     active
-                      ? 'border-amber-400/80 bg-amber-500/20 text-white shadow-[0_0_20px_rgba(245,158,11,0.18)]'
+                      ? 'border-cyan-400 bg-cyan-500/16 shadow-[0_0_22px_rgba(34,211,238,0.26)]'
                       : done
-                        ? 'border-emerald-400/50 bg-emerald-500/12 text-emerald-200 hover:border-emerald-300'
-                        : 'hud-panel text-slate-200 hover:border-sky-400/55'
+                        ? 'border-emerald-400/50 bg-emerald-500/10 hover:border-emerald-300'
+                        : 'border-sky-400/20 bg-slate-950/65 hover:border-cyan-400/55 hover:bg-slate-900/80'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-1 font-hud font-bold tracking-wide">
-                    <span>{m.shortLabel}</span>
-                    {done && (
-                      <span className="font-mono-tech text-[10px] text-emerald-300">DONE</span>
-                    )}
+                  {meta.planetThumb ? (
+                    <PlanetThumb bodyId={meta.planetThumb} size="sm" />
+                  ) : (
+                    <GatewayStationThumb sizeClass="h-8 w-8" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span
+                        className={`truncate font-hud text-xs font-bold ${
+                          active ? 'text-white' : 'text-slate-100'
+                        }`}
+                      >
+                        {meta.num}. {meta.name}
+                      </span>
+                      {done && (
+                        <span className="rounded bg-emerald-500/25 px-1 font-mono-tech text-[9px] font-bold text-emerald-300">
+                          DONE
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={`truncate text-[11px] ${
+                        active ? 'text-cyan-200' : 'text-slate-400'
+                      }`}
+                    >
+                      {meta.destination}
+                    </div>
                   </div>
+                  <ChevronRight
+                    className={`h-3.5 w-3.5 shrink-0 transition ${
+                      active
+                        ? 'text-cyan-300'
+                        : 'text-slate-500 group-hover:translate-x-0.5 group-hover:text-cyan-300'
+                    }`}
+                  />
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 max-w-lg rounded-xl border border-sky-400/20 bg-slate-950/75 px-3 py-2 text-[11px]">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-hud font-bold tracking-wide text-amber-300 uppercase">
-                {activeMission.code}
-              </span>
-              <span className="font-mono-tech text-[10px] text-sky-300">
-                {MISSION_ROUTE_BADGE[activeMission.id]}
-              </span>
-            </div>
-            <p className="mt-0.5 text-slate-200">{activeMission.objectiveSummary}</p>
+
+          {/* Concise Active Objective Readout */}
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-sky-400/15 bg-slate-950/75 px-3 py-1.5 text-[11px]">
+            <span className="truncate text-slate-200">
+              <strong className="font-hud text-cyan-300 uppercase">{activeMission.code}: </strong>
+              {activeMission.objectiveSummary}
+            </span>
           </div>
-        </div>
+        </section>
 
-        {/* Primary CTA */}
-        <div className="pointer-events-auto mb-4 flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            data-start="true"
-            onClick={onStartMission}
-            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-display text-sm font-bold tracking-wider whitespace-nowrap text-slate-950 uppercase shadow-lg transition hover:bg-amber-400 active:scale-[0.98]"
-          >
-            <Play className="h-4 w-4 fill-slate-950" />
-            Brief &amp; Launch
-          </button>
+        {/* Primary Action CTAs: BRIEF & LAUNCH / EXPLORE / HARDWARE BAY */}
+        <div className="pointer-events-auto flex flex-col gap-2">
+          <div className="grid grid-cols-[1.28fr_1fr] gap-2.5">
+            <button
+              type="button"
+              data-start="true"
+              onClick={onStartMission}
+              className="hud-cta-cyan inline-flex items-center justify-between gap-2 rounded-xl px-4 py-3 font-display text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.985]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Play className="h-4 w-4 fill-white" />
+                Brief &amp; Launch
+              </span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
 
-          <button
-            type="button"
-            data-testid="free-explore-btn"
-            onClick={onStartFreeExplore}
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/60 bg-emerald-500/20 px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-emerald-100 uppercase transition hover:bg-emerald-500/30"
-          >
-            <Compass className="h-4 w-4 text-emerald-300" />
-            Free Explore
-          </button>
+            <button
+              type="button"
+              data-testid="free-explore-btn"
+              onClick={onStartFreeExplore}
+              className="hud-btn-glass inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.985]"
+            >
+              <Compass className="h-4 w-4 text-cyan-300" />
+              Explore
+            </button>
+          </div>
 
           <button
             type="button"
             onClick={() => onJumpToPhase('inspector')}
-            className="hud-panel inline-flex items-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wide whitespace-nowrap text-sky-100 uppercase transition hover:border-sky-400/65"
+            className="hud-btn-glass inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-hud text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.99]"
           >
+            <Wrench className="h-4 w-4 text-cyan-300" />
             Hardware Bay
           </button>
-        </div>
 
-        {/* Direct Stage Jump Strip */}
-        <div className="pointer-events-auto">
-          <div className="mb-1.5 font-hud text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-            Quick Jump
+          {/* Compact Expandable Quick Jump & 3D Preview Drawer */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setQuickToolsOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-hud text-[11px] font-semibold text-cyan-300/90 transition hover:bg-cyan-500/10 hover:text-cyan-200"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+              {quickToolsOpen ? 'Hide 3D Preview & Quick Jump' : '3D Preview & Quick Jump'}
+            </button>
+
+            <AudioQualityPopover
+              audio={audioSettings}
+              quality={qualityPreset}
+              onUpdateAudio={onUpdateAudio}
+              onChangeQuality={onChangeQuality}
+            />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {QUICK_STAGES.map((stage) => (
-              <button
-                key={stage.phase}
-                type="button"
-                onClick={() => onJumpToPhase(stage.phase)}
-                className="hud-panel rounded-lg px-2.5 py-1.5 font-hud text-xs font-bold whitespace-nowrap text-slate-100 transition hover:border-amber-400/70 hover:text-amber-200"
-              >
-                {stage.label}
-              </button>
-            ))}
-          </div>
+
+          {quickToolsOpen && (
+            <div className="hud-panel animate-modal-enter space-y-2 rounded-xl p-2.5 text-xs">
+              <div>
+                <div className="mb-1 font-hud text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  Direct Stage Jump
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {QUICK_STAGES.map((stage) => (
+                    <button
+                      key={stage.phase}
+                      type="button"
+                      onClick={() => onJumpToPhase(stage.phase)}
+                      className="rounded-lg border border-sky-400/20 bg-slate-900/80 px-2.5 py-1 font-hud text-[11px] font-bold text-slate-200 hover:border-cyan-400 hover:text-cyan-200"
+                    >
+                      {stage.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 font-hud text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  Backdrop 3D Model
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {SHOWCASE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => onSelectShowcase(opt.id)}
+                      className={`rounded-lg px-2 py-1 font-hud text-[11px] font-bold transition ${
+                        showcase === opt.id
+                          ? 'bg-cyan-400 text-slate-950'
+                          : 'border border-sky-400/20 bg-slate-900/80 text-slate-200 hover:border-cyan-400/60'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Bottom Strip: Control Hints + 3D Showcase Switcher */}
-      <div className="relative z-10 flex flex-wrap items-end justify-between gap-4 px-6 pb-5">
-        <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-3 rounded-lg px-3.5 py-2 text-xs text-slate-200">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">Enter</span> Start
+      {/* BOTTOM STRIP: Controls (Left), Planet Selector Carousel (Center), Selected Planet Card (Right) */}
+      <div className="relative z-10 flex items-end justify-between gap-4 px-5 pb-4 lg:px-7">
+        {/* Bottom-Left Controls Hint */}
+        <div className="hud-soft pointer-events-auto flex items-center gap-3.5 rounded-2xl px-4 py-2.5 text-xs text-slate-200">
+          <span className="inline-flex items-center gap-1">
+            {['W', 'A', 'S', 'D'].map((k) => (
+              <span key={k} className="keycap">
+                {k}
+              </span>
+            ))}
+            <span className="ml-1 font-medium text-slate-300">Navigate</span>
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">WASD</span> Fly / Drive
+          <span className="inline-flex items-center gap-1.5 text-slate-300">
+            <Mouse className="h-3.5 w-3.5 text-cyan-300" />
+            <span className="font-semibold text-white">Click</span> Select
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">Space</span> Stage / Drill
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="keycap">Tab</span> Map
+          <span className="hidden items-center gap-1.5 text-slate-300 xl:inline-flex">
+            <span className="font-semibold text-white">Scroll</span> Zoom
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <CameraViewControls
-            compact
-            onSelectPreset={onSetCameraPreset}
-            onZoom={onZoomCamera}
-            onReset={onResetCamera}
-          />
-
-          <div className="hud-panel pointer-events-auto flex flex-wrap items-center gap-1 rounded-xl p-1.5">
-            <span className="px-2 font-hud text-[11px] font-bold text-slate-400 uppercase">
-              3D Model
-            </span>
-            {SHOWCASE_OPTIONS.map((opt) => (
+        {/* Bottom-Center Interactive Planet Selector Pill */}
+        <div
+          data-testid="title-planet-selector"
+          className="hud-soft pointer-events-auto flex items-center gap-2 rounded-full px-3.5 py-2 shadow-[0_12px_36px_rgba(2,6,23,0.75)]"
+        >
+          {visibleCarouselIds.map((bodyId) => {
+            const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
+            if (!spec) return null;
+            const active = selectedPlanetId === bodyId;
+            return (
               <button
-                key={opt.id}
+                key={bodyId}
                 type="button"
-                onClick={() => onSelectShowcase(opt.id)}
-                className={`rounded-lg px-2.5 py-1 font-hud text-xs font-bold whitespace-nowrap transition ${
-                  showcase === opt.id
-                    ? 'bg-sky-400 text-slate-950'
-                    : 'text-slate-200 hover:bg-slate-800'
+                data-testid={`title-planet-btn-${bodyId}`}
+                aria-label={`Select ${spec.name}`}
+                title={`${spec.name} · ${spec.gravityDisplay}`}
+                onClick={() => setSelectedPlanetId(bodyId)}
+                className={`relative flex h-11 w-11 items-center justify-center rounded-full transition ${
+                  active
+                    ? 'scale-110 ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#050811] shadow-[0_0_22px_rgba(34,211,238,0.55)]'
+                    : 'opacity-85 hover:scale-105 hover:opacity-100'
                 }`}
               >
-                {opt.label}
+                <PlanetThumb bodyId={bodyId} size="md" />
               </button>
-            ))}
-          </div>
+            );
+          })}
+
+          <button
+            type="button"
+            aria-label="More Solar System Worlds"
+            title="Show more worlds"
+            onClick={handleCycleCarousel}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-400/25 bg-slate-900/75 text-cyan-300 transition hover:border-cyan-400 hover:text-white"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
+
+        {/* Bottom-Right Selected Planet Info Card */}
+        <aside
+          data-testid="title-planet-info-card"
+          className="hud-soft pointer-events-auto w-72 shrink-0 rounded-2xl p-3.5 text-slate-100"
+        >
+          <div className="flex items-start gap-3">
+            <PlanetThumb bodyId={selectedPlanet.id} size="lg" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-base leading-tight font-bold text-white">
+                {selectedPlanet.id === 'moon' ? 'The Moon' : selectedPlanet.name}
+              </h2>
+              <p className="mt-0.5 font-mono-tech text-[11px] font-semibold text-cyan-300">
+                {selectedPlanet.gravityG}g · {selectedPlanet.avgDistanceDisplay}
+              </p>
+              <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-300">
+                {selectedPlanet.fact}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              data-testid="title-explore-planet-btn"
+              onClick={() => onExploreWorld(selectedPlanet.id)}
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/65 bg-cyan-500/18 px-3.5 py-1.5 font-hud text-xs font-bold tracking-wide text-cyan-100 transition hover:bg-cyan-400 hover:text-slate-950"
+            >
+              <span>Explore Planet</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
-

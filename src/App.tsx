@@ -714,10 +714,22 @@ export default function App() {
     setFocusedSolarBodyId(bodyId);
     if (bodyId) {
       const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
-      const baseSize = bodyId === 'sun' ? 11.4 : bodyId === 'earth' ? 4.8 : spec?.explorationBodySize ?? 2.5;
+      const isSci = s.solarScaleMode === 'scientific';
+      const baseSize =
+        (bodyId === 'sun' ? 11.4 : bodyId === 'earth' ? 4.8 : spec?.explorationBodySize ?? 2.5) *
+        (isSci ? 0.5 : 1);
       s.orbitYaw = bodyId === 'earth' ? 0.35 : 0.52;
       s.orbitPitch = bodyId === 'earth' ? 0.34 : 0.32;
-      s.orbitDistance = bodyId === 'sun' ? 44 : bodyId === 'earth' ? 30 : Math.max(11, baseSize * 4.6);
+      s.orbitDistance =
+        bodyId === 'sun'
+          ? isSci
+            ? 24
+            : 44
+          : bodyId === 'earth'
+            ? isSci
+              ? 16
+              : 30
+            : Math.max(isSci ? 7.5 : 11, baseSize * 4.6);
       setExploredSolarBodyIds((prev) => (prev.includes(bodyId) ? prev : [...prev, bodyId]));
     } else {
       setSelectedBodyPin(null);
@@ -1473,6 +1485,10 @@ export default function App() {
       }
 
       if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) {
+        if (menuOpenRef.current && e.code === 'Escape') {
+          closeMenu();
+          return;
+        }
         if (isGameplay) {
           if (menuOpenRef.current) {
             closeMenu();
@@ -1483,7 +1499,13 @@ export default function App() {
         return;
       }
 
-      if (s.phase === 'title' && (e.code === 'Enter' || e.code === 'Space')) {
+      if (
+        s.phase === 'title' &&
+        !menuOpenRef.current &&
+        !nasaModalOpen &&
+        !fieldNotebookOpen &&
+        (e.code === 'Enter' || e.code === 'Space')
+      ) {
         jumpToPhase('briefing');
         return;
       }
@@ -2014,6 +2036,21 @@ export default function App() {
     [syncUiNow]
   );
 
+  const handleDismissAnomaly = useCallback(
+    (anomalyId: string) => {
+      if (activeAnomalyRef.current && activeAnomalyRef.current.id === anomalyId) {
+        activeAnomalyRef.current = {
+          ...activeAnomalyRef.current,
+          resolvedChoiceId: '__dismissed__',
+          resolvedSummary: 'Alert dismissed by Flight Director.',
+        };
+        soundSynth.playClick();
+        syncUiNow();
+      }
+    },
+    [syncUiNow]
+  );
+
   const nearestObjective =
     phase === 'rover'
       ? objectivesUi.find(
@@ -2064,6 +2101,8 @@ export default function App() {
         <TitleOverlay
           showcase={showcase}
           carryover={carryoverUi}
+          donki={donki}
+          osdr={osdr}
           audioSettings={audioSettings}
           qualityPreset={qualityPreset}
           onUpdateAudio={handleUpdateAudio}
@@ -2086,9 +2125,22 @@ export default function App() {
             jumpToPhase('briefing');
           }}
           onStartFreeExplore={handleStartFreeExplore}
+          onExploreWorld={(bodyId) => {
+            simRef.current.freeExploreMode = true;
+            setFreeExploreMode(true);
+            scoreRef.current = 0;
+            jumpToPhase('space', bodyId === 'mars' ? 'mars' : 'moon');
+            handleFocusSolarBody(bodyId);
+          }}
           onJumpToPhase={(p) => jumpToPhase(p)}
+          onOpenBriefing={() => {
+            simRef.current.freeExploreMode = false;
+            setFreeExploreMode(false);
+            jumpToPhase('briefing');
+          }}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
           onOpenNasaModal={() => setNasaModalOpen(true)}
+          onOpenMenuTab={openMenuWithTab}
           muted={muted}
           onToggleMute={toggleMute}
         />
@@ -2473,7 +2525,9 @@ export default function App() {
           <CenteredEventCard
             anomaly={activeAnomalyUi}
             apollo1202Active={phase === 'landing' && apollo1202Active}
+            placement={phase === 'space' ? 'space-corner' : 'center'}
             onResolveAnomaly={handleResolveAnomaly}
+            onDismissAnomaly={handleDismissAnomaly}
             onAckApollo1202={() => {
               apollo1202ClearedRef.current = true;
               setApollo1202Active(false);

@@ -85,17 +85,17 @@ export function LaunchHUD({
           <div className="flex items-center gap-2.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
             <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
               <path d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z" fill="#FFFFFF" />
-              <path d="M7 22C12 18 20 15 28 16.5" stroke="#F59E0B" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M7 22C12 18 20 15 28 16.5" stroke="#22D3EE" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
             <div className="leading-none">
-              <span className="block text-base font-extrabold tracking-widest text-white">ARTEMIS</span>
-              <span className="block text-base font-extrabold tracking-widest text-white">ODYSSEY</span>
+              <span className="block font-display text-sm font-extrabold tracking-widest text-white">ARTEMIS</span>
+              <span className="block font-display text-sm font-extrabold tracking-widest text-cyan-300">ODYSSEY</span>
             </div>
           </div>
 
           <section className="hud-soft pointer-events-auto max-w-xs rounded-2xl px-4 py-3 text-slate-100">
-            <div className="flex items-center gap-2 text-base font-bold text-amber-400">
-              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-amber-400" />
+            <div className="flex items-center gap-2 text-base font-bold text-cyan-300">
+              <span className="inline-block h-2.5 w-2.5 rotate-45 rounded-[2px] bg-cyan-400" />
               <span>LC-39B Ascent</span>
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-4">
@@ -228,8 +228,8 @@ export function LaunchHUD({
                       onClick={() => onTogglePreLaunchCheck(item.key)}
                       className={`rounded-xl border px-3 py-1.5 text-left text-sm font-semibold transition ${
                         checked
-                          ? 'border-amber-400/60 bg-amber-500/20 text-amber-100'
-                          : 'border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-amber-300'
+                          ? 'border-cyan-400/75 bg-cyan-500/20 text-cyan-100'
+                          : 'border-sky-400/20 bg-slate-900/75 text-slate-200 hover:border-cyan-300'
                       }`}
                     >
                       {item.label} · {checked ? 'GO' : 'CHK'}
@@ -244,9 +244,9 @@ export function LaunchHUD({
                   if (!allChecksGo) onVerifyAllPreLaunchChecks();
                   onBeginSimulation();
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-base font-bold"
               >
-                <Play className="h-4 w-4 fill-slate-950" />
+                <Play className="h-4 w-4 fill-white" />
                 {allChecksGo ? 'Begin Countdown' : 'Verify & Start'}
               </button>
             </div>
@@ -254,7 +254,7 @@ export function LaunchHUD({
 
           {launch.launchSequence === 'COUNTDOWN' && (
             <div className="hud-soft rounded-2xl px-8 py-3 text-center">
-              <div className="text-4xl font-bold text-amber-400">T-{countdownDigit}</div>
+              <div className="font-display text-4xl font-bold text-cyan-300">T-{countdownDigit}</div>
               <div className="text-sm text-slate-200">Arming RS-25 Core</div>
             </div>
           )}
@@ -265,7 +265,7 @@ export function LaunchHUD({
               data-testid="start-launch-btn"
               data-hold-keys="forward"
               onClick={onStartLaunch}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-7 py-3 text-lg font-bold text-slate-950 shadow-lg hover:bg-amber-400"
+              className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-2 rounded-2xl px-7 py-3 text-lg font-bold"
             >
               <Rocket className="h-5 w-5" />
               Ignite &amp; Launch
@@ -274,7 +274,7 @@ export function LaunchHUD({
 
           {launch.orbitReached && (
             <div className="hud-soft pointer-events-auto flex items-center gap-3 rounded-2xl px-5 py-3">
-              <Orbit className="h-5 w-5 text-amber-400" />
+              <Orbit className="h-5 w-5 text-cyan-300" />
               <div className="text-base font-semibold text-white">
                 165 km Orbit ({Math.round(leoTransfer.tliBurnProgressPct)}%)
               </div>
@@ -283,7 +283,7 @@ export function LaunchHUD({
                 data-testid="fire-tli-btn"
                 disabled={leoTransfer.tliBurnActive || leoTransfer.readyForSpaceTransition}
                 onClick={onFireTliBurn}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-base font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-60"
+                className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-4 py-2 text-base font-bold disabled:opacity-60"
               >
                 <Flame className="h-4 w-4" />
                 {leoTransfer.tliBurnActive ? 'Firing TLI...' : 'Fire TLI Burn'}

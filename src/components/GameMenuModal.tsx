@@ -179,15 +179,22 @@ export function GameMenuModal({
     },
   ];
 
-  const tabs: Array<{ id: GameMenuTab; label: string; icon: typeof Map }> = [
-    { id: 'map', label: phase === 'rover' ? 'Topo Map' : phase === 'space' ? 'Solar Map' : 'Flight Map', icon: Map },
-    { id: 'outpost', label: 'Base Console', icon: DoorOpen },
+  const isTitleOrInspector = phase === 'title' || phase === 'inspector';
+  const allTabs: Array<{ id: GameMenuTab; label: string; icon: typeof Map; gameplayOnly?: boolean }> = [
+    {
+      id: 'map',
+      label: phase === 'rover' ? 'Topo Map' : phase === 'space' ? 'Solar Map' : 'Flight Map',
+      icon: Map,
+      gameplayOnly: true,
+    },
+    { id: 'outpost', label: 'Base Console', icon: DoorOpen, gameplayOnly: true },
     { id: 'ledger', label: 'Field Ledger', icon: BookOpen },
     { id: 'achievements', label: 'Achievements', icon: Trophy },
     { id: 'nasa', label: 'NASA Data', icon: Database },
     { id: 'glossary', label: 'Glossary & Facts', icon: HelpCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+  const tabs = allTabs.filter((t) => !isTitleOrInspector || !t.gameplayOnly);
 
   return (
     <div
@@ -226,11 +233,11 @@ export function GameMenuModal({
                 onClick={() => onSelectTab(tab.id)}
                 className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                   active
-                    ? 'bg-amber-500 text-slate-950'
-                    : 'border border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/50'
+                    ? 'hud-nav-active'
+                    : 'border border-sky-400/15 bg-slate-900/65 text-slate-200 hover:border-cyan-400/50 hover:text-white'
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className={`h-4 w-4 ${active ? 'text-cyan-300' : 'text-slate-300'}`} />
                 {tab.label}
               </button>
             );
@@ -241,7 +248,7 @@ export function GameMenuModal({
               onClose();
               onJumpToInspector();
             }}
-            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-amber-300 hover:border-amber-400"
+            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-500/12 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-white"
           >
             <Wrench className="h-4 w-4" />
             Hardware Bay
@@ -489,13 +496,13 @@ export function GameMenuModal({
                   key={ach.id}
                   className={`flex items-start gap-3 rounded-xl border p-4 ${
                     ach.unlocked
-                      ? 'border-amber-400/50 bg-amber-500/10'
+                      ? 'border-cyan-400/55 bg-cyan-500/12'
                       : 'border-sky-400/20 bg-slate-950/60'
                   }`}
                 >
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                      ach.unlocked ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-slate-400'
+                      ach.unlocked ? 'bg-cyan-400 text-slate-950' : 'bg-white/5 text-slate-400'
                     }`}
                   >
                     {ach.unlocked ? <CheckCircle2 className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
@@ -503,7 +510,7 @@ export function GameMenuModal({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="font-bold text-white">{ach.title}</h3>
-                      <span className="text-xs font-semibold text-amber-300 tabular-nums">
+                      <span className="text-xs font-semibold text-cyan-300 tabular-nums">
                         {ach.progress}
                       </span>
                     </div>
@@ -527,7 +534,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenOutpostConsole();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
               >
                 Open Base Console
               </button>
@@ -546,7 +553,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenFieldLedger();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
               >
                 Open Full Ledger
               </button>
@@ -565,7 +572,7 @@ export function GameMenuModal({
                   onClose();
                   onOpenNasaModal();
                 }}
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+                className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
               >
                 Open NASA Data Center
               </button>
@@ -575,7 +582,7 @@ export function GameMenuModal({
           {activeTab === 'glossary' && (
             <div className="space-y-4">
               <div className="rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
-                <h3 className="mb-2 text-lg font-bold text-amber-300">Phase &ldquo;Did you know?&rdquo; Facts</h3>
+                <h3 className="mb-2 text-lg font-bold text-cyan-300">Phase &ldquo;Did you know?&rdquo; Facts</h3>
                 <ul className="space-y-2 text-base text-slate-200">
                   {phaseFacts.map((f) => (
                     <li key={f.text} className="rounded-lg bg-white/5 px-3 py-2">
@@ -589,7 +596,7 @@ export function GameMenuModal({
                   <div key={entry.id} className="rounded-xl border border-sky-400/20 bg-slate-950/60 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-base font-bold text-white">{entry.term}</span>
-                      <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                      <span className="rounded bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-200">
                         {entry.badge}
                       </span>
                     </div>
@@ -604,13 +611,13 @@ export function GameMenuModal({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
                 <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                  <Sliders className="h-5 w-5 text-amber-400" />
+                  <Sliders className="h-5 w-5 text-cyan-400" />
                   Audio &amp; Quality
                 </h3>
                 <button
                   type="button"
                   onClick={() => onUpdateAudio({ muted: !audioSettings.muted })}
-                  className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-white hover:border-amber-400"
+                  className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
                 >
                   Sound: {audioSettings.muted ? 'Muted' : 'Active'}
                 </button>
@@ -621,7 +628,7 @@ export function GameMenuModal({
                       type="button"
                       onClick={() => onChangeQuality(q)}
                       className={`rounded-lg px-3 py-1.5 text-sm font-bold uppercase ${
-                        qualityPreset === q ? 'bg-amber-500 text-slate-950' : 'bg-white/10 text-slate-200'
+                        qualityPreset === q ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'
                       }`}
                     >
                       {q}
@@ -636,17 +643,17 @@ export function GameMenuModal({
                   type="button"
                   data-testid="toggle-speed-scale-btn"
                   onClick={onToggleSpeedScale}
-                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-base font-semibold text-white hover:border-amber-400"
+                  className="w-full rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-left text-base font-semibold text-white hover:border-cyan-400"
                 >
                   Speed Scale:{' '}
-                  <span className="text-amber-300">
+                  <span className="text-cyan-300">
                     {speedScale === 'REAL_SPEED' ? 'Real NASA 1× (0.18 m/s)' : 'Kid Explore ×25'}
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={onResetCamera}
-                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-base font-semibold text-slate-200 hover:border-amber-400"
+                  className="w-full rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-left text-base font-semibold text-slate-200 hover:border-cyan-400"
                 >
                   Reset Chase Camera
                 </button>
@@ -658,31 +665,35 @@ export function GameMenuModal({
         {/* Footer Actions */}
         <div className="mt-4 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3">
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onRestartStage}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-slate-200 hover:border-amber-400"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Restart Stage
-            </button>
-            <button
-              type="button"
-              onClick={onBackToTitle}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-base font-semibold text-slate-200 hover:border-amber-400"
-            >
-              <Home className="h-4 w-4" />
-              Command Deck
-            </button>
+            {phase !== 'title' && (
+              <>
+                <button
+                  type="button"
+                  onClick={onRestartStage}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-slate-200 hover:border-cyan-400"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Restart Stage
+                </button>
+                <button
+                  type="button"
+                  onClick={onBackToTitle}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-slate-200 hover:border-cyan-400"
+                >
+                  <Home className="h-4 w-4" />
+                  Command Deck
+                </button>
+              </>
+            )}
           </div>
           <button
             type="button"
             data-testid="resume-from-menu-btn"
             onClick={onClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-2.5 text-base font-bold text-slate-950 hover:bg-amber-400"
+            className="hud-cta-cyan inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-base font-bold"
           >
-            <Play className="h-4 w-4 fill-slate-950" />
-            Resume
+            <Play className="h-4 w-4 fill-white" />
+            {phase === 'title' ? 'Close' : 'Resume'}
           </button>
         </div>
       </div>

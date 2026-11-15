@@ -91,8 +91,8 @@ export function OutpostConsoleModal({
               onClick={() => setShowSolReport((v) => !v)}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-hud text-xs font-bold uppercase ${
                 showSolReport
-                  ? 'border-amber-400 bg-amber-500/20 text-amber-200'
-                  : 'border-sky-400/35 bg-slate-900/75 text-sky-200 hover:border-sky-300'
+                  ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200'
+                  : 'border-sky-400/35 bg-slate-900/75 text-sky-200 hover:border-cyan-300'
               }`}
             >
               <FileBarChart className="h-3.5 w-3.5" />
@@ -204,7 +204,7 @@ export function OutpostConsoleModal({
                 <button
                   type="button"
                   onClick={onAdvanceSol}
-                  className="rounded-lg bg-amber-500 px-3.5 py-1.5 font-hud text-xs font-bold text-slate-950 uppercase hover:bg-amber-400"
+                  className="hud-cta-cyan rounded-lg px-3.5 py-1.5 font-hud text-xs font-bold uppercase"
                 >
                   Start Sol {solReport.solNumber + 1} (+Recharge)
                 </button>

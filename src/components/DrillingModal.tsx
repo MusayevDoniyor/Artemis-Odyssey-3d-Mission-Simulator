@@ -90,8 +90,8 @@ export function DrillingModal({
                       onClick={() => onChangeSetting(m.id)}
                       className={`rounded-lg border px-2.5 py-2 text-left transition ${
                         active
-                          ? 'border-amber-400 bg-amber-500/20 text-white'
-                          : 'border-sky-400/15 bg-slate-900/75 text-slate-300 hover:border-sky-400/50'
+                          ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                          : 'border-sky-400/15 bg-slate-900/75 text-slate-300 hover:border-cyan-400/50'
                       }`}
                     >
                       <div className="font-hud text-xs font-bold uppercase">{m.label}</div>
@@ -202,7 +202,7 @@ export function DrillingModal({
                         ? 'bg-slate-800 text-slate-500'
                         : state.isDrilling
                           ? 'bg-emerald-400 text-slate-950'
-                          : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                          : 'hud-cta-cyan'
                     }`}
                   >
                     {state.isDrilling ? 'DRILLING AUGER...' : 'HOLD TO DRILL CORE (OR TAP STEP)'}

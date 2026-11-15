@@ -223,11 +223,11 @@ export function LearnObjectModal({
       data-testid="learn-object-modal"
       className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/78 p-4"
     >
-      <div className="relative w-full max-w-4xl rounded-2xl border border-amber-400/55 bg-[#110d0c]/95 p-6 text-slate-100 shadow-[0_0_48px_rgba(245,158,11,0.18)]">
-        {/* Top Header matching LEARN Reference */}
-        <div className="mb-5 flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="hud-panel tactical-frame animate-modal-enter relative w-full max-w-4xl rounded-2xl p-6 text-slate-100">
+        {/* Top Header */}
+        <div className="mb-5 flex items-start justify-between gap-4 border-b border-sky-400/20 pb-4">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-amber-400/35 bg-amber-500/12 text-amber-300">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-500/15 text-cyan-300">
               <BookOpen className="h-6 w-6" />
             </div>
             <div>
@@ -235,7 +235,7 @@ export function LearnObjectModal({
                 <h2 className="font-display text-2xl font-extrabold tracking-wide text-white uppercase">
                   LEARN
                 </h2>
-                <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                <span className="rounded-md border border-cyan-400/40 bg-cyan-500/12 px-2 py-0.5 text-xs font-semibold text-cyan-200">
                   {objective.siteName}
                 </span>
               </div>
@@ -247,7 +247,7 @@ export function LearnObjectModal({
             type="button"
             aria-label="Close Learn Modal"
             onClick={onClose}
-            className="rounded-xl border border-white/15 bg-white/5 p-2 text-slate-300 transition hover:border-amber-400/60 hover:text-white"
+            className="rounded-xl border border-sky-400/25 bg-slate-900/75 p-2 text-slate-300 transition hover:border-cyan-400/70 hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -297,15 +297,15 @@ export function LearnObjectModal({
             {state.activeStep === 'notes' && (
               <div
                 data-testid="learn-notes-panel"
-                className="flex h-full flex-col justify-between rounded-xl border border-amber-400/30 bg-slate-950/75 p-4"
+                className="flex h-full flex-col justify-between rounded-xl border border-sky-400/30 bg-slate-950/75 p-4"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
-                    <span className="inline-flex items-center gap-2 text-sm font-bold text-amber-300">
+                    <span className="inline-flex items-center gap-2 text-sm font-bold text-cyan-300">
                       <FileText className="h-4 w-4" />
                       Field Research Notes
                     </span>
-                    <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-sky-300">
+                    <span className="rounded bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-200">
                       {spec.nasaSourceLabel}
                     </span>
                   </div>
@@ -314,9 +314,9 @@ export function LearnObjectModal({
                     {spec.researchBullets.map((bullet) => (
                       <li
                         key={bullet}
-                        className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-white/5 p-3"
+                        className="flex items-start gap-2.5 rounded-lg border border-sky-400/15 bg-slate-900/65 p-3"
                       >
-                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
+                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cyan-400" />
                         <span>{bullet}</span>
                       </li>
                     ))}
@@ -331,7 +331,7 @@ export function LearnObjectModal({
                       onMarkNotesRead();
                       onSelectStep('quiz');
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    className="hud-cta-cyan inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold"
                   >
                     Understood · Next Quiz
                     <ChevronRight className="h-4 w-4" />
@@ -343,11 +343,11 @@ export function LearnObjectModal({
             {state.activeStep === 'quiz' && (
               <div
                 data-testid="learn-quiz-panel"
-                className="flex h-full flex-col justify-between rounded-xl border border-amber-400/30 bg-slate-950/75 p-4"
+                className="flex h-full flex-col justify-between rounded-xl border border-sky-400/30 bg-slate-950/75 p-4"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2.5">
-                    <span className="inline-flex items-center gap-2 text-sm font-bold text-amber-300">
+                    <span className="inline-flex items-center gap-2 text-sm font-bold text-cyan-300">
                       <HelpCircle className="h-4 w-4" />
                       Knowledge Check
                     </span>
@@ -371,7 +371,7 @@ export function LearnObjectModal({
                               ? 'border-emerald-400 bg-emerald-500/20 font-semibold text-emerald-100'
                               : picked && !isCorrect
                                 ? 'border-rose-400 bg-rose-500/15 text-rose-100'
-                                : 'border-white/15 bg-white/5 text-slate-200 hover:border-amber-400/60'
+                                : 'border-sky-400/20 bg-slate-900/65 text-slate-200 hover:border-cyan-400/65'
                           }`}
                         >
                           {opt}
@@ -399,7 +399,7 @@ export function LearnObjectModal({
           {/* Right Panel: Your Learning Tasks */}
           <div className="flex flex-col justify-between gap-3">
             <div>
-              <div className="mb-3 flex items-center gap-2 text-base font-bold text-amber-400">
+              <div className="mb-3 flex items-center gap-2 text-base font-bold text-cyan-300">
                 <FileText className="h-4 w-4" />
                 <span>Your Learning Tasks:</span>
               </div>
@@ -416,11 +416,11 @@ export function LearnObjectModal({
                       onClick={() => onSelectStep(task.id)}
                       className={`flex w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition ${
                         active
-                          ? 'border-amber-400/75 bg-amber-500/12'
-                          : 'border-white/15 bg-white/5 hover:border-amber-400/40'
+                          ? 'border-cyan-400/80 bg-cyan-500/14 shadow-[0_0_20px_rgba(34,211,238,0.16)]'
+                          : 'border-sky-400/20 bg-slate-900/65 hover:border-cyan-400/50'
                       }`}
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-200">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800/85 text-cyan-200">
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -430,7 +430,7 @@ export function LearnObjectModal({
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
                           task.done
-                            ? 'border-amber-400 bg-amber-400 text-slate-950'
+                            ? 'border-cyan-400 bg-cyan-400 text-slate-950'
                             : 'border-slate-500 bg-transparent text-transparent'
                         }`}
                       >
@@ -442,22 +442,22 @@ export function LearnObjectModal({
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-slate-300">
-              <span className="font-semibold text-amber-300">Site Rewards:</span> {objective.rewardText}
+            <div className="rounded-xl border border-sky-400/20 bg-slate-900/65 px-4 py-2.5 text-xs text-slate-300">
+              <span className="font-semibold text-cyan-300">Site Rewards:</span> {objective.rewardText}
             </div>
           </div>
         </div>
 
-        {/* Bottom Reward Bar + Primary Amber Button */}
+        {/* Bottom Reward Bar + Primary Action Button */}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-          <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-3 rounded-xl border border-sky-400/20 bg-slate-900/65 px-4 py-2.5 text-sm">
             <span className="text-slate-300">Reward:</span>
-            <span className="inline-flex items-center gap-1.5 font-bold text-amber-400">
-              <Star className="h-4 w-4 fill-amber-400" />+{spec.rewardXp} XP
+            <span className="inline-flex items-center gap-1.5 font-bold text-amber-300">
+              <Star className="h-4 w-4 fill-amber-300" />+{spec.rewardXp} XP
             </span>
             <span className="text-white/20">|</span>
             <span className="inline-flex items-center gap-1.5 font-bold text-slate-100">
-              <Package className="h-4 w-4 text-sky-300" />
+              <Package className="h-4 w-4 text-cyan-300" />
               {spec.dataPackLabel}
             </span>
           </div>
@@ -470,7 +470,7 @@ export function LearnObjectModal({
             className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-bold transition ${
               allCompleted
                 ? 'bg-emerald-400 text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.4)] hover:bg-emerald-300'
-                : 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-[0_0_24px_rgba(245,158,11,0.35)] hover:from-amber-300 hover:to-amber-400 disabled:opacity-50'
+                : 'hud-cta-cyan disabled:opacity-50'
             }`}
           >
             <span>{primaryCtaLabel}</span>
