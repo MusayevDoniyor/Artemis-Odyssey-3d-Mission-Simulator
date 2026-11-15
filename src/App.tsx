@@ -1,7 +1,6 @@
 import { Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BriefingOverlay } from './components/BriefingOverlay';
-import { CalmFactToast } from './components/CalmFactToast';
 import { CenteredEventCard } from './components/CenteredEventCard';
 import { DrillingModal } from './components/DrillingModal';
 import { FieldNotebookModal } from './components/FieldNotebookModal';
@@ -10,9 +9,7 @@ import { LandingHUD } from './components/LandingHUD';
 import { LaunchHUD } from './components/LaunchHUD';
 import { LearnObjectModal } from './components/LearnObjectModal';
 import { MobileAcademyView } from './components/MobileAcademyView';
-import { NasaDataModal } from './components/NasaDataModal';
 import { OutcomeModal } from './components/OutcomeModal';
-import { OutpostConsoleModal } from './components/OutpostConsoleModal';
 import { RoverHUD } from './components/RoverHUD';
 import { SpaceFlightHUD } from './components/SpaceFlightHUD';
 import { TitleOverlay } from './components/TitleOverlay';
@@ -2532,13 +2529,7 @@ export default function App() {
         <MobileAcademyView
           donki={donki}
           osdr={osdr}
-          onOpenNasaModal={() => setNasaModalOpen(true)}
-        />
-        <NasaDataModal
-          open={nasaModalOpen}
-          donki={donki}
-          osdr={osdr}
-          onClose={() => setNasaModalOpen(false)}
+          onOpenNasaModal={() => {}}
         />
       </div>
     );
@@ -3085,17 +3076,6 @@ export default function App() {
           />
         )}
 
-      {!menuOpen && !discoveryObjUi && (
-        <CalmFactToast
-          fact={activeToastFact}
-          onDismiss={() => {
-            activeToastRef.current = null;
-            toastVisibleSecRef.current = 0;
-            setActiveToastFact(null);
-          }}
-        />
-      )}
-
       <GameMenuModal
         open={menuOpen}
         activeTab={menuTab}
@@ -3335,54 +3315,6 @@ export default function App() {
         />
       )}
 
-      {outpostConsoleUi.open && (
-        <OutpostConsoleModal
-          state={outpostConsoleUi}
-          resources={resourcesUi}
-          carryover={carryoverUi}
-          dustPct={roverUi.dustAccumulationPct}
-          onClose={() => {
-            outpostConsoleRef.current = { ...outpostConsoleRef.current, open: false };
-            syncUiNow();
-          }}
-          onToggleAirlock={() => {
-            outpostConsoleRef.current = toggleOutpostAirlock(outpostConsoleRef.current);
-            soundSynth.playAirlockCycle();
-            syncUiNow();
-          }}
-          onSelectRoom={(room: OutpostInteriorRoom) => {
-            outpostConsoleRef.current = { ...outpostConsoleRef.current, activeRoom: room };
-            soundSynth.playClick();
-            syncUiNow();
-          }}
-          onSwitchPowerSource={(mode: PowerSourceMode) => {
-            outpostConsoleRef.current = switchOutpostPowerSource(outpostConsoleRef.current, mode);
-            simRef.current.kilopowerActive = outpostConsoleRef.current.kilopowerActive;
-            soundSynth.playClick();
-            syncUiNow();
-          }}
-          onAdvanceSol={() => {
-            const solNum = outpostConsoleRef.current.solNumber + 1;
-            const kilopower = outpostConsoleRef.current.powerSource === 'kilopower';
-            simRef.current.resources = {
-              power: clamp(
-                simRef.current.resources.power + (kilopower ? 25 : 15),
-                15,
-                100
-              ),
-              oxygen: clamp(simRef.current.resources.oxygen + 18, 15, 100),
-              shield: clamp(simRef.current.resources.shield + 14, 15, 100),
-            };
-            outpostConsoleRef.current = {
-              ...outpostConsoleRef.current,
-              solNumber: solNum,
-            };
-            soundSynth.playSuccess();
-            syncUiNow();
-          }}
-        />
-      )}
-
       {discoveryObjUi && (
         <OutcomeModal
           mode="discovery"
@@ -3428,13 +3360,6 @@ export default function App() {
           onBackToTitle={() => jumpToPhase('title')}
         />
       )}
-
-      <NasaDataModal
-        open={nasaModalOpen}
-        donki={donki}
-        osdr={osdr}
-        onClose={() => setNasaModalOpen(false)}
-      />
 
       <FieldNotebookModal
         open={fieldNotebookOpen}
