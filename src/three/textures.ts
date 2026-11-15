@@ -312,38 +312,63 @@ export function createProceduralTextureSet(maxAnisotropy: number): ProceduralTex
   oCtx.arc(256, 174, 22, 0, Math.PI * 2);
   oCtx.fill();
 
-  // 8. NASA Meatball Insignia Decal Texture (vector fallback + crisp transparent PNG overlay)
+  // 8. Flight Operations Insignia Decal Texture (Original Vector Hexagonal Shield & Cislunar Orbit Chevron - Fixes B4)
   const nasaCanvas = document.createElement('canvas');
   nasaCanvas.width = 256;
   nasaCanvas.height = 256;
   const nCtx = nasaCanvas.getContext('2d')!;
   nCtx.clearRect(0, 0, 256, 256);
-  nCtx.fillStyle = '#0B3D91';
+
+  // Hexagonal Aerospace Shield Background
+  nCtx.fillStyle = '#0a192f';
+  nCtx.strokeStyle = '#38bdf8';
+  nCtx.lineWidth = 6;
   nCtx.beginPath();
-  nCtx.arc(128, 128, 96, 0, Math.PI * 2);
+  const hexPoints: [number, number][] = [
+    [128, 16],
+    [228, 72],
+    [228, 184],
+    [128, 240],
+    [28, 184],
+    [28, 72],
+  ];
+  nCtx.moveTo(hexPoints[0][0], hexPoints[0][1]);
+  for (let i = 1; i < hexPoints.length; i++) {
+    nCtx.lineTo(hexPoints[i][0], hexPoints[i][1]);
+  }
+  nCtx.closePath();
   nCtx.fill();
-  nCtx.strokeStyle = '#FC3D21';
-  nCtx.lineWidth = 14;
-  nCtx.beginPath();
-  nCtx.moveTo(28, 165);
-  nCtx.lineTo(132, 90);
-  nCtx.lineTo(234, 54);
   nCtx.stroke();
-  nCtx.fillStyle = '#FFFFFF';
-  nCtx.font = 'bold 52px Georgia, serif';
+
+  // Cislunar Elliptical Orbit
+  nCtx.save();
+  nCtx.translate(128, 138);
+  nCtx.rotate(-0.38);
+  nCtx.strokeStyle = '#22d3ee';
+  nCtx.lineWidth = 5;
+  nCtx.setLineDash([8, 6]);
+  nCtx.beginPath();
+  nCtx.ellipse(0, 0, 80, 34, 0, 0, Math.PI * 2);
+  nCtx.stroke();
+  nCtx.restore();
+
+  // Ascent Chevron Vector
+  nCtx.fillStyle = '#f59e0b';
+  nCtx.beginPath();
+  nCtx.moveTo(128, 52);
+  nCtx.lineTo(172, 175);
+  nCtx.lineTo(128, 150);
+  nCtx.lineTo(84, 175);
+  nCtx.closePath();
+  nCtx.fill();
+
+  // Artemis Text
+  nCtx.fillStyle = '#ffffff';
+  nCtx.font = 'bold 22px system-ui, sans-serif';
   nCtx.textAlign = 'center';
-  nCtx.fillText('NASA', 128, 146);
+  nCtx.fillText('ARTEMIS', 128, 214);
 
   const nasaDecal = finalizeColorTex(nasaCanvas, maxAnisotropy);
-  if (typeof Image !== 'undefined') {
-    const nasaImg = new Image();
-    nasaImg.onload = () => {
-      nCtx.clearRect(0, 0, 256, 256);
-      nCtx.drawImage(nasaImg, 12, 12, 232, 232);
-      nasaDecal.needsUpdate = true;
-    };
-    nasaImg.src = '/assets/nasa-meatball.png';
-  }
 
   // 9. KSC Ground Coastal Plain, Palmetto Scrub & Dune Silt (no flat square CAD grid)
   const kscCanvas = document.createElement('canvas');

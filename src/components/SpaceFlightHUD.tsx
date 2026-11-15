@@ -10,6 +10,7 @@ import {
   Clock,
   Compass,
   Database,
+  ExternalLink,
   Mouse,
   Orbit,
   Radio,
@@ -32,6 +33,7 @@ import {
   type SolarScaleMode,
   computeKeplerBodyPosition,
   getLiveSolarTargetPosition,
+  getNasaFactSheetUrl,
 } from '../game/solarSystemData';
 import type { DataProvenance } from '../game/planetaryCatalog';
 import type {
@@ -699,7 +701,18 @@ export function SpaceFlightHUD({
                 <Database className="h-3.5 w-3.5 text-cyan-300" />
                 Data Source
               </dt>
-              <dd className="text-right text-[11px] font-bold text-emerald-300">{selectedBody.provenance}</dd>
+              <dd className="text-right text-[11px] font-bold text-emerald-300">
+                <a
+                  href={getNasaFactSheetUrl(selectedBody.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 underline decoration-cyan-400/50"
+                  title="View official NASA Planetary Fact Sheet"
+                >
+                  <span>{selectedBody.provenance}</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </dd>
             </div>
           </dl>
 

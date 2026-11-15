@@ -15,13 +15,13 @@
   - [x] 1.5 Real drawn Earth parking orbit (~165 km, 7.8 km/s, ~87 min period) with apsis markers before TLI burn.
   - [x] 1.6 Verify and tag `overnight-phase-1-green`.
 
-- [ ] **PHASE 2: Celestial bodies (Sun, planets, Moon, Pluto, asteroids)**
-  - [ ] 2.1 Research and source real NASA/USGS maps (Sun, Mercury, Venus, Earth Blue Marble + specular/clouds, Moon LOLA, Mars MOLA, Outer Gas Giants, Pluto).
-  - [ ] 2.2 Saturn rings, thin faint ring bands for gas giants, correct axial tilts & rotation periods.
-  - [ ] 2.3 Atmospheric limb glow shaders & Sun emissive corona.
-  - [ ] 2.4 Asteroid belt & NASA Bennu 3D model.
-  - [ ] 2.5 Orbit lines (J2000 Keplerian elements) and hover telemetry cards.
-  - [ ] 2.6 Verify and tag `overnight-phase-2-green`.
+- [x] **PHASE 2: Celestial bodies (Sun, planets, Moon, Pluto, asteroids)**
+  - [x] 2.1 Research and source real NASA/USGS maps (Sun, Mercury, Venus, Earth Blue Marble + specular/clouds, Moon LOLA, Mars MOLA, Outer Gas Giants, Pluto).
+  - [x] 2.2 Saturn rings, thin faint ring bands for gas giants, correct axial tilts & rotation periods.
+  - [x] 2.3 Atmospheric limb glow shaders & Sun emissive corona.
+  - [x] 2.4 Asteroid belt & NASA Bennu 3D model.
+  - [x] 2.5 Orbit lines (J2000 Keplerian elements) and hover telemetry cards.
+  - [x] 2.6 Verify and tag `overnight-phase-2-green`.
 
 - [ ] **PHASE 3: Rockets (launch vehicles), exact and detailed**
   - [ ] 3.1 Research & source: SLS Block 1, Saturn V, Falcon 9 / Starship stack.

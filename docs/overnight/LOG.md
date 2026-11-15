@@ -48,3 +48,27 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
 - **Bug Fixes Verified**:
   - **B1**: Orion scale corrected from 0.62 to 0.048; close chase camera calibrated to 0.85u offset; billboarded tactical beacon reticle added when distance > 6u. Educational mode body radii now match true NASA physical ratios.
   - **B2**: `computeLaunchOrbitHandoffState` and continuous parking orbit coasting implemented. Spacecraft enters orbit at 165 km altitude, 7.81 km/s, 87.7 min period, downrange advancing continuously. Phase handoff preserves Cartesian state without teleportation.
+
+---
+
+### [2026-11-16T03:07:00+05:00] Phase 2: Celestial Bodies (Sun, Planets, Moon, Pluto, Asteroid Bennu)
+- **Verification Commands Executed**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 66 tests passing, 0 failing (duration 1570 ms).
+  - `npm run build`: dist/index.html (1.18 kB), dist/assets/index.css (114.63 kB), dist/assets/index.js (1593.93 kB).
+  - Headless browser verification (Playwright Chromium 1440x900):
+    - Free exploration -> Space scene overview -> Saturn ring inspection -> Sun SDO imagery -> Solar system map with asteroid Bennu.
+    - Console errors: 0.
+- **Artifacts & Screens Generated**:
+  - `docs/overnight/research/celestial_textures_and_rings.md`: Texture datasets, licensing, and ring dimensions.
+  - `docs/overnight/screens/phase2-title-planets-1440px.png`: Title screen displaying authentic planetary textures.
+  - `docs/overnight/screens/phase2-space-overview-earth.png`: Earth Blue Marble, night lights shader, and outer atmospheric limb glow.
+  - `docs/overnight/screens/phase2-saturn-rings-cassini.png`: Saturn with 26.73° axial tilt and Cassini Division ring system.
+  - `docs/overnight/screens/phase2-sun-sdo-imagery.png`: Sun SDO AIA 4500Å continuum map with emissive corona.
+  - `docs/overnight/screens/phase2-solar-system-map-bennu.png`: Complete Keplerian orbit map including asteroid 101955 Bennu and outer Kuiper belt.
+- **Features Implemented & Verified**:
+  - **B4 & B5 Fixed**: Removed NASA meatball canvas decal loader (replaced with original vector Artemis flight operations emblem). Replaced all procedural canvas planetary textures with verified 2K equirectangular maps (Sun, Mercury, Venus, Earth night lights, Jupiter, Saturn & rings, Uranus, Neptune, Ceres).
+  - **Planetary Ring System**: Implemented `createPlanetaryRingGeometry` with radial UV projection `u = (r - r_in) / (r_out - r_in)` for Saturn's C, B, Cassini, and A rings (1.24 to 2.27 R_sat). Added thin faint ring bands for Jupiter, Uranus, and Neptune.
+  - **Atmosphere Shaders**: Rayleigh limb glow shaders tuned for Venus (dense runaway greenhouse haze), Mars (thin CO₂ limb), and gas giants. Earth features dynamic night lights masked by live solar direction (`uSunDir`).
+  - **NASA Asteroid 101955 Bennu**: Sourced and loaded official NASA OSIRIS-REx 3D model (`public/assets/asteroids/bennu.glb`, 329 KB). Integrated into Keplerian orbit solver with real info card telemetry and NASA fact sheet source links.
+  - **Atmospheric Meteors**: Added subtle shooting star entry streaks in Earth's orbital sky.

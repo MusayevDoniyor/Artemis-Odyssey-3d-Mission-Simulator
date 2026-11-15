@@ -58,6 +58,10 @@ const PLANET_ART_STYLE: Record<string, { background: string; ring?: boolean; sun
     background:
       'radial-gradient(circle at 35% 34%, #f0f9ff 0%, #38bdf8 58%, #1e293b 100%)',
   },
+  bennu: {
+    background:
+      'radial-gradient(circle at 35% 34%, #cbd5e1 0%, #64748b 54%, #18181b 100%)',
+  },
 };
 
 export function PlanetThumb({

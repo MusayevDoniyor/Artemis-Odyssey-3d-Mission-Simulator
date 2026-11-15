@@ -4,6 +4,31 @@ This file records all architectural, engineering, and asset decisions made auton
 
 ---
 
+## Decision D2: Real Planetary Textures, Ring Systems, Atmosphere Shaders & Asteroid Bennu (Phase 2)
+- **Date**: 2026-11-16T03:05:00+05:00
+- **Decision**:
+  1. **Real Scientific Textures**: Replaced all procedural canvas planetary textures with verified 2K equirectangular maps:
+     - Sun: SDO AIA 4500Å continuum map with unlit emissive material, coronal prominences, and additive glow.
+     - Mercury: MESSENGER MDIS global mosaic.
+     - Venus: Mariner 10 / Pioneer Venus cloud layer with dense Rayleigh limb glow (`uDayColor: 0xffe2a4`, `uTwilightColor: 0xd97706`) + Magellan radar surface map.
+     - Earth: NASA Blue Marble daylight mosaic, alpha-masked clouds, and NASA Black Marble night lights shader dynamically masked by solar terminator direction (`uSunDir`).
+     - Moon: LRO LROC WAC mosaic.
+     - Mars: MGS MOC / Viking MDIM mosaic with thin Martian atmosphere shader.
+     - Jupiter: Cassini/Juno composite map with Galilean moons and faint ring band.
+     - Saturn: Cassini ISS calibrated cylindrical map.
+     - Uranus: Voyager 2 composite map with 97.77° axial tilt and faint ring band.
+     - Neptune: Voyager 2 composite map with 28.32° axial tilt and faint ring band.
+     - Ceres: Dawn Framing Camera global mosaic.
+     - Bennu: NASA OSIRIS-REx 3D laser altimeter / shape model (.glb).
+  2. **Planetary Ring Geometry**: Implemented `createPlanetaryRingGeometry` with radial UV projection `u = (r - r_in) / (r_out - r_in)` to accurately map 1D radial ring profiles (C ring, B ring, Cassini Division, A ring out to 2.27 R_sat) with zero polar distortion. Added faint ring bands for Jupiter, Uranus, and Neptune; no rings on bodies that have none.
+  3. **Atmospheric Shaders**: Rayleigh limb glow shaders tuned for Venus (thick dense greenhouse haze), Mars (thin tenuous CO₂ limb), and gas giants.
+  4. **NASA Fact Sheet References & Bennu Integration**: Expanded `SOLAR_SYSTEM_BODIES` and `PLANETARY_CATALOG_SI` with authentic NASA fact sheet figures (mean diameter, mass, surface gravity, rotation period, orbit elements) and clickable direct links to official NASA fact sheets.
+  5. **B4 & B5 Resolution**: Verified elimination of NASA meatball canvas decal (replaced with original vector Artemis flight operations insignia) and poor procedural textures.
+- **Why**: Fulfills Phase 2 requirements for aerospace realism; replaces generic procedural noise with authentic scientific imagery while staying within the <3 MB asset budget.
+- **Alternatives Considered**:
+  - Procedural WebGL noise shaders for planets (rejected: produces synthetic textures that fail aerospace fidelity standards).
+  - 8K uncompressed textures (rejected: would exceed the 3 MB budget per asset and cause mobile VRAM exhaustion; 2K equirectangular WebP/JPEG provides crisp resolution while keeping total planetary package under 7 MB).
+
 ## Decision D0: Overnight Branch & Safety Configuration
 - **Date**: 2026-11-16T02:04:00+05:00
 - **Decision**: Created isolated branch `overnight/world-and-models` from `rebuild/m4-design-system`. Set up `.gitignore` for `assets-src/*` while tracking `assets-src/SOURCES.md`.
@@ -11,6 +36,31 @@ This file records all architectural, engineering, and asset decisions made auton
 - **Alternatives Considered**: Direct work on `rebuild/m4-design-system` (rejected: separates design system milestone from overnight multi-phase asset overhaul).
 
 ---
+
+## Decision D2: Real Planetary Textures, Ring Systems, Atmosphere Shaders & Asteroid Bennu (Phase 2)
+- **Date**: 2026-11-16T03:05:00+05:00
+- **Decision**:
+  1. **Real Scientific Textures**: Replaced all procedural canvas planetary textures with verified 2K equirectangular maps:
+     - Sun: SDO AIA 4500Å continuum map with unlit emissive material, coronal prominences, and additive glow.
+     - Mercury: MESSENGER MDIS global mosaic.
+     - Venus: Mariner 10 / Pioneer Venus cloud layer with dense Rayleigh limb glow (`uDayColor: 0xffe2a4`, `uTwilightColor: 0xd97706`) + Magellan radar surface map.
+     - Earth: NASA Blue Marble daylight mosaic, alpha-masked clouds, and NASA Black Marble night lights shader dynamically masked by solar terminator direction (`uSunDir`).
+     - Moon: LRO LROC WAC mosaic.
+     - Mars: MGS MOC / Viking MDIM mosaic with thin Martian atmosphere shader.
+     - Jupiter: Cassini/Juno composite map with Galilean moons and faint ring band.
+     - Saturn: Cassini ISS calibrated cylindrical map.
+     - Uranus: Voyager 2 composite map with 97.77° axial tilt and faint ring band.
+     - Neptune: Voyager 2 composite map with 28.32° axial tilt and faint ring band.
+     - Ceres: Dawn Framing Camera global mosaic.
+     - Bennu: NASA OSIRIS-REx 3D laser altimeter / shape model (.glb).
+  2. **Planetary Ring Geometry**: Implemented `createPlanetaryRingGeometry` with radial UV projection `u = (r - r_in) / (r_out - r_in)` to accurately map 1D radial ring profiles (C ring, B ring, Cassini Division, A ring out to 2.27 R_sat) with zero polar distortion. Added faint ring bands for Jupiter, Uranus, and Neptune; no rings on bodies that have none.
+  3. **Atmospheric Shaders**: Rayleigh limb glow shaders tuned for Venus (thick dense greenhouse haze), Mars (thin tenuous CO₂ limb), and gas giants.
+  4. **NASA Fact Sheet References & Bennu Integration**: Expanded `SOLAR_SYSTEM_BODIES` and `PLANETARY_CATALOG_SI` with authentic NASA fact sheet figures (mean diameter, mass, surface gravity, rotation period, orbit elements) and clickable direct links to official NASA fact sheets.
+  5. **B4 & B5 Resolution**: Verified elimination of NASA meatball canvas decal (replaced with original vector Artemis flight operations insignia) and poor procedural textures.
+- **Why**: Fulfills Phase 2 requirements for aerospace realism; replaces generic procedural noise with authentic scientific imagery while staying within the <3 MB asset budget.
+- **Alternatives Considered**:
+  - Procedural WebGL noise shaders for planets (rejected: produces synthetic textures that fail aerospace fidelity standards).
+  - 8K uncompressed textures (rejected: would exceed the 3 MB budget per asset and cause mobile VRAM exhaustion; 2K equirectangular WebP/JPEG provides crisp resolution while keeping total planetary package under 7 MB).
 
 ## Decision D1: Dual Scale Modes, Continuous Coordinates, and Depth Buffer Calibration (Phase 1)
 - **Date**: 2026-11-16T02:40:00+05:00

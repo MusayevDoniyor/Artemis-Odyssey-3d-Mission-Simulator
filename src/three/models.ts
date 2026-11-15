@@ -22,10 +22,13 @@ import {
 import { getLunarTerrainHeight, getSurfaceTerrainHeight } from '../game/physics';
 import type { RoverCollider, SpaceTargetId, SurfacePlanet } from '../game/types';
 import {
+  createEarthNightMaterial,
   createEarthSurfaceScatteringMaterial,
+  createPlanetaryRingGeometry,
   createPlanetAtmosphereMaterial,
   type RealPlanetMaps,
 } from './planetMaps';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { ProceduralTextureSet } from './textures';
 
 export function tagPart(
@@ -3244,6 +3247,7 @@ export interface SolarSystemHandles {
   shipShieldShell: THREE.Mesh;
   shipWingsGroup: THREE.Group;
   earthBodyGroup: THREE.Group;
+  earthNight: THREE.Mesh;
   earthClouds: THREE.Mesh;
   earthScatter: THREE.Mesh;
   earthAtmo: THREE.Mesh;
@@ -3500,8 +3504,8 @@ export function createSolarSystemScene(
   const sunTiltGroup = new THREE.Group();
   sunTiltGroup.rotation.z = PLANETARY_CATALOG_SI.sun.axialTiltRad;
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(1.0, 36, 28),
-    new THREE.MeshBasicMaterial({ map: tex.sunAlbedo, color: 0xffffff })
+    new THREE.SphereGeometry(1.0, 48, 36),
+    new THREE.MeshBasicMaterial({ map: planetMaps.sunMap, color: 0xffffff })
   );
   markSolarBody(sun, 'sun');
   sunTiltGroup.add(sun);
@@ -3595,6 +3599,11 @@ export function createSolarSystemScene(
     })
   );
   earthBodyGroup.add(earth);
+  const earthNight = new THREE.Mesh(
+    new THREE.SphereGeometry(1.002, 48, 36),
+    createEarthNightMaterial(planetMaps.earthNightMap)
+  );
+  earthBodyGroup.add(earthNight);
   const earthClouds = new THREE.Mesh(
     new THREE.SphereGeometry(1.014, 44, 32),
     new THREE.MeshStandardMaterial({
@@ -3624,6 +3633,41 @@ export function createSolarSystemScene(
     })
   );
   earthBodyGroup.add(earthAtmo);
+
+  // Occasional meteors/streaks in Earth's orbital sky (clearly an atmospheric effect)
+  const meteorCount = 12;
+  const meteorGeo = new THREE.BufferGeometry();
+  const meteorPositions = new Float32Array(meteorCount * 6);
+  for (let i = 0; i < meteorCount; i++) {
+    const angle = (i / meteorCount) * Math.PI * 2;
+    const r = 1.08 + (i % 3) * 0.02;
+    const x0 = Math.cos(angle) * r;
+    const y0 = ((i % 5) - 2) * 0.15;
+    const z0 = Math.sin(angle) * r;
+    const trailAngle = angle + 0.06;
+    const x1 = Math.cos(trailAngle) * (r - 0.04);
+    const y1 = y0 - 0.03;
+    const z1 = Math.sin(trailAngle) * (r - 0.04);
+    meteorPositions[i * 6] = x0;
+    meteorPositions[i * 6 + 1] = y0;
+    meteorPositions[i * 6 + 2] = z0;
+    meteorPositions[i * 6 + 3] = x1;
+    meteorPositions[i * 6 + 4] = y1;
+    meteorPositions[i * 6 + 5] = z1;
+  }
+  meteorGeo.setAttribute('position', new THREE.BufferAttribute(meteorPositions, 3));
+  const meteorLines = new THREE.LineSegments(
+    meteorGeo,
+    new THREE.LineBasicMaterial({
+      color: 0xbae6fd,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  earthBodyGroup.add(meteorLines);
+
   earthTiltGroup.add(earthBodyGroup);
   earthScaleGroup.add(earthTiltGroup);
   earthGroup.add(earthScaleGroup);
@@ -4030,28 +4074,30 @@ export function createSolarSystemScene(
   );
   group.add(courseLine);
 
-  // Remaining Complete Solar System Bodies (Mercury -> Eris + Halley's Comet)
+  // Remaining Complete Solar System Bodies (Mercury -> Eris + Halley's Comet + Bennu)
   let halleyTail = new THREE.Mesh();
   const textureForBody = (id: string) => {
     switch (id) {
       case 'mercury':
-        return tex.mercuryAlbedo;
+        return planetMaps.mercuryMap;
       case 'venus':
-        return tex.venusAlbedo;
+        return planetMaps.venusMap;
       case 'jupiter':
-        return tex.jupiterAlbedo;
+        return planetMaps.jupiterMap;
       case 'saturn':
-        return tex.saturnAlbedo;
+        return planetMaps.saturnMap;
       case 'uranus':
-        return tex.uranusAlbedo;
+        return planetMaps.uranusMap;
       case 'neptune':
-        return tex.neptuneAlbedo;
+        return planetMaps.neptuneMap;
       case 'pluto':
         return tex.plutoAlbedo;
       case 'ceres':
-        return tex.mercuryAlbedo;
+        return planetMaps.ceresMap;
       case 'eris':
         return tex.plutoAlbedo;
+      case 'bennu':
+        return tex.moonAlbedo;
       default:
         return undefined;
     }
@@ -4085,32 +4131,106 @@ export function createSolarSystemScene(
       // Equatorial ring systems inside tiltGroup so Saturn (26.73°) & Uranus (97.77°) align to exact pole tilt
       if (b.id === 'saturn') {
         const rings = new THREE.Mesh(
-          new THREE.RingGeometry(1.24, 2.27, 72),
+          createPlanetaryRingGeometry(1.24, 2.27, 96),
           new THREE.MeshBasicMaterial({
-            map: tex.saturnRingAlbedo,
+            map: planetMaps.saturnRingMap,
             color: 0xffffff,
             transparent: true,
-            opacity: 0.94,
+            opacity: 0.96,
             side: THREE.DoubleSide,
             depthWrite: false,
           })
         );
         rings.rotation.x = -Math.PI / 2;
         tiltGroup.add(rings);
+
+        const sAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.035, 36, 28),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0xfef08a,
+            twilightColor: 0xb45309,
+            intensity: 0.48,
+            power: 2.9,
+            nightFloor: 0.04,
+          })
+        );
+        tiltGroup.add(sAtmo);
       } else if (b.id === 'uranus') {
         const uRing = new THREE.Mesh(
-          new THREE.RingGeometry(1.38, 1.72, 56),
+          createPlanetaryRingGeometry(1.42, 1.95, 72),
           new THREE.MeshBasicMaterial({
             color: 0xa5f3fc,
             transparent: true,
-            opacity: 0.46,
+            opacity: 0.22,
             side: THREE.DoubleSide,
             depthWrite: false,
           })
         );
         uRing.rotation.x = -Math.PI / 2;
         tiltGroup.add(uRing);
+
+        const uAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.035, 36, 28),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0x67e8f9,
+            twilightColor: 0x0891b2,
+            intensity: 0.65,
+            power: 2.6,
+            nightFloor: 0.04,
+          })
+        );
+        tiltGroup.add(uAtmo);
+      } else if (b.id === 'neptune') {
+        const nRing = new THREE.Mesh(
+          createPlanetaryRingGeometry(1.68, 2.45, 72),
+          new THREE.MeshBasicMaterial({
+            color: 0x93c5fd,
+            transparent: true,
+            opacity: 0.14,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
+        );
+        nRing.rotation.x = -Math.PI / 2;
+        tiltGroup.add(nRing);
+
+        const nAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.035, 36, 28),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0x38bdf8,
+            twilightColor: 0x1d4ed8,
+            intensity: 0.72,
+            power: 2.5,
+            nightFloor: 0.04,
+          })
+        );
+        tiltGroup.add(nAtmo);
       } else if (b.id === 'jupiter') {
+        const jRing = new THREE.Mesh(
+          createPlanetaryRingGeometry(1.40, 1.81, 72),
+          new THREE.MeshBasicMaterial({
+            color: 0xfde68a,
+            transparent: true,
+            opacity: 0.09,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
+        );
+        jRing.rotation.x = -Math.PI / 2;
+        tiltGroup.add(jRing);
+
+        const jAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.035, 40, 32),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0xfed7aa,
+            twilightColor: 0xc2410c,
+            intensity: 0.52,
+            power: 2.8,
+            nightFloor: 0.04,
+          })
+        );
+        tiltGroup.add(jAtmo);
+
         for (let m = 0; m < 4; m++) {
           const jMoon = new THREE.Mesh(
             new THREE.SphereGeometry(0.055, 10, 8),
@@ -4121,6 +4241,18 @@ export function createSolarSystemScene(
           jMoon.position.set(Math.cos(ang) * distR, 0, Math.sin(ang) * distR);
           tiltGroup.add(jMoon);
         }
+      } else if (b.id === 'venus') {
+        const vAtmo = new THREE.Mesh(
+          new THREE.SphereGeometry(1.045, 36, 28),
+          createPlanetAtmosphereMaterial({
+            dayColor: 0xffe2a4,
+            twilightColor: 0xd97706,
+            intensity: 1.45,
+            power: 2.1,
+            nightFloor: 0.06,
+          })
+        );
+        tiltGroup.add(vAtmo);
       } else if (b.id === 'pluto') {
         const charon = new THREE.Mesh(
           new THREE.SphereGeometry(0.51, 14, 10),
@@ -4136,6 +4268,42 @@ export function createSolarSystemScene(
         halleyTail.rotation.x = Math.PI / 2;
         halleyTail.position.z = 6.2;
         scaleGroup.add(halleyTail);
+      } else if (b.id === 'bennu') {
+        sph.visible = false;
+        const bennuHolder = new THREE.Group();
+        tiltGroup.add(bennuHolder);
+        if (typeof Image !== 'undefined') {
+          const gltfLoader = new GLTFLoader();
+          gltfLoader.load(
+            '/assets/asteroids/bennu.glb',
+            (gltf) => {
+              const model = gltf.scene;
+              model.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material = new THREE.MeshStandardMaterial({
+                    color: 0x71717a,
+                    roughness: 0.94,
+                    metalness: 0.06,
+                  });
+                  child.castShadow = true;
+                  child.receiveShadow = true;
+                  markSolarBody(child, 'bennu');
+                }
+              });
+              const bbox = new THREE.Box3().setFromObject(model);
+              const sz = bbox.getSize(new THREE.Vector3());
+              const maxD = Math.max(sz.x, sz.y, sz.z) || 1.0;
+              model.scale.setScalar(2.0 / maxD);
+              bennuHolder.add(model);
+            },
+            undefined,
+            () => {
+              sph.visible = true;
+            }
+          );
+        } else {
+          sph.visible = true;
+        }
       }
 
       scaleGroup.add(tiltGroup);
@@ -4300,6 +4468,7 @@ export function createSolarSystemScene(
     shipShieldShell,
     shipWingsGroup,
     earthBodyGroup,
+    earthNight,
     earthClouds,
     earthScatter,
     earthAtmo,

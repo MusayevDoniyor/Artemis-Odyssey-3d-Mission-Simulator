@@ -67,6 +67,7 @@ export const EXPLORATION_VISUAL_LAYOUT: Record<
   pluto: { orbitRadiusUnits: 380.0, bodyRadiusUnits: 0.438 },
   eris: { orbitRadiusUnits: 440.0, bodyRadiusUnits: 0.429 },
   halley: { orbitRadiusUnits: 95.0, bodyRadiusUnits: 0.45 },
+  bennu: { orbitRadiusUnits: 44.5, bodyRadiusUnits: 0.12 },
 };
 
 /**

@@ -2611,6 +2611,12 @@ export class SpaceSceneManager {
       this.sunOriginVec,
       this.scratchVec
     );
+    updateAtmosphereSunDirection(
+      ss.earthNight,
+      this.scratchAtmoVec,
+      this.sunOriginVec,
+      this.scratchVec
+    );
     this.scratchAtmoVec.set(marsPos.x, marsPos.y, marsPos.z);
     updateAtmosphereSunDirection(
       ss.marsAtmo,

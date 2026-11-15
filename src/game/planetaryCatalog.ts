@@ -24,7 +24,7 @@ export interface PlanetaryPhysicalEntry {
   name: string;
   jplId: string;
   parentBodyId: 'sun' | 'earth' | null;
-  category: 'star' | 'planet' | 'moon' | 'dwarf' | 'comet';
+  category: 'star' | 'planet' | 'moon' | 'dwarf' | 'comet' | 'asteroid';
   /** Mean volumetric radius in SI meters (JPL Planetary Physical Parameters) */
   meanRadiusM: number;
   /** Equatorial radius in SI meters */
@@ -456,6 +456,33 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     },
     provenance: 'REAL NASA/JPL DATA',
     sourceCitation: 'JPL Small-Body Database (1P/Halley)',
+  },
+  bennu: {
+    id: 'bennu',
+    name: '101955 Bennu',
+    jplId: '2101955',
+    parentBodyId: 'sun',
+    category: 'asteroid',
+    meanRadiusM: 245.03, // 490.06m volumetric mean diameter
+    equatorialRadiusM: 255.0,
+    massKg: 7.329e10,
+    densityKgM3: 1190,
+    muM3S2: 4.89,
+    surfaceGravityMs2: 0.00006,
+    siderealRotationPeriodS: 4.296 * 3600, // 4.296 hours
+    axialTiltRad: 177.6 * D2R, // Retrograde rotator
+    siderealOrbitPeriodS: 436.604 * SI.DAY_S, // 1.195 years
+    geometricAlbedo: 0.046, // B-type carbonaceous asteroid
+    orbitalElements: {
+      semiMajorAxisM: 1.12639 * SI.AU_M,
+      eccentricity: 0.20374,
+      inclinationRad: 6.0349 * D2R,
+      ascendingNodeRad: 2.0609 * D2R,
+      argPeriapsisRad: 66.2231 * D2R,
+      meanAnomalyJ2000Rad: 101.7039 * D2R,
+    },
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA OSIRIS-REx Mission Archive & JPL Small-Body Database (101955 Bennu)',
   },
 };
 
