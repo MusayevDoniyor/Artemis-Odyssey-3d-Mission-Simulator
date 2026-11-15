@@ -47,7 +47,6 @@ type NoteFilter = 'all' | FieldNote['category'];
 interface MobileAcademyViewProps {
   donki: DonkiStatus;
   osdr: OsdrStatus;
-  onOpenNasaModal: () => void;
 }
 
 const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = HARDWARE_ORDER.map(
@@ -57,7 +56,6 @@ const VEHICLE_ORDER: Array<{ id: VehicleShowcaseId; short: string }> = HARDWARE_
 export function MobileAcademyView({
   donki,
   osdr,
-  onOpenNasaModal,
 }: MobileAcademyViewProps) {
   const [activeTab, setActiveTab] = useState<AcademyTab>('missions');
   const [selectedMission, setSelectedMission] = useState<CampaignMissionId>('artemis-2');
@@ -115,14 +113,12 @@ export function MobileAcademyView({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenNasaModal}
-            className="hud-panel inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-hud text-[11px] font-bold tracking-wide text-emerald-300 uppercase transition active:scale-[0.98]"
+          <div
+            className="hud-panel inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-hud text-[11px] font-bold tracking-wide text-emerald-300 uppercase"
           >
             <Database className="h-3.5 w-3.5" />
             Live API
-          </button>
+          </div>
         </div>
 
         {/* 4-Tab Tactical Navigation */}
@@ -661,13 +657,6 @@ export function MobileAcademyView({
                   <h2 className="font-hud text-xs font-bold tracking-wider text-emerald-300 uppercase">
                     NASA OSDR Radiobiology Grounding
                   </h2>
-                  <button
-                    type="button"
-                    onClick={onOpenNasaModal}
-                    className="font-mono-tech text-[10px] font-bold text-cyan-300 underline"
-                  >
-                    Open Full Inspector
-                  </button>
                 </div>
 
                 {osdr.studies.length > 0 ? (

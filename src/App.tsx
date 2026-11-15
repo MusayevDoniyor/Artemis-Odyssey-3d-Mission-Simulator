@@ -2477,7 +2477,6 @@ export default function App() {
         <MobileAcademyView
           donki={donki}
           osdr={osdr}
-          onOpenNasaModal={() => {}}
         />
       </div>
     );
@@ -2551,7 +2550,6 @@ export default function App() {
             jumpToPhase('briefing');
           }}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => {}}
           onOpenMenuTab={openMenuWithTab}
           muted={muted}
           onToggleMute={toggleMute}
@@ -2632,7 +2630,6 @@ export default function App() {
           osdr={osdr}
           onBack={() => jumpToPhase('title')}
           onLaunch={startActiveMission}
-          onOpenNasaModal={() => {}}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
         />
       )}
@@ -2651,7 +2648,6 @@ export default function App() {
               const obj = objectivesUi.find((o) => o.id === objId);
               if (obj) handleOpenLearnForObjective(obj);
             }}
-            onOpenOutpost={() => {}}
             onQueueMarsTarget={(prompt) => {
               soundSynth.init();
               marsQueueRef.current = startAutoDriveToWaypoint(
@@ -2816,7 +2812,6 @@ export default function App() {
           onOpenBriefing={() => jumpToPhase('briefing')}
           onOpenHardwareBay={() => jumpToPhase('inspector')}
           onOpenNotebook={() => setFieldNotebookOpen(true)}
-          onOpenNasaModal={() => {}}
           onToggleAutoPilot={() => {
             simRef.current.space.autoPilot = !simRef.current.space.autoPilot;
             syncUiNow();
@@ -2937,7 +2932,6 @@ export default function App() {
           onOpenDrillConsole={(obj) => {
             handleOpenLearnForObjective(obj);
           }}
-          onOpenOutpostConsole={() => {}}
           onOpenMenuTab={openMenuWithTab}
           onSetDriveMode={(mode: RoverDriveMode) => {
             simRef.current.rover.driveMode = mode;
@@ -3033,9 +3027,7 @@ export default function App() {
           closeMenu();
           jumpToPhase('title');
         }}
-        onOpenOutpostConsole={() => {}}
         onOpenFieldLedger={() => setFieldNotebookOpen(true)}
-        onOpenNasaModal={() => {}}
         onJumpToInspector={() => jumpToPhase('inspector')}
         onToggleSpeedScale={() => {
           soundSynth.playClick();
