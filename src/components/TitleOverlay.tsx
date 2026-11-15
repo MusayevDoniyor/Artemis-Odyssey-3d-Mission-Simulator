@@ -38,6 +38,7 @@ import type {
 import { AudioQualityPopover } from './AudioQualityPopover';
 import { NASAInsignia } from './NASAInsignia';
 import { GatewayStationThumb, PlanetThumb } from './PlanetThumb';
+import { Button, Panel, StatusPill } from './ui';
 
 interface TitleOverlayProps {
   showcase: VehicleShowcaseId;
@@ -88,29 +89,44 @@ const QUICK_STAGES: Array<{ phase: GamePhase; label: string }> = [
 
 const CAMPAIGN_CARD_META: Record<
   CampaignMissionId,
-  { num: number; name: string; destination: string; planetThumb?: string }
+  {
+    num: number;
+    name: string;
+    destination: string;
+    targetDate: string;
+    status: 'ready' | 'in-development';
+    planetThumb?: string;
+  }
 > = {
   'artemis-2': {
     num: 1,
     name: 'Artemis II',
-    destination: 'Earth → LLO',
+    destination: 'Earth → LLO · HERMES Deploy',
+    targetDate: 'Flown Flyby Trajectory',
+    status: 'ready',
     planetThumb: 'earth',
   },
   'artemis-3': {
     num: 2,
     name: 'Artemis III',
-    destination: 'Moon South Pole',
+    destination: 'Moon South Pole · LEO Docking',
+    targetDate: 'Target 2026 (as of Nov 2026)',
+    status: 'in-development',
     planetThumb: 'moon',
   },
   'artemis-4': {
     num: 3,
     name: 'Artemis IV',
-    destination: 'Lunar Gateway',
+    destination: 'Lunar Gateway & Landing',
+    targetDate: 'Target 2028 (as of Nov 2026)',
+    status: 'in-development',
   },
   'mars-pathfinder': {
     num: 4,
     name: 'Mars Expedition',
-    destination: 'Jezero Crater',
+    destination: 'Jezero Crater · Surface Operations',
+    targetDate: 'Target 2030s (as of Nov 2026)',
+    status: 'in-development',
     planetThumb: 'mars',
   },
 };
@@ -281,20 +297,7 @@ export function TitleOverlay({
               </button>
             )}
 
-            <div
-              className="hud-soft inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-100"
-            >
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  nasaLive
-                    ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                    : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
-                }`}
-              />
-              <span className={nasaLive ? 'text-emerald-200' : 'text-amber-200'}>
-                {nasaLive ? 'NASA Data Connected' : 'NASA Data Archived'}
-              </span>
-            </div>
+            <StatusPill donki={donki} osdr={osdr} />
 
             {onToggleMusic && (
               <div className="hud-soft hidden items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-200 sm:flex">
@@ -376,13 +379,13 @@ export function TitleOverlay({
         {/* Eyebrow */}
         <div className="mb-1.5 flex items-center gap-2">
           <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
-          <p className="font-hud text-[11px] font-bold tracking-[0.26em] text-cyan-300 uppercase">
-            NASA Flight Operations Simulator
+          <p className="font-hud text-[11px] font-bold tracking-[0.24em] text-cyan-300 uppercase">
+            Flight Operations Simulator
           </p>
         </div>
 
-        {/* Title Lockup with Cyan Orbital Swoosh + Official Mission Patch */}
-        <div className="relative mb-3 flex items-center gap-3.5">
+        {/* Title Lockup with Cyan Orbital Swoosh + Mission Patch */}
+        <div className="relative mb-2 flex items-center gap-3.5">
           <svg
             width="64"
             height="68"
@@ -415,15 +418,18 @@ export function TitleOverlay({
                 ODYSSEY
               </span>
             </h1>
+            <p className="mt-1 font-body text-[10px] text-slate-400">
+              Unofficial educational project · Not affiliated with or endorsed by NASA (14 CFR § 1221)
+            </p>
           </div>
         </div>
 
-        <p className="mb-4 max-w-[430px] text-sm leading-relaxed text-slate-200/95">
-          Launch SLS, explore the Moon and Mars, and experience the next chapter of space exploration.
+        <p className="mb-3 max-w-[430px] font-body text-sm leading-relaxed text-slate-200/95">
+          Launch SLS, explore the Moon and Mars, and experience real astronaut spaceflight engineering.
         </p>
 
         {/* CAMPAIGN MISSIONS 2×2 Interactive Card Panel */}
-        <section className="hud-soft pointer-events-auto mb-3.5 rounded-2xl p-3">
+        <Panel variant="surface" className="pointer-events-auto mb-3.5 p-3">
           <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
             <div className="flex items-center gap-2 font-hud text-[11px] font-bold tracking-[0.18em] text-cyan-200 uppercase">
               <span className="inline-block h-2 w-2 rotate-45 rounded-[1px] bg-cyan-400" />
@@ -441,6 +447,7 @@ export function TitleOverlay({
               const meta = CAMPAIGN_CARD_META[id];
               const active = carryover.activeMission === id;
               const done = carryover.completedMissions.includes(id);
+              const isLocked = meta.status === 'in-development';
 
               return (
                 <button
@@ -455,12 +462,14 @@ export function TitleOverlay({
                       setCarouselPage(0);
                     }
                   }}
-                  className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+                  className={`group flex items-start gap-2.5 rounded-xl border p-2 text-left transition ${
                     active
                       ? 'border-cyan-400 bg-cyan-500/16 shadow-[0_0_22px_rgba(34,211,238,0.26)]'
-                      : done
-                        ? 'border-emerald-400/50 bg-emerald-500/10 hover:border-emerald-300'
-                        : 'border-sky-400/20 bg-slate-950/65 hover:border-cyan-400/55 hover:bg-slate-900/80'
+                      : isLocked
+                        ? 'border-slate-800 bg-slate-950/50 opacity-80 hover:border-slate-700 hover:opacity-100'
+                        : done
+                          ? 'border-emerald-400/50 bg-emerald-500/10 hover:border-emerald-300'
+                          : 'border-sky-400/20 bg-slate-950/65 hover:border-cyan-400/55 hover:bg-slate-900/80'
                   }`}
                 >
                   {meta.planetThumb ? (
@@ -477,11 +486,15 @@ export function TitleOverlay({
                       >
                         {meta.num}. {meta.name}
                       </span>
-                      {done && (
+                      {isLocked ? (
+                        <span className="rounded border border-amber-400/30 bg-amber-500/15 px-1 font-mono-tech text-[8px] font-bold text-amber-300 uppercase">
+                          DEV
+                        </span>
+                      ) : done ? (
                         <span className="rounded bg-emerald-500/25 px-1 font-mono-tech text-[9px] font-bold text-emerald-300">
                           DONE
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div
                       className={`truncate text-[11px] ${
@@ -489,6 +502,9 @@ export function TitleOverlay({
                       }`}
                     >
                       {meta.destination}
+                    </div>
+                    <div className="mt-0.5 truncate font-mono-tech text-[9px] text-slate-500">
+                      {meta.targetDate}
                     </div>
                   </div>
                   <ChevronRight
@@ -503,50 +519,73 @@ export function TitleOverlay({
             })}
           </div>
 
-          {/* Concise Active Objective Readout */}
+          {/* Active Objective Readout */}
           <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-sky-400/15 bg-slate-950/75 px-3 py-1.5 text-[11px]">
-            <span className="truncate text-slate-200">
-              <strong className="font-hud text-cyan-300 uppercase">{activeMission.code}: </strong>
-              {activeMission.objectiveSummary}
-            </span>
+            {CAMPAIGN_CARD_META[carryover.activeMission].status === 'in-development' ? (
+              <span className="truncate text-slate-300">
+                <strong className="font-hud text-amber-300 uppercase">In Development: </strong>
+                {activeMission.title} simulation systems are in development (as of Nov 2026). Select Artemis II to launch.
+              </span>
+            ) : (
+              <span className="truncate text-slate-200">
+                <strong className="font-hud text-cyan-300 uppercase">{activeMission.code}: </strong>
+                {activeMission.objectiveSummary}
+              </span>
+            )}
           </div>
-        </section>
+        </Panel>
 
         {/* Primary Action CTAs: BRIEF & LAUNCH / EXPLORE / HARDWARE BAY */}
         <div className="pointer-events-auto flex flex-col gap-2">
           <div className="grid grid-cols-[1.28fr_1fr] gap-2.5">
-            <button
-              type="button"
-              data-start="true"
-              onClick={onStartMission}
-              className="hud-cta-cyan inline-flex items-center justify-between gap-2 rounded-xl px-4 py-3 font-display text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.985]"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Play className="h-4 w-4 fill-white" />
-                Brief &amp; Launch
-              </span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            {CAMPAIGN_CARD_META[carryover.activeMission].status === 'ready' ? (
+              <Button
+                variant="primary"
+                size="lg"
+                data-start="true"
+                onClick={onStartMission}
+                className="w-full justify-between font-display text-sm font-bold tracking-wider uppercase"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Play className="h-4 w-4 fill-slate-950" />
+                  Brief &amp; Launch
+                </span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="lg"
+                data-start="true"
+                disabled
+                title="Mission in development (as of Nov 2026). Select Artemis II to fly."
+                className="w-full text-xs text-amber-300/90"
+              >
+                In Development
+              </Button>
+            )}
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="lg"
               data-testid="free-explore-btn"
               onClick={onStartFreeExplore}
-              className="hud-btn-glass inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-hud text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.985]"
+              className="w-full font-hud text-sm font-bold tracking-wider uppercase"
             >
               <Compass className="h-4 w-4 text-cyan-300" />
               Explore
-            </button>
+            </Button>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="md"
             onClick={() => onJumpToPhase('inspector')}
-            className="hud-btn-glass inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-hud text-sm font-bold tracking-wider whitespace-nowrap uppercase transition active:scale-[0.99]"
+            className="w-full border border-sky-400/20 bg-slate-900/60 font-hud text-sm font-bold tracking-wider uppercase"
           >
             <Wrench className="h-4 w-4 text-cyan-300" />
             Hardware Bay
-          </button>
+          </Button>
 
           {/* Compact Expandable Quick Jump & 3D Preview Drawer */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
