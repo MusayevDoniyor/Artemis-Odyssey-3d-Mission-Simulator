@@ -74,7 +74,6 @@ interface SpaceFlightHUDProps {
   onOpenBriefing: () => void;
   onOpenHardwareBay: () => void;
   onOpenNotebook: () => void;
-  onOpenNasaModal: () => void;
   onToggleAutoPilot: () => void;
   onToggleShieldBoost: () => void;
   onCompleteSatelliteMission: () => void;
@@ -112,7 +111,6 @@ export function SpaceFlightHUD({
   onOpenBriefing,
   onOpenHardwareBay,
   onOpenNotebook,
-  onOpenNasaModal,
   onToggleAutoPilot,
   onToggleShieldBoost,
   onCompleteSatelliteMission,
@@ -369,10 +367,8 @@ export function SpaceFlightHUD({
                 Enable Audio
               </button>
             )}
-            <button
-              type="button"
-              onClick={onOpenNasaModal}
-              className="hud-soft inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-100 transition hover:border-sky-300/60 lg:px-3.5 lg:text-sm"
+            <div
+              className="hud-soft inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-100 lg:px-3.5 lg:text-sm"
             >
               <span
                 className={`h-2 w-2 rounded-full ${
@@ -382,7 +378,7 @@ export function SpaceFlightHUD({
               <span>{nasaOnline ? 'Online' : 'Archived'}</span>
               <span className="text-slate-500">·</span>
               <span className="text-sky-200">NASA Data</span>
-            </button>
+            </div>
             <NASAInsignia size={28} />
           </div>
         </header>

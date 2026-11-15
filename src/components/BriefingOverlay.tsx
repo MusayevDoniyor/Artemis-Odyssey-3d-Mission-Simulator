@@ -60,7 +60,6 @@ interface BriefingOverlayProps {
   osdr: OsdrStatus;
   onBack: () => void;
   onLaunch: () => void;
-  onOpenNasaModal: () => void;
   onOpenNotebook: () => void;
 }
 
@@ -256,7 +255,6 @@ export function BriefingOverlay({
   osdr,
   onBack,
   onLaunch,
-  onOpenNasaModal,
   onOpenNotebook,
 }: BriefingOverlayProps) {
   const activeMissionId = carryover.activeMission;
@@ -326,14 +324,12 @@ export function BriefingOverlay({
               Ledger ({carryover.unlockedFieldNotes.length})
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenNasaModal}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-bold whitespace-nowrap text-amber-200 uppercase transition hover:bg-amber-500/25"
+            <div
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2 text-xs font-bold whitespace-nowrap text-amber-200 uppercase"
             >
               <Database className="h-4 w-4 shrink-0" />
               {nasaBadgeText}
-            </button>
+            </div>
           </div>
         </header>
 

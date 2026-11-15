@@ -24,7 +24,6 @@ interface RoverHUDProps {
   freeExploreMode: boolean;
   onToggleSpeedScale: () => void;
   onOpenDrillConsole: (obj: RoverObjective) => void;
-  onOpenOutpostConsole: () => void;
   onOpenMenuTab: (tab: GameMenuTab) => void;
   onSetDriveMode: (mode: RoverDriveMode) => void;
   onTransmitMarsQueue: () => void;
@@ -45,7 +44,6 @@ export function RoverHUD({
   freeExploreMode,
   onToggleSpeedScale,
   onOpenDrillConsole,
-  onOpenOutpostConsole,
   onOpenMenuTab,
   onSetDriveMode,
   onTransmitMarsQueue,
@@ -122,24 +120,20 @@ export function RoverHUD({
             { keys: 'A/D', label: 'Turn', hold: 'left' as const },
             {
               keys: 'E',
-              label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Interact',
+              label: nearestObjective ? 'Learn' : 'Interact',
               action: nearestObjective
                 ? () => onOpenDrillConsole(nearestObjective)
-                : atBaseCamp
-                  ? onOpenOutpostConsole
-                  : undefined,
+                : undefined,
             },
           ]
         : [
             { keys: 'W', label: 'Drive', hold: 'forward' as const },
             {
-              keys: nearestObjective ? 'E' : atBaseCamp ? 'E' : 'Auto',
-              label: nearestObjective ? 'Learn' : atBaseCamp ? 'Airlock' : 'Auto-Drive',
+              keys: nearestObjective ? 'E' : 'Auto',
+              label: nearestObjective ? 'Learn' : 'Auto-Drive',
               action: nearestObjective
                 ? () => onOpenDrillConsole(nearestObjective)
-                : atBaseCamp
-                  ? onOpenOutpostConsole
-                  : onStartAutoDriveNext,
+                : onStartAutoDriveNext,
             },
             { keys: 'Tab', label: 'Map & Menu', action: () => onOpenMenuTab('map') },
           ];
@@ -266,18 +260,8 @@ export function RoverHUD({
             </div>
           </div>
 
-          {(marsHighDust || donkiFlareActive || atBaseCamp) && (
+          {(marsHighDust || donkiFlareActive) && (
             <div className="flex flex-wrap justify-end gap-2">
-              {atBaseCamp && (
-                <button
-                  type="button"
-                  data-testid="open-outpost-console-btn"
-                  onClick={onOpenOutpostConsole}
-                  className="hud-soft pointer-events-auto rounded-xl border-amber-400/50 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-amber-200 hover:border-amber-300"
-                >
-                  Base Shelter · Enter [E]
-                </button>
-              )}
               {marsHighDust && (
                 <span className="hud-soft-alert rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-rose-200">
                   Dust {Math.round(rover.dustAccumulationPct)}%

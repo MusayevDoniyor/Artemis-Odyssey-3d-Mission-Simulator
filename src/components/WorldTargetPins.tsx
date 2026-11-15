@@ -6,7 +6,6 @@ interface WorldTargetPinsProps {
   planet: SurfacePlanet;
   marsQueue?: MarsQueueState;
   onInteractObjective: (objectiveId: string) => void;
-  onOpenOutpost: () => void;
   onQueueMarsTarget?: (prompt: SurfaceWorldPrompt) => void;
 }
 
@@ -15,7 +14,6 @@ export function WorldTargetPins({
   planet,
   marsQueue,
   onInteractObjective,
-  onOpenOutpost,
   onQueueMarsTarget,
 }: WorldTargetPinsProps) {
   const visiblePrompts = prompts.filter((p) => p.visible);
@@ -43,30 +41,21 @@ export function WorldTargetPins({
           >
             <div className="flex flex-col items-center gap-1">
               {/* Proximity Interact Prompt (E Interact) */}
-              {p.inRange ? (
+              {p.inRange && !isBase ? (
                 <button
                   type="button"
-                  data-testid={isBase ? 'world-basecamp-interact' : `world-interact-${p.id}`}
-                  onClick={() => (isBase ? onOpenOutpost() : onInteractObjective(p.id))}
+                  data-testid={`world-interact-${p.id}`}
+                  onClick={() => onInteractObjective(p.id)}
                   className="hud-soft pointer-events-auto inline-flex items-center gap-2 rounded-xl border-cyan-400/75 px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition hover:border-cyan-300 lg:text-sm"
                 >
                   <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-cyan-400 px-1 text-xs font-bold text-slate-950">
                     E
                   </span>
                   <span className="flex items-center gap-1.5 whitespace-nowrap">
-                    {isBase ? (
-                      <>
-                        <Home className="h-3.5 w-3.5 text-emerald-300" />
-                        Enter Airlock
-                      </>
-                    ) : (
-                      <>
-                        <BookOpen className="h-3.5 w-3.5 text-cyan-300" />
-                        Learn &amp; Sample {p.title}
-                      </>
-                    )}
+                    <BookOpen className="h-3.5 w-3.5 text-cyan-300" />
+                    Learn &amp; Sample {p.title}
                   </span>
-                  {!isBase && p.progress > 0 && (
+                  {p.progress > 0 && (
                     <span className="text-xs font-bold text-cyan-300 tabular-nums">
                       {Math.round(p.progress * 100)}%
                     </span>

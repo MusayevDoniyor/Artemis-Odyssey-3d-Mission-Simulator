@@ -2,8 +2,6 @@ import {
   BookOpen,
   CheckCircle2,
   Compass,
-  Database,
-  DoorOpen,
   HelpCircle,
   Home,
   Lock,
@@ -62,9 +60,7 @@ interface GameMenuModalProps {
   onClose: () => void;
   onRestartStage: () => void;
   onBackToTitle: () => void;
-  onOpenOutpostConsole: () => void;
   onOpenFieldLedger: () => void;
-  onOpenNasaModal: () => void;
   onJumpToInspector: () => void;
   onToggleSpeedScale: () => void;
   onUpdateAudio: (partial: Partial<AudioSettings>) => void;
@@ -106,9 +102,7 @@ export function GameMenuModal({
   onClose,
   onRestartStage,
   onBackToTitle,
-  onOpenOutpostConsole,
   onOpenFieldLedger,
-  onOpenNasaModal,
   onJumpToInspector,
   onToggleSpeedScale,
   onUpdateAudio,
@@ -196,10 +190,8 @@ export function GameMenuModal({
       icon: Map,
       gameplayOnly: true,
     },
-    { id: 'outpost', label: 'Base Console', icon: DoorOpen, gameplayOnly: true },
     { id: 'ledger', label: 'Field Ledger', icon: BookOpen },
     { id: 'achievements', label: 'Achievements', icon: Trophy },
-    { id: 'nasa', label: 'NASA Data', icon: Database },
     { id: 'glossary', label: 'Glossary & Facts', icon: HelpCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -554,26 +546,6 @@ export function GameMenuModal({
             </div>
           )}
 
-          {activeTab === 'outpost' && (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
-              <h3 className="text-lg font-bold text-white">Base Camp Airlock &amp; Power Console</h3>
-              <p className="text-base text-slate-300">
-                Pressurize the airlock to inspect crew quarters, lab, greenhouse, Kilopower fission, and review your Sol summary.
-              </p>
-              <button
-                type="button"
-                data-testid="menu-open-outpost-btn"
-                onClick={() => {
-                  onClose();
-                  onOpenOutpostConsole();
-                }}
-                className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
-              >
-                Open Base Console
-              </button>
-            </div>
-          )}
-
           {activeTab === 'ledger' && (
             <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
               <h3 className="text-lg font-bold text-white">Astronaut Field Ledger</h3>
@@ -589,25 +561,6 @@ export function GameMenuModal({
                 className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
               >
                 Open Full Ledger
-              </button>
-            </div>
-          )}
-
-          {activeTab === 'nasa' && (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-5">
-              <h3 className="text-lg font-bold text-white">NASA DONKI, OSDR &amp; JPL Data Sources</h3>
-              <p className="text-base text-slate-300">
-                Inspect live space weather alerts, biological shielding studies, and solar system light-time data.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenNasaModal();
-                }}
-                className="hud-cta-cyan rounded-xl px-5 py-2.5 text-base font-bold"
-              >
-                Open NASA Data Center
               </button>
             </div>
           )}

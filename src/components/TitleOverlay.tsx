@@ -63,7 +63,6 @@ interface TitleOverlayProps {
   onJumpToPhase: (phase: GamePhase) => void;
   onOpenBriefing: () => void;
   onOpenNotebook: () => void;
-  onOpenNasaModal: () => void;
   onOpenMenuTab: (tab: GameMenuTab) => void;
   muted: boolean;
   onToggleMute: () => void;
@@ -148,7 +147,6 @@ export function TitleOverlay({
   onJumpToPhase,
   onOpenBriefing,
   onOpenNotebook,
-  onOpenNasaModal,
   onOpenMenuTab,
   muted,
   onToggleMute,
@@ -283,10 +281,8 @@ export function TitleOverlay({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={onOpenNasaModal}
-              className="hud-soft inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-100 transition hover:border-cyan-400/70"
+            <div
+              className="hud-soft inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-100"
             >
               <span
                 className={`h-2.5 w-2.5 rounded-full ${
@@ -298,7 +294,7 @@ export function TitleOverlay({
               <span className={nasaLive ? 'text-emerald-200' : 'text-amber-200'}>
                 {nasaLive ? 'NASA Data Connected' : 'NASA Data Archived'}
               </span>
-            </button>
+            </div>
 
             {onToggleMusic && (
               <div className="hud-soft hidden items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-200 sm:flex">
