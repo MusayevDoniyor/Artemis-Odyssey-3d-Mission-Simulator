@@ -3551,6 +3551,9 @@ export interface SolarSystemHandles {
     earthMoon: THREE.Line;
     moonGateway: THREE.Line;
     gatewayMars: THREE.Line;
+    earthParking?: THREE.Line;
+    freeReturn?: THREE.Line;
+    moonSoi?: THREE.Line;
   };
   selectionRing: THREE.Group;
   halleyTail: THREE.Mesh;
@@ -4441,11 +4444,30 @@ export function createSolarSystemScene(
     new THREE.Vector3(SOLAR_TARGETS.mars.x, 0, SOLAR_TARGETS.mars.z),
     0xf97316
   );
-  group.add(arcEarthMoon, arcMoonGateway, arcGatewayMars);
+  const buildDynamicTrajectoryLine = (color: number, pointsCount: number, dashed = false) => {
+    const positions = new Float32Array(pointsCount * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = dashed
+      ? new THREE.LineDashedMaterial({ color, dashSize: 0.6, gapSize: 0.4, transparent: true, opacity: 0.45 })
+      : new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55 });
+    const line = new THREE.Line(geo, mat);
+    line.frustumCulled = false;
+    return line;
+  };
+
+  const arcEarthParking = buildDynamicTrajectoryLine(0x38bdf8, 65, false); // 64 segments + 1
+  const arcFreeReturn = buildDynamicTrajectoryLine(0xf59e0b, 81, true);   // 80 segments + 1
+  const arcMoonSoi = buildDynamicTrajectoryLine(0x0ea5e9, 49, false);     // 48 segments + 1
+
+  group.add(arcEarthMoon, arcMoonGateway, arcGatewayMars, arcEarthParking, arcFreeReturn, arcMoonSoi);
   const transferArcs = {
     earthMoon: arcEarthMoon,
     moonGateway: arcMoonGateway,
     gatewayMars: arcGatewayMars,
+    earthParking: arcEarthParking,
+    freeReturn: arcFreeReturn,
+    moonSoi: arcMoonSoi,
   };
 
   // Targets: HERMES Relay Orbit, Moon, Gateway NRHO, Mars (using normalized r=1.0 hierarchy for planets/Moon)

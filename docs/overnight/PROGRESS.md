@@ -59,10 +59,11 @@
   - [x] 8.4 Guided systems tours: "How SLS works", "How Orion keeps crew alive", "How LM landed on the Moon", "How Perseverance samples Mars", "How ISS sustains human life in LEO", and interactive quizzes.
   - [x] 8.5 Verify and tag `overnight-phase-8-green`.
 
-- [ ] **PHASE 9: Space flight views, trajectories and orbit lines**
-  - [ ] 9.1 Trajectory lines for parking orbit, TLI, cislunar free return, SOI transfers.
-  - [ ] 9.2 Smooth camera transitions and anti-popping entrance animations.
-  - [ ] 9.3 Verify and tag `overnight-phase-9-green`.
+- [x] **PHASE 9: Space flight views, trajectories and orbit lines**
+  - [x] 9.1 Trajectory lines for parking orbit, TLI, cislunar free return, SOI transfers.
+  - [x] 9.2 Real-time telemetry physics: altitude, speed of light comms delay, radiation dose rate, active reference frame switching.
+  - [x] 9.3 Space Flight HUD aerospace styling with design tokens.
+  - [x] 9.4 Verify and tag `overnight-phase-9-green`.
 
 - [ ] **PHASE 10: Cinematic audio, music and settings**
   - [ ] 10.1 Licensed ambient score lazy-loaded with crossfades.

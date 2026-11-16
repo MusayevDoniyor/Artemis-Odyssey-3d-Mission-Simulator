@@ -20,6 +20,12 @@ import {
 import { PLANETARY_CATALOG_SI } from '../game/planetaryCatalog';
 import { HARDWARE_CATALOG } from '../game/hardwareCatalog';
 import { getStageSepStep, resolveInspectorLabelLayout } from '../game/hardwareInspector';
+import {
+  generateEarthParkingOrbitCoordinates,
+  generateTliConicCoordinates,
+  generateCislunarFreeReturnCoordinates,
+  generateMoonSoiConicCoordinates,
+} from '../sim/orbit/orbitPhysics';
 import type {
   CameraMode,
   CampaignMissionId,
@@ -2710,6 +2716,52 @@ export class SpaceSceneManager {
       marsPos.y,
       marsPos.z
     );
+
+    // Update dynamic reference frame trajectories (parking orbit, cislunar free-return loop, lunar SOI conic)
+    if (ss.transferArcs.earthParking) {
+      const parkPts = generateEarthParkingOrbitCoordinates(
+        earthPos,
+        getBodyVisualRadiusUnits('earth', scaleMode) * (isSci ? 1.08 : 1.38),
+        64
+      );
+      const attr = ss.transferArcs.earthParking.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < parkPts.length; i++) {
+        attr.setXYZ(i, parkPts[i].x, parkPts[i].y, parkPts[i].z);
+      }
+      attr.needsUpdate = true;
+      ss.transferArcs.earthParking.visible = !isLocal || localAnchorId === 'earth';
+    }
+
+    if (ss.transferArcs.freeReturn) {
+      const freePts = generateCislunarFreeReturnCoordinates(
+        earthPos,
+        moonPos,
+        getBodyVisualRadiusUnits('moon', scaleMode),
+        80
+      );
+      const attr = ss.transferArcs.freeReturn.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < freePts.length; i++) {
+        attr.setXYZ(i, freePts[i].x, freePts[i].y, freePts[i].z);
+      }
+      attr.needsUpdate = true;
+      ss.transferArcs.freeReturn.visible = !isLocal && s.campaignMission !== 'mars-pathfinder';
+    }
+
+    if (ss.transferArcs.moonSoi) {
+      const approachAngle = Math.atan2(moonPos.x - earthPos.x, moonPos.z - earthPos.z) + Math.PI;
+      const moonSoiPts = generateMoonSoiConicCoordinates(
+        moonPos,
+        approachAngle,
+        getBodyVisualRadiusUnits('moon', scaleMode) * 1.35,
+        48
+      );
+      const attr = ss.transferArcs.moonSoi.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < moonSoiPts.length; i++) {
+        attr.setXYZ(i, moonSoiPts[i].x, moonSoiPts[i].y, moonSoiPts[i].z);
+      }
+      attr.needsUpdate = true;
+      ss.transferArcs.moonSoi.visible = !isLocal || localAnchorId === 'moon';
+    }
 
     // Phobos sits inside Mars bodyScaleGroup at 2.76 Mars radii
     ss.marsPhobos.position.set(

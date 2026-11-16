@@ -42,6 +42,167 @@ export interface SpaceHandoffState {
   trajectoryRegime?: OrbitalTrajectoryRegime;
 }
 
+/**
+ * Generates coordinate points for an inclined Low Earth Parking Orbit (28.5 deg LC-39B).
+ */
+export function generateEarthParkingOrbitCoordinates(
+  earthPos: { x: number; y?: number; z: number },
+  radius: number,
+  pointsCount = 64
+): Array<{ x: number; y: number; z: number }> {
+  const points: Array<{ x: number; y: number; z: number }> = [];
+  const inclRad = 28.5 * (Math.PI / 180);
+  const cosI = Math.cos(inclRad);
+  const sinI = Math.sin(inclRad);
+  const ey = earthPos.y ?? 0;
+
+  for (let i = 0; i <= pointsCount; i++) {
+    const theta = (i / pointsCount) * Math.PI * 2;
+    const xOrb = radius * Math.cos(theta);
+    const zOrb = radius * Math.sin(theta);
+    points.push({
+      x: earthPos.x + xOrb,
+      y: ey + zOrb * sinI,
+      z: earthPos.z + zOrb * cosI,
+    });
+  }
+  return points;
+}
+
+/**
+ * Generates outbound Trans-Lunar Injection (TLI) Keplerian transfer conic arc.
+ */
+export function generateTliConicCoordinates(
+  earthPos: { x: number; y?: number; z: number },
+  moonPos: { x: number; y?: number; z: number },
+  pointsCount = 64
+): Array<{ x: number; y: number; z: number }> {
+  const points: Array<{ x: number; y: number; z: number }> = [];
+  const dx = moonPos.x - earthPos.x;
+  const dz = moonPos.z - earthPos.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.001) return points;
+
+  const ux = dx / dist;
+  const uz = dz / dist;
+  const nx = -uz;
+  const nz = ux;
+
+  const ey = earthPos.y ?? 0;
+  const my = moonPos.y ?? 0;
+
+  for (let i = 0; i <= pointsCount; i++) {
+    const s = i / pointsCount;
+    const bow = Math.sin(s * Math.PI) * (dist * 0.16);
+    const yLift = Math.sin(s * Math.PI) * 0.28 + (ey * (1 - s) + my * s);
+
+    points.push({
+      x: earthPos.x + ux * (s * dist) + nx * bow,
+      y: yLift,
+      z: earthPos.z + uz * (s * dist) + nz * bow,
+    });
+  }
+  return points;
+}
+
+/**
+ * Generates an authentic Cislunar Free-Return trajectory figure-8 loop in synodic frame.
+ * Leaves Earth prograde, swings behind Moon far-side at perilune (~110 km),
+ * and re-enters Earth's atmospheric corridor.
+ */
+export function generateCislunarFreeReturnCoordinates(
+  earthPos: { x: number; y?: number; z: number },
+  moonPos: { x: number; y?: number; z: number },
+  moonVisualRadius = 0.5,
+  pointsCount = 80
+): Array<{ x: number; y: number; z: number }> {
+  const points: Array<{ x: number; y: number; z: number }> = [];
+  const dx = moonPos.x - earthPos.x;
+  const dz = moonPos.z - earthPos.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.001) return points;
+
+  const ux = dx / dist;
+  const uz = dz / dist;
+  const nx = -uz;
+  const nz = ux;
+
+  const ey = earthPos.y ?? 0;
+  const my = moonPos.y ?? 0;
+
+  for (let i = 0; i <= pointsCount; i++) {
+    const t = i / pointsCount;
+    let longitudinal = 0;
+    let lateral = 0;
+    let vertical = 0;
+
+    if (t < 0.45) {
+      const u = t / 0.45;
+      longitudinal = u * (dist - moonVisualRadius * 0.8);
+      lateral = Math.sin(u * Math.PI) * (dist * 0.15);
+      vertical = Math.sin(u * Math.PI) * 0.22;
+    } else if (t <= 0.55) {
+      const u = (t - 0.45) / 0.10;
+      const sweepAngle = Math.PI * (0.5 - u);
+      const periluneR = moonVisualRadius * 1.35;
+      const offsetAlong = Math.cos(sweepAngle) * periluneR;
+      const offsetPerp = Math.sin(sweepAngle) * periluneR;
+      longitudinal = dist + offsetAlong;
+      lateral = offsetPerp;
+      vertical = Math.cos(sweepAngle) * 0.08;
+    } else {
+      const u = (t - 0.55) / 0.45;
+      longitudinal = (1 - u) * (dist - moonVisualRadius * 0.8);
+      lateral = -Math.sin(u * Math.PI) * (dist * 0.18);
+      vertical = Math.sin(u * Math.PI) * 0.18;
+    }
+
+    const px = earthPos.x + ux * longitudinal + nx * lateral;
+    const pz = earthPos.z + uz * longitudinal + nz * lateral;
+    const py = ey * (1 - t) + my * t + vertical;
+
+    points.push({ x: px, y: py, z: pz });
+  }
+
+  return points;
+}
+
+/**
+ * Generates hyperbolic flyby / capture arc coordinates around the Moon inside its SOI.
+ */
+export function generateMoonSoiConicCoordinates(
+  moonPos: { x: number; y?: number; z: number },
+  incomingHeadingRad: number,
+  periapsisRadius: number,
+  pointsCount = 48
+): Array<{ x: number; y: number; z: number }> {
+  const points: Array<{ x: number; y: number; z: number }> = [];
+  const my = moonPos.y ?? 0;
+  const ecc = 1.4;
+  const p = periapsisRadius * (1 + ecc);
+  const maxTrueAnomaly = Math.PI * 0.42;
+
+  for (let i = 0; i <= pointsCount; i++) {
+    const f = -maxTrueAnomaly + (i / pointsCount) * (2 * maxTrueAnomaly);
+    const r = p / (1 + ecc * Math.cos(f));
+    const lx = r * Math.sin(f);
+    const lz = -r * Math.cos(f);
+
+    const cosH = Math.cos(incomingHeadingRad);
+    const sinH = Math.sin(incomingHeadingRad);
+    const rx = lx * cosH - lz * sinH;
+    const rz = lx * sinH + lz * cosH;
+
+    points.push({
+      x: moonPos.x + rx,
+      y: my,
+      z: moonPos.z + rz,
+    });
+  }
+
+  return points;
+}
+
 export function computeLaunchOrbitHandoffState(
   launch: {
     altitudeKm: number;
@@ -208,6 +369,10 @@ export function createInitialSpaceFlightState(
     orbitalSpeedKmS: handoff?.orbitalSpeedKmS ?? 1.02,
     distanceFromSunAu: Math.round(metersToAu(earthSi.rM) * 1000) / 1000,
     distanceToTargetKm: 384400,
+    altitudeKm: 165,
+    commsDelaySec: 0.0,
+    radiationDoseRateUsvH: 18.0,
+    activeTrajectoryFrame: 'earth_inertial',
   };
 }
 
@@ -632,9 +797,26 @@ export function stepSpaceFlightPhysics(
     }
   } else {
     if (domId === 'earth') {
-      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.earth.meanRadiusM + 165_000, (domDist / 5.8) * 384_400_000);
+      const earthVisR = getBodyVisualRadiusUnits('earth', solarScaleMode);
+      const leoLimit = earthVisR * (solarScaleMode === 'scientific' ? 1.05 : 1.08);
+      if (domDist <= leoLimit) {
+        // Low Earth Orbit (165 - 500 km)
+        const altRatio = Math.max(0, (domDist - earthVisR) / Math.max(0.01, leoLimit - earthVisR));
+        domRadiusPhysM = PLANETARY_CATALOG_SI.earth.meanRadiusM + (165_000 + altRatio * 335_000);
+      } else {
+        const cislunarFraction = Math.min(1.0, Math.max(0, (domDist - leoLimit) / Math.max(0.1, 5.8 - leoLimit)));
+        domRadiusPhysM = PLANETARY_CATALOG_SI.earth.meanRadiusM + 500_000 + cislunarFraction * 380_000_000;
+      }
     } else if (domId === 'moon') {
-      domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.moon.meanRadiusM + 100_000, (domDist / 2.2) * 18_000_000);
+      const moonVisR = getBodyVisualRadiusUnits('moon', solarScaleMode);
+      const lloLimit = moonVisR * (solarScaleMode === 'scientific' ? 1.06 : 1.15);
+      if (domDist <= lloLimit) {
+        // Low Lunar Orbit (~100 - 250 km)
+        const altRatio = Math.max(0, (domDist - moonVisR) / Math.max(0.01, lloLimit - moonVisR));
+        domRadiusPhysM = PLANETARY_CATALOG_SI.moon.meanRadiusM + (100_000 + altRatio * 150_000);
+      } else {
+        domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.moon.meanRadiusM + 100_000, (domDist / 2.2) * 18_000_000);
+      }
     } else if (domId === 'mars') {
       domRadiusPhysM = Math.max(PLANETARY_CATALOG_SI.mars.meanRadiusM + 250_000, (domDist / 2.8) * 45_000_000);
     } else {
@@ -683,6 +865,51 @@ export function stepSpaceFlightPhysics(
   s.orbitalSpeedKmS = Math.round((vPhysMs / 1000) * 100) / 100;
 
   s.distanceFromSunAu = Math.round(sunAuNow * 1000) / 1000;
+
+  // Real physical altitude relative to dominant body surface (km)
+  const domCatalog = PLANETARY_CATALOG_SI[domId];
+  const domRadiusKm = domCatalog ? domCatalog.meanRadiusM / 1000 : 0;
+  s.altitudeKm = Math.max(0, Math.round(domRadiusPhysM / 1000 - domRadiusKm));
+
+  // One-way speed of light latency from Earth ground stations to spacecraft (sec)
+  let distEarthMeters = 0;
+  if (domId === 'earth') {
+    distEarthMeters = domRadiusPhysM;
+  } else if (solarScaleMode === 'local') {
+    distEarthMeters = distEarth * 1_000_000;
+  } else if (solarScaleMode === 'scientific') {
+    distEarthMeters = (distEarth / 160) * SI.AU_M;
+  } else {
+    const isCislunar = distMoon <= soiRadii.moon || distEarth <= soiRadii.earth;
+    distEarthMeters = isCislunar
+      ? distEarth * (384_400_000 / 5.8)
+      : (distEarth / 38.5) * SI.AU_M;
+  }
+  s.commsDelaySec = Math.round((distEarthMeters / SI.SPEED_OF_LIGHT_MS) * 100) / 100;
+
+  // Radiation dose rate (uSv/h): GCR background ~62 uSv/h, shielded in LEO ~18 uSv/h, solar storm surge up to ~1500+ uSv/h
+  let baseDose = 62.0;
+  if (domId === 'earth' && (s.altitudeKm ?? 0) < 1200) {
+    baseDose = 18.0;
+  }
+  if (s.inRadiationZone || donkiFlareActive) {
+    const stormFlux = donkiFlareActive ? 1450.0 : 650.0;
+    const prox = Math.max(1.0, 1.0 / Math.max(0.2, sunAuNow));
+    baseDose += stormFlux * prox * (s.inRadiationZone ? 1.0 : 0.35);
+  }
+  if (s.shieldBoostActive) {
+    baseDose *= 0.28; // Water-wall storm shelter ~72% attenuation
+  }
+  s.radiationDoseRateUsvH = Math.round(baseDose * 10) / 10;
+
+  // Active trajectory reference frame
+  if (distMoon <= soiRadii.moon) {
+    s.activeTrajectoryFrame = 'moon_centred';
+  } else if (domId === 'earth' && (s.altitudeKm ?? 0) < 2000) {
+    s.activeTrajectoryFrame = 'earth_inertial';
+  } else {
+    s.activeTrajectoryFrame = 'earth_moon_rotating';
+  }
   if (solarScaleMode === 'local') {
     s.distanceToTargetKm = Math.round(distToTarget * 1000);
   } else if (solarScaleMode === 'scientific') {

@@ -572,11 +572,13 @@ export function SpaceFlightHUD({
                 </div>
               )}
 
-              {(space.inRadiationZone || space.fuelPct < 35 || (!freeExploreMode && space.targetId === 'mars')) && (
+              {(space.inRadiationZone || space.fuelPct < 35 || (!freeExploreMode && (space.commsDelaySec ?? 0) > 1.0)) && (
                 <div className="flex flex-wrap justify-end gap-2">
-                  {!freeExploreMode && space.targetId === 'mars' && (
-                    <span className="hud-soft rounded-xl px-3 py-1 text-xs font-semibold text-amber-200">
-                      14m radio lag
+                  {space.commsDelaySec != null && space.commsDelaySec > 1.0 && (
+                    <span className="hud-soft rounded-xl px-3 py-1 text-xs font-semibold text-amber-200 tabular-nums">
+                      {space.commsDelaySec < 60
+                        ? `${space.commsDelaySec.toFixed(2)}s radio lag`
+                        : `${(space.commsDelaySec / 60).toFixed(1)}m radio lag`}
                     </span>
                   )}
                   {space.fuelPct < 35 && (
@@ -590,7 +592,8 @@ export function SpaceFlightHUD({
                       onClick={onToggleShieldBoost}
                       className="hud-soft-alert pointer-events-auto rounded-xl px-3 py-1 text-xs font-semibold text-rose-200 transition hover:border-rose-300"
                     >
-                      {donkiFlareActive ? 'Solar Storm' : 'Radiation Zone'} ·{' '}
+                      {donkiFlareActive ? 'Solar Storm' : 'Radiation Zone'}
+                      {space.radiationDoseRateUsvH != null ? ` (${space.radiationDoseRateUsvH.toFixed(0)} µSv/h)` : ''} ·{' '}
                       {space.shieldBoostActive ? 'Shield On' : 'Enable Shield'}
                     </button>
                   )}
@@ -936,15 +939,29 @@ export function SpaceFlightHUD({
               )}
 
               {(isMoving || solarScaleMode !== 'exploration' || space.trajectoryRegime) && (
-                <div className="hud-soft flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs tabular-nums">
+                <div className="hud-soft flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs tabular-nums font-mono-tech">
                   <span className="font-bold text-white">{shipSpeed.toFixed(1)} u/s</span>
                   {space.orbitalSpeedKmS != null && (
                     <span className="font-semibold text-cyan-300">
                       {space.orbitalSpeedKmS.toFixed(2)} km/s
                     </span>
                   )}
+                  {space.altitudeKm != null && (
+                    <span className="text-slate-300">
+                      · Alt {space.altitudeKm.toLocaleString()} km
+                    </span>
+                  )}
                   {space.dominantBodyName && (
                     <span className="text-sky-200">· {space.dominantBodyName} SOI</span>
+                  )}
+                  {space.activeTrajectoryFrame && (
+                    <span className="rounded bg-sky-950/70 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-sky-300 border border-sky-400/30 uppercase">
+                      {space.activeTrajectoryFrame === 'moon_centred'
+                        ? 'Lunar SOI'
+                        : space.activeTrajectoryFrame === 'earth_inertial'
+                          ? 'Earth Inertial'
+                          : 'Earth-Moon Rotating'}
+                    </span>
                   )}
                   {space.trajectoryRegime && (
                     <span
@@ -968,6 +985,16 @@ export function SpaceFlightHUD({
                   {space.distanceToTargetKm != null && (
                     <span className="text-sky-200">
                       · {Math.round(space.distanceToTargetKm).toLocaleString()} km
+                    </span>
+                  )}
+                  {space.commsDelaySec != null && space.commsDelaySec > 0.05 && (
+                    <span className="text-amber-300">
+                      · Comms {space.commsDelaySec < 60 ? `${space.commsDelaySec.toFixed(2)}s` : `${(space.commsDelaySec / 60).toFixed(1)}m`}
+                    </span>
+                  )}
+                  {space.radiationDoseRateUsvH != null && (
+                    <span className={space.radiationDoseRateUsvH > 100 ? 'text-rose-300 font-bold' : 'text-slate-400'}>
+                      · {space.radiationDoseRateUsvH.toFixed(0)} µSv/h
                     </span>
                   )}
                   {space.autoPilot && (

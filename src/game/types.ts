@@ -257,6 +257,10 @@ export interface SpaceFlightState {
   orbitalEccentricity?: number;
   distanceFromSunAu?: number;
   distanceToTargetKm?: number;
+  altitudeKm?: number;
+  commsDelaySec?: number;
+  radiationDoseRateUsvH?: number;
+  activeTrajectoryFrame?: 'earth_inertial' | 'earth_moon_rotating' | 'moon_centred';
 }
 
 export interface LandingZone {

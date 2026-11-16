@@ -301,7 +301,9 @@ export default function App() {
   const [osdr, setOsdr] = useState<OsdrStatus>(DEFAULT_OSDR);
   const [fieldNotebookOpen, setFieldNotebookOpen] = useState<boolean>(false);
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
-    typeof window === 'undefined' ? true : window.innerWidth >= 1024
+    typeof window === 'undefined'
+      ? true
+      : window.innerWidth >= 1024 || window.location.search.includes('desktop=1')
   );
   const modalOpenRef = useRef<boolean>(false);
   const menuOpenRef = useRef<boolean>(false);
@@ -363,7 +365,7 @@ export default function App() {
 
   useEffect(() => {
     const onResize = () => {
-      const nextDesktop = window.innerWidth >= 1024;
+      const nextDesktop = window.innerWidth >= 1024 || window.location.search.includes('desktop=1');
       setIsDesktop(nextDesktop);
       if (!nextDesktop) {
         soundSynth.setThrustVolume(0);

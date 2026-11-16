@@ -226,3 +226,33 @@ This file records all architectural, engineering, and asset decisions made auton
   - Standalone modal popups for guided tours (rejected: keeps player connected to the real-time 3D interactive model with synchronous camera moves and subsystem highlights).
 
 
+---
+
+## Decision D9: Space Flight Views, Reference Frames, Trajectories & Orbit Lines (Phase 9)
+- **Date**: 2026-11-16T10:08:00+05:00
+- **Decision**:
+  1. **Analytical Trajectory & Reference Frame Generators**:
+     - Implemented 4 coordinate generator functions in `src/sim/orbit/orbitPhysics.ts`:
+       - `generateEarthParkingOrbitCoordinates`: 64-segment closed orbital ring around Earth inclined at 28.5 deg (LC-39B Kennedy Space Center latitude) at 165 km altitude.
+       - `generateTliConicCoordinates`: Trans-Lunar Injection Keplerian outbound transfer conic arc interpolating from Earth parking orbit to Moon arrival coordinates with smooth lateral bow and vertical elevation.
+       - `generateCislunarFreeReturnCoordinates`: Authentic Earth-Moon synodic rotating frame figure-8 loop (80 segments). Leaves Earth prograde, swings behind the Moon's far side at perilune (~110 km above surface), and arcs back across the retrograde corridor into Earth's atmospheric entry interface.
+       - `generateMoonSoiConicCoordinates`: Hyperbolic flyby / capture arc (48 segments, eccentricity $e = 1.4$) resolving perilune approach distance and outward divergence inside lunar SOI.
+  2. **Multi-Frame Telemetry Physics**:
+     - Extended `SpaceFlightState` with `altitudeKm`, `commsDelaySec`, `radiationDoseRateUsvH`, and `activeTrajectoryFrame`.
+     - In `stepSpaceFlightPhysics`:
+       - `altitudeKm`: Computed from dominant body surface ($r - R_{body}$), resolving Low Earth Orbit (165-500 km), Low Lunar Orbit (~100-250 km), and scaling across cislunar space.
+       - `commsDelaySec`: Real-time one-way speed of light latency $\tau = d / c$ using exact distance to Earth ground stations (negligible in LEO, ~1.28s at Moon, 3.1 to 22.2 min at Mars).
+       - `radiationDoseRateUsvH`: GCR deep space background (~62 $\mu$Sv/h), geomagnetic shielding in LEO (~18 $\mu$Sv/h), solar particle storm surges (up to 1,500+ $\mu$Sv/h), and water-wall storm shelter attenuation (~72% dose reduction when shield active).
+       - `activeTrajectoryFrame`: Automatic reference frame switching ('earth_inertial' in LEO parking orbit, 'earth_moon_rotating' during cislunar transit, 'moon_centred' inside lunar SOI).
+  3. **Zero-Allocation 3D Trajectory Rendering**:
+     - Added `earthParking`, `freeReturn`, and `moonSoi` dynamic line buffers to `SolarSystemVisuals` in `src/three/models.ts`.
+     - In `SpaceSceneManager.ts`, updated line buffer coordinates in-place during `syncSpaceScene` with zero per-frame garbage collector allocations.
+  4. **Space Flight HUD Aerospace Styling**:
+     - Upgraded telemetry cards in `SpaceFlightHUD.tsx` using design tokens (`font-mono-tech`, `border-slate-800`, `bg-[#070D1B]/95`).
+     - Added dedicated readouts for Altitude, Speed of Light Comms Delay, Radiation Dose Rate, and Active Reference Frame badge (`EARTH INERTIAL`, `EARTH-MOON ROTATING`, `LUNAR SOI`).
+  5. **Verification**:
+     - Created test suite `src/sim/models/spaceFlightTrajectories.test.ts` (5 comprehensive unit tests, all green). Total test suite now 111 tests passing green.
+- **Why**: Replaces simplistic straight lines with mathematically sound Keplerian and synodic orbital mechanics, giving the player authentic aerospace situational awareness during lunar transit.
+- **Alternatives Considered**:
+  - Full numeric 3-body Runge-Kutta 4th order integrator on every animation frame (rejected: prone to numerical divergence and high CPU overhead; analytical Keplerian and rotating synodic conics provide stable, continuous, 60 FPS performance while accurately depicting real Apollo/Artemis trajectory geometry).
+

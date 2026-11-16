@@ -206,3 +206,21 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **Guided Systems Tours**: Built 5 sequenced walkthrough tours with an interactive banner, step progress indicator, camera focus zoom, next/previous step navigation, and seamless quiz launch upon tour completion.
   - **100% Node Coverage**: Verified all 10 vehicles in `HARDWARE_ORDER` (45 subsystems) have complete copy, 3 educational levels (>25 chars), 3+ technical specs, multiple-choice quizzes, and primary source citations.
   - **Aerospace Source Citations**: Displayed verified source attributions on craft overview cards and subsystem details panels.
+
+## 2026-11-16T10:09:00+05:00 - Phase 9 Completed: Space Flight Views, Reference Frames, Trajectories & Orbit Lines
+- **Phase Objective**: Implement authentic multi-frame trajectory lines (28.5° inclined Low Earth Parking Orbit, TLI outbound transfer arc, cislunar free-return figure-8 loop in synodic rotating frame, and lunar SOI hyperbolic flyby conic); calculate real-time multi-frame telemetry physics (surface altitude, speed of light comms delay, radiation dose rate with water-wall storm shelter attenuation, and active reference frame transitions); upgrade Space Flight HUD with design tokens and high-contrast telemetry readouts; verify with automated unit test suite.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 111 tests passing, 0 failing (duration 561 ms).
+  - `npm run build`: built in 961ms (dist/index.html 1.18 kB, dist/assets/index.css 116.55 kB, dist/assets/index.js 1684.22 kB).
+  - Puppeteer browser verification: verified 3D spaceflight view, trajectory arcs, and dynamic telemetry strip displaying speed, altitude, SOI body, reference frame badge, escape velocity, light delay, and radiation dose rate.
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/space_trajectories_and_reference_frames.md`: Coordinate systems and orbital mechanics baseline for Earth-Centred Inertial (ECI), Earth-Moon synodic rotating frame, Moon-centred selenocentric frame, TLI transfer conics, Cislunar figure-8 free-return geometry, Speed of Light comms delays, and deep space radiation environments.
+  - Test suites:
+    - `src/sim/models/spaceFlightTrajectories.test.ts`: 5 unit tests covering Low Earth Parking Orbit geometry and 28.5° inclination, TLI transfer arc lateral bowing, Cislunar free-return figure-8 loop and perilune swing-by behind the far side of the Moon, Lunar SOI hyperbolic flyby conic closest approach resolution, and real-time telemetry physics (LEO altitude, comms delay, GCR radiation background, solar storm surge, water-wall attenuation, and reference frame transitions).
+- **Features Implemented & Verified**:
+  - **Analytical Trajectory Generators**: Added `generateEarthParkingOrbitCoordinates`, `generateTliConicCoordinates`, `generateCislunarFreeReturnCoordinates`, and `generateMoonSoiConicCoordinates` to `src/sim/orbit/orbitPhysics.ts`.
+  - **Zero-Allocation 3D Line Rendering**: Added `earthParking`, `freeReturn`, and `moonSoi` line buffers to `SolarSystemVisuals` in `src/three/models.ts` and updated them in-place during `syncSpaceScene` in `src/three/SpaceSceneManager.ts` without per-frame garbage collector allocations.
+  - **Multi-Frame Telemetry Physics**: Extended `SpaceFlightState` and computed surface altitude $r - R_{body}$, real-time speed of light comms delay $\tau = d/c$, deep space radiation dose rate (geomagnetically shielded in LEO, elevated during solar flares, attenuated ~72% by water-wall storm shelter), and active trajectory frame switching.
+  - **Space Flight HUD Aerospace Styling**: Overhauled telemetry cards using design tokens (`font-mono-tech`, `border-slate-800`, `bg-[#070D1B]/95`), displaying active reference frame badges (`EARTH INERTIAL`, `EARTH-MOON ROTATING`, `LUNAR SOI`), altitude, speed of light delay, and radiation rate.
