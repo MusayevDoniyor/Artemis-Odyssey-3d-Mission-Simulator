@@ -77,4 +77,43 @@ To guarantee consistent 60 fps rendering on mid-range laptops:
 | **Total Active Scene Budget** | **$\le 185,000$ tris** | **$\le 6.5\text{ MB}$** | **$\le 45$ calls** |
 
 ---
+
+## 5. IMPLEMENTED PRODUCTION ASSETS AUDIT TABLE (POST-OVERNIGHT RUN)
+
+All verified and integrated assets in `public/` adhering strictly to project constraints:
+
+| Category | File Path | Measured File Size | Format / Encoding | Source / License |
+| :--- | :--- | :---: | :---: | :--- |
+| **Spacecraft** | `public/assets/crafts/perseverance.glb` | 1,513.1 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Spacecraft** | `public/assets/crafts/jwst.glb` | 980.7 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Spacecraft** | `public/assets/crafts/apollo_lunar_module.glb` | 700.0 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Spacecraft** | `public/assets/crafts/iss.glb` | 465.8 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Spacecraft** | `public/assets/crafts/voyager.glb` | 279.2 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Spacecraft** | `public/assets/crafts/tdrs.glb` | 94.5 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Launch Vehicle** | `public/assets/rockets/saturn_v.glb` | 905.5 KB | GLB / Draco | NASA 3D Resources (Public Domain) |
+| **Asteroid** | `public/assets/asteroids/bennu.glb` | 321.9 KB | GLB / Draco | NASA OSIRIS-REx / 3D Resources (Public Domain) |
+| **Audio** | `public/audio/rocket-launch-distant.ogg` | 1,104.0 KB | OGG Vorbis | NASA Historical STS Launch / Internet Archive (Public Domain) |
+| **Audio** | `public/audio/rocket-launch-roar.ogg` | 925.0 KB | OGG Vorbis | NASA Historical STS Launch / Internet Archive (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/ceres.jpg` | 1,101.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/venus_surface.jpg` | 864.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/mercury.jpg` | 852.1 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/sun.jpg` | 803.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/mars.jpg` | 512.9 KB | JPEG (2K) | NASA JPL / USGS (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/earth.jpg` | 500.6 KB | JPEG (2K) | NASA Visible Earth Blue Marble (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/jupiter.jpg` | 487.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/moon.jpg` | 394.2 KB | JPEG (2K) | NASA SVS / LROC (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/earth_night.jpg` | 249.3 KB | JPEG (2K) | NASA Black Marble / VIIRS (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/neptune.jpg` | 235.9 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/venus.jpg` | 224.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/earth-clouds.png` | 220.8 KB | PNG | NASA Visible Earth (Public Domain) |
+| **Celestial Texture** | `public/assets/planets/saturn.jpg` | 195.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/saturn_ring.png` | 11.8 KB | PNG Alpha | Solar System Scope (CC-BY 4.0) |
+| **Celestial Texture** | `public/assets/planets/uranus.jpg` | 75.9 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) |
+| **Draco Decoder** | `public/draco/draco_decoder.wasm` | 187.9 KB | WASM | Google Draco (Apache 2.0) |
+| **Draco Decoder** | `public/draco/draco_decoder.js` | 500.5 KB | JS | Google Draco (Apache 2.0) |
+| **Typography** | `public/fonts/jetbrains-mono-latin.woff2` | 30.7 KB | WOFF2 | JetBrains (OFL-1.1) |
+| **Typography** | `public/fonts/plus-jakarta-sans-latin.woff2`| 26.7 KB | WOFF2 | Tokotype (OFL-1.1) |
+| **Typography** | `public/fonts/orbitron-latin.woff2` | 11.5 KB | WOFF2 | Matt McInerney (OFL-1.1) |
+
+---
 *End of Asset Manifest.*

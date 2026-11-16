@@ -3820,8 +3820,18 @@ export class SpaceSceneManager {
       if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.Line) {
         obj.geometry?.dispose();
         const mat = obj.material;
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else mat?.dispose();
+        const disposeMat = (m: THREE.Material) => {
+          if ((m as any).map) (m as any).map.dispose();
+          if ((m as any).lightMap) (m as any).lightMap.dispose();
+          if ((m as any).bumpMap) (m as any).bumpMap.dispose();
+          if ((m as any).normalMap) (m as any).normalMap.dispose();
+          if ((m as any).specularMap) (m as any).specularMap.dispose();
+          if ((m as any).roughnessMap) (m as any).roughnessMap.dispose();
+          if ((m as any).metalnessMap) (m as any).metalnessMap.dispose();
+          m.dispose();
+        };
+        if (Array.isArray(mat)) mat.forEach(disposeMat);
+        else if (mat) disposeMat(mat);
       }
     });
 

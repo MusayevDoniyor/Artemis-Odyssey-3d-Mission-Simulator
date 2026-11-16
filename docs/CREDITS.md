@@ -64,3 +64,15 @@ The following fonts are bundled locally under the SIL Open Font License 1.1 (OFL
   - Local Draco WebAssembly decoder files (`public/draco/`).
   - Source: Google Draco (https://github.com/google/draco)
   - License: Apache License, Version 2.0.
+
+---
+
+## 5. Acoustic & Audio Recordings
+- **NASA Historical STS Rocket Launch Audio (Public Domain)**:
+  - High-fidelity physical rocket liftoff acoustic recordings captured at Kennedy Space Center LC-39 pad perimeter during Space Shuttle launches (STS program), capturing real solid rocket motor crackle, liquid engine low-frequency rumble, and pad deluge steam quenching.
+  - Sourced via: NASA Audio Collections on Internet Archive (https://archive.org/details/nasa-audio).
+  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
+  - Processing: Compressed to OGG Vorbis (`rocket-launch-roar.ogg` at 947 KB, `rocket-launch-distant.ogg` at 1.08 MB) strictly adhering to the <1.5 MB audio asset limit.
+- **Procedural Space Piano & Atmospheric Harmonies (Original Project Synthesis)**:
+  - Real-time Web Audio API synthesized harmonic progressions (high-pass filtered >100 Hz to prevent low-end hum) covering Main Menu, Ascent, Space Flight, Descent, and Surface Exploration.
+  - Created by: Artemis Odyssey team, distributed under project open-source terms.
