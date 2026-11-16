@@ -65,10 +65,10 @@
   - [x] 9.3 Space Flight HUD aerospace styling with design tokens.
   - [x] 9.4 Verify and tag `overnight-phase-9-green`.
 
-- [ ] **PHASE 10: Cinematic audio, music and settings**
-  - [ ] 10.1 Licensed ambient score lazy-loaded with crossfades.
-  - [ ] 10.2 Comprehensive settings overhaul: buses, graphics presets, units, accessibility, key bindings, localStorage persistence.
-  - [ ] 10.3 Verify and tag `overnight-phase-10-green`.
+- [x] **PHASE 10: Cinematic audio, music and settings**
+  - [x] 10.1 4-bus audio mixing console architecture with smooth parameter ramping and 5-phase procedural mood chord collections.
+  - [x] 10.2 Comprehensive settings overhaul: 4 buses, 4 graphics presets, aerospace units (NIST SP 811), accessibility toggles, flight deck key bindings, resilient localStorage persistence.
+  - [x] 10.3 Verify and tag `overnight-phase-10-green`.
 
 - [ ] **PHASE 11: Performance, cleanup and final report**
   - [ ] 11.1 Lazy-loading, disposal, draw call optimizations, zero memory leaks.

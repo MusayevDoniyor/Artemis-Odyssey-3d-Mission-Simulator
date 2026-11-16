@@ -3,8 +3,10 @@ import {
   BookOpen,
   CheckCircle2,
   Compass,
+  Gauge,
   HelpCircle,
   Home,
+  Keyboard,
   Lock,
   Map,
   Play,
@@ -12,6 +14,8 @@ import {
   Settings,
   Sliders,
   Trophy,
+  Volume2,
+  VolumeX,
   Wrench,
   X,
 } from 'lucide-react';
@@ -36,6 +40,7 @@ import type {
   SpaceFlightState,
   SpaceTargetId,
   TelemetrySpeedScale,
+  UnitsSystem,
 } from '../game/types';
 import { SurfaceMapPanel } from './SurfaceMapPanel';
 import { Button, Panel } from './ui';
@@ -58,6 +63,9 @@ interface GameMenuModalProps {
   solarScaleMode: SolarScaleMode;
   solarTimeSpeed: number;
   focusedSolarBodyId: string | null;
+  unitsSystem?: UnitsSystem;
+  reducedMotion?: boolean;
+  highContrastBorders?: boolean;
   onSelectTab: (tab: GameMenuTab) => void;
   onClose: () => void;
   onRestartStage: () => void;
@@ -69,6 +77,10 @@ interface GameMenuModalProps {
   onToggleMusic?: () => void;
   onChangeMusicVolume?: (vol: number) => void;
   onChangeQuality: (q: QualityPreset) => void;
+  onChangeUnits?: (units: UnitsSystem) => void;
+  onToggleReducedMotion?: () => void;
+  onToggleHighContrast?: () => void;
+  onResetPreferences?: () => void;
   onResetCamera: () => void;
   onQueueMarsPoint: (x: number, z: number, label: string, objectiveId?: string) => void;
   onAutoDriveToPoint?: (x: number, z: number, label: string, objectiveId?: string) => void;
@@ -100,6 +112,9 @@ export function GameMenuModal({
   solarScaleMode,
   solarTimeSpeed,
   focusedSolarBodyId,
+  unitsSystem = 'metric',
+  reducedMotion = false,
+  highContrastBorders = false,
   onSelectTab,
   onClose,
   onRestartStage,
@@ -111,6 +126,10 @@ export function GameMenuModal({
   onToggleMusic,
   onChangeMusicVolume,
   onChangeQuality,
+  onChangeUnits,
+  onToggleReducedMotion,
+  onToggleHighContrast,
+  onResetPreferences,
   onResetCamera,
   onQueueMarsPoint,
   onAutoDriveToPoint,
@@ -601,83 +620,328 @@ export function GameMenuModal({
           )}
 
           {activeTab === 'settings' && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                  <Sliders className="h-5 w-5 text-cyan-400" />
-                  Audio &amp; Quality
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onUpdateAudio({ muted: !audioSettings.muted })}
-                    className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
-                  >
-                    Sound: {audioSettings.muted ? 'Muted' : 'Active'}
-                  </button>
-                  {onToggleMusic && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* 4-Bus Audio Mixing Console */}
+                <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-white">
+                      <Sliders className="h-4 w-4 text-cyan-400" />
+                      Acoustic &amp; Audio Console
+                    </h3>
                     <button
                       type="button"
-                      onClick={onToggleMusic}
-                      className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-base font-semibold text-white hover:border-cyan-400"
+                      data-testid="audio-mute-toggle-btn"
+                      onClick={() => onUpdateAudio({ muted: !audioSettings.muted })}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        audioSettings.muted
+                          ? 'border border-rose-500/40 bg-rose-500/20 text-rose-300'
+                          : 'border border-cyan-400/30 bg-cyan-500/15 text-cyan-200 hover:border-cyan-400'
+                      }`}
                     >
-                      Music: {musicState?.musicEnabled !== false ? 'On' : 'Off'}
+                      {audioSettings.muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                      {audioSettings.muted ? 'MUTED' : 'LIVE'}
                     </button>
-                  )}
-                </div>
-                {onChangeMusicVolume && (
-                  <label className="flex items-center justify-between gap-3 rounded-xl border border-sky-400/15 bg-slate-900/55 px-3 py-2 text-sm text-slate-200">
-                    <span>Music Volume</span>
+                  </div>
+
+                  {/* Master Volume */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-slate-300">
+                      <span>Master Bus</span>
+                      <span className="font-mono-tech text-cyan-300">
+                        {Math.round((audioSettings.masterVolume ?? 0.85) * 100)}%
+                      </span>
+                    </div>
                     <input
                       type="range"
                       min={0}
                       max={1}
                       step={0.02}
-                      value={musicState?.musicVolume ?? 0.28}
-                      onChange={(e) => onChangeMusicVolume(Number(e.target.value))}
-                      className="w-32 accent-cyan-400"
+                      aria-label="Master Volume"
+                      value={audioSettings.masterVolume ?? 0.85}
+                      onChange={(e) => onUpdateAudio({ masterVolume: Number(e.target.value) })}
+                      className="w-full accent-cyan-400"
                     />
-                    <span className="w-9 text-right font-mono-tech text-xs font-bold text-cyan-300 tabular-nums">
-                      {Math.round((musicState?.musicVolume ?? 0.28) * 100)}%
+                  </div>
+
+                  {/* Engine Acoustics Volume */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-slate-300">
+                      <span>Rocket Propulsion &amp; Thrusters</span>
+                      <span className="font-mono-tech text-amber-300">
+                        {Math.round((audioSettings.engineVolume ?? 0.85) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      aria-label="Engine Propulsion Volume"
+                      value={audioSettings.engineVolume ?? 0.85}
+                      onChange={(e) => onUpdateAudio({ engineVolume: Number(e.target.value) })}
+                      className="w-full accent-amber-400"
+                    />
+                  </div>
+
+                  {/* SFX Volume */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-slate-300">
+                      <span>Telemetry &amp; Systems SFX</span>
+                      <span className="font-mono-tech text-cyan-300">
+                        {Math.round((audioSettings.sfxVolume ?? 0.9) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      aria-label="Sound Effects Volume"
+                      value={audioSettings.sfxVolume ?? 0.9}
+                      onChange={(e) => onUpdateAudio({ sfxVolume: Number(e.target.value) })}
+                      className="w-full accent-cyan-400"
+                    />
+                  </div>
+
+                  {/* Music Volume & Toggle */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                      <span className="flex items-center gap-1.5">
+                        <span>Procedural Score</span>
+                        {onToggleMusic && (
+                          <button
+                            type="button"
+                            onClick={onToggleMusic}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                              musicState?.musicEnabled !== false
+                                ? 'bg-cyan-500/20 text-cyan-300'
+                                : 'bg-white/10 text-slate-400'
+                            }`}
+                          >
+                            {musicState?.musicEnabled !== false ? 'ON' : 'OFF'}
+                          </button>
+                        )}
+                      </span>
+                      <span className="font-mono-tech text-cyan-300">
+                        {Math.round((musicState?.musicVolume ?? 0.28) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      aria-label="Music Volume"
+                      value={musicState?.musicVolume ?? 0.28}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (onChangeMusicVolume) onChangeMusicVolume(val);
+                        onUpdateAudio({ ambienceVolume: val });
+                      }}
+                      className="w-full accent-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Graphics & Visual Fidelity */}
+                <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-white">
+                      <Gauge className="h-4 w-4 text-cyan-400" />
+                      Visual Fidelity Presets
+                    </h3>
+                    <span className="font-mono-tech text-xs font-bold uppercase text-cyan-300">
+                      {qualityPreset}
                     </span>
-                  </label>
-                )}
-                <div className="flex gap-2">
-                  {(['low', 'med', 'high'] as const).map((q) => (
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { id: 'low', label: 'Low', desc: '1.0× DPR · No Shadows' },
+                        { id: 'med', label: 'Medium', desc: '1.5× DPR · Basic Shadows' },
+                        { id: 'high', label: 'High', desc: '2.0× DPR · PCF Shadows' },
+                        { id: 'ultra', label: 'Ultra', desc: '2.5× DPR · PCF Soft' },
+                      ] as const
+                    ).map((q) => (
+                      <button
+                        key={q.id}
+                        type="button"
+                        data-testid={`quality-preset-${q.id}`}
+                        onClick={() => onChangeQuality(q.id)}
+                        className={`rounded-xl border p-2.5 text-left transition ${
+                          qualityPreset === q.id
+                            ? 'border-cyan-400 bg-cyan-500/20 text-white'
+                            : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="text-xs font-bold uppercase">{q.label}</div>
+                        <div className="text-[10px] text-slate-400">{q.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Rover Speed & Camera */}
+                  <div className="border-t border-white/10 pt-2 space-y-2">
                     <button
-                      key={q}
                       type="button"
-                      onClick={() => onChangeQuality(q)}
-                      className={`rounded-lg px-3 py-1.5 text-sm font-bold uppercase ${
-                        qualityPreset === q ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-slate-200 hover:bg-white/15'
-                      }`}
+                      data-testid="toggle-speed-scale-btn"
+                      onClick={onToggleSpeedScale}
+                      className="flex w-full items-center justify-between rounded-xl border border-sky-400/25 bg-slate-900/75 px-3 py-2 text-left text-xs font-semibold text-white hover:border-cyan-400"
                     >
-                      {q}
+                      <span>Rover Telemetry Speed</span>
+                      <span className="font-mono-tech text-cyan-300">
+                        {speedScale === 'REAL_SPEED' ? 'NASA 1× (0.18 m/s)' : 'Sim 25× (4.5 m/s)'}
+                      </span>
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={onResetCamera}
+                      className="w-full rounded-xl border border-sky-400/25 bg-slate-900/75 px-3 py-2 text-left text-xs font-semibold text-slate-200 hover:border-cyan-400"
+                    >
+                      Reset Active Camera Pose
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
-                <h3 className="text-lg font-bold text-white">Rover Speed &amp; Camera</h3>
-                <button
-                  type="button"
-                  data-testid="toggle-speed-scale-btn"
-                  onClick={onToggleSpeedScale}
-                  className="w-full rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-left text-base font-semibold text-white hover:border-cyan-400"
-                >
-                  Speed Scale:{' '}
-                  <span className="text-cyan-300">
-                    {speedScale === 'REAL_SPEED' ? 'Real NASA 1× (0.18 m/s)' : 'Kid Explore ×25'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={onResetCamera}
-                  className="w-full rounded-xl border border-sky-400/25 bg-slate-900/75 px-4 py-2 text-left text-base font-semibold text-slate-200 hover:border-cyan-400"
-                >
-                  Reset Chase Camera
-                </button>
+              {/* Units, Accessibility & Flight Deck Controls */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-white border-b border-white/10 pb-2">
+                    <Compass className="h-4 w-4 text-cyan-400" />
+                    Units &amp; Accessibility
+                  </h3>
+
+                  {/* Units Switcher */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-white">Engineering Units</div>
+                      <div className="text-[10px] text-slate-400">
+                        {unitsSystem === 'imperial' ? 'Nautical Miles, ft/s, lbf, psi' : 'Kilometers, m/s, kN, bar'}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 rounded-lg border border-white/10 bg-black/40 p-0.5">
+                      <button
+                        type="button"
+                        data-testid="units-metric-btn"
+                        onClick={() => onChangeUnits?.('metric')}
+                        className={`rounded px-2.5 py-1 text-xs font-bold transition ${
+                          unitsSystem !== 'imperial'
+                            ? 'bg-cyan-400 text-slate-950'
+                            : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        Metric (SI)
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="units-imperial-btn"
+                        onClick={() => onChangeUnits?.('imperial')}
+                        className={`rounded px-2.5 py-1 text-xs font-bold transition ${
+                          unitsSystem === 'imperial'
+                            ? 'bg-cyan-400 text-slate-950'
+                            : 'text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        Aerospace (US)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Reduced Motion Toggle */}
+                  <div className="flex items-center justify-between border-t border-white/10 pt-2">
+                    <div>
+                      <div className="text-xs font-semibold text-white">Reduced Motion</div>
+                      <div className="text-[10px] text-slate-400">Dampens camera shake, launch turbulence, &amp; drift</div>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="reduced-motion-toggle-btn"
+                      onClick={() => onToggleReducedMotion?.()}
+                      className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                        reducedMotion
+                          ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300'
+                          : 'border border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                      }`}
+                    >
+                      {reducedMotion ? 'ENABLED' : 'OFF'}
+                    </button>
+                  </div>
+
+                  {/* High Contrast Borders Toggle */}
+                  <div className="flex items-center justify-between border-t border-white/10 pt-2">
+                    <div>
+                      <div className="text-xs font-semibold text-white">High-Contrast Borders</div>
+                      <div className="text-[10px] text-slate-400">Enhance HUD element frames for high legibility</div>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="high-contrast-toggle-btn"
+                      onClick={() => onToggleHighContrast?.()}
+                      className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                        highContrastBorders
+                          ? 'border border-cyan-400 bg-cyan-500/20 text-cyan-300'
+                          : 'border border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                      }`}
+                    >
+                      {highContrastBorders ? 'ENABLED' : 'OFF'}
+                    </button>
+                  </div>
+
+                  {/* Reset Preferences */}
+                  {onResetPreferences && (
+                    <div className="border-t border-white/10 pt-2">
+                      <button
+                        type="button"
+                        data-testid="reset-preferences-btn"
+                        onClick={onResetPreferences}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 py-1.5 text-xs font-bold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/20"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reset All Settings to Defaults
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Flight Deck Keyboard Controls Reference */}
+                <div className="space-y-3 rounded-xl border border-sky-400/20 bg-slate-950/60 p-4">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-white border-b border-white/10 pb-2">
+                    <Keyboard className="h-4 w-4 text-cyan-400" />
+                    Flight Deck Keybindings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Pitch / Throttle</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">W / S</kbd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Yaw / Steer</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">A / D</kbd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Stage / Booster</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">Space</kbd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Cycle Camera</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">C</kbd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Mission Menu</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">Tab / Esc</kbd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1.5">
+                      <span className="text-slate-300">Mute Audio</span>
+                      <kbd className="rounded bg-black/50 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300">M</kbd>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-cyan-950/30 border border-cyan-500/20 p-2 text-[11px] text-cyan-200">
+                    Tip: Click and drag anywhere in 3D viewport to engage free orbital camera orbit around your spacecraft.
+                  </div>
+                </div>
               </div>
             </div>
           )}

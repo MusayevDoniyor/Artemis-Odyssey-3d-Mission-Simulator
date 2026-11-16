@@ -5,7 +5,7 @@ import {
   type RocketAcousticsOutput,
 } from '../sim/audio/rocketAcoustics';
 
-export type MusicTrackId = 'menu' | 'space';
+export type MusicTrackId = 'menu' | 'launch' | 'space' | 'descent' | 'surface';
 
 export interface MusicState {
   musicEnabled: boolean;
@@ -16,24 +16,48 @@ export interface MusicState {
 }
 
 const MUSIC_PREFS_KEY = 'artemis_music_prefs';
-const TRACK_URLS: Record<MusicTrackId, string> = {
+export const TRACK_URLS: Record<MusicTrackId, string> = {
   menu: '/audio/main-menu-ambient.mp3',
+  launch: '/audio/launch-ambient.mp3',
   space: '/audio/space-flight-ambient.mp3',
+  descent: '/audio/descent-ambient.mp3',
+  surface: '/audio/surface-ambient.mp3',
 };
 
 // High-register, zero-hum Space Piano & Celesta harmonic progressions (no sub-bass drone < 196 Hz)
-const MENU_CHORDS: number[][] = [
+export const MENU_CHORDS: number[][] = [
   [293.66, 349.23, 440.0, 523.25, 659.25], // Dm9 celestial piano
   [233.08, 293.66, 349.23, 440.0, 587.33], // Bbmaj9 warm horizon
   [261.63, 329.63, 392.0, 493.88, 587.33], // Cmaj9 orbital light
   [220.0, 261.63, 329.63, 392.0, 493.88],  // Am9 quiet stars
 ];
 
-const SPACE_CHORDS: number[][] = [
+export const LAUNCH_CHORDS: number[][] = [
+  [293.66, 349.23, 440.0, 587.33],         // Dm ascent tension
+  [349.23, 440.0, 523.25, 698.46],         // F major horizon
+  [261.63, 329.63, 392.0, 523.25],         // C major thrust
+  [196.0, 246.94, 293.66, 392.0],          // G major orbital insertion
+];
+
+export const SPACE_CHORDS: number[][] = [
   [220.0, 293.66, 329.63, 440.0, 659.25],  // Asus2 / Am9 deep cosmos
   [261.63, 349.23, 440.0, 523.25, 659.25], // Fmaj7 expanse
   [196.0, 293.66, 392.0, 493.88, 587.33],  // Gmaj7 solar wind
   [293.66, 349.23, 440.0, 523.25, 783.99], // Dm9 cislunar drift
+];
+
+export const DESCENT_CHORDS: number[][] = [
+  [196.0, 233.08, 293.66, 392.0],          // Gm descent focus
+  [233.08, 293.66, 349.23, 466.16],        // Eb radar lock
+  [349.23, 440.0, 523.25, 698.46],         // F touchdown window
+  [293.66, 349.23, 440.0, 587.33],         // Dm landing contact
+];
+
+export const SURFACE_CHORDS: number[][] = [
+  [261.63, 329.63, 392.0, 493.88],         // Cmaj7 Shackleton rim
+  [164.81, 246.94, 329.63, 392.0],         // Em7 cold trap stillness
+  [174.61, 261.63, 349.23, 440.0],         // Fmaj7 polar dust
+  [196.0, 246.94, 293.66, 392.0],          // G sunlit peaks
 ];
 
 const ARPEGGIO_PATTERNS: number[][] = [
@@ -78,13 +102,18 @@ function saveMusicPrefs(musicEnabled: boolean, musicVolume: number) {
 
 class SoundSynth {
   private ctx: AudioContext | null = null;
+  private masterBusGain: GainNode | null = null;
+  private sfxBusGain: GainNode | null = null;
+  private musicBusGain: GainNode | null = null;
+  private engineBusGain: GainNode | null = null;
   private thrustGain: GainNode | null = null;
   private thrustFilter: BiquadFilterNode | null = null;
   private settings: AudioSettings = {
     muted: false,
     masterVolume: 0.85,
     sfxVolume: 0.9,
-    ambienceVolume: 0.75,
+    ambienceVolume: 0.4,
+    engineVolume: 0.85,
   };
   private altitudeScale = 1.0;
 
@@ -98,7 +127,13 @@ class SoundSynth {
   private musicListeners = new Set<(st: MusicState) => void>();
   private desiredTrack: MusicTrackId | null = null;
   private trackElements: Partial<Record<MusicTrackId, HTMLAudioElement>> = {};
-  private trackVolumes: Record<MusicTrackId, number> = { menu: 0, space: 0 };
+  private trackVolumes: Record<MusicTrackId, number> = {
+    menu: 0,
+    launch: 0,
+    space: 0,
+    descent: 0,
+    surface: 0,
+  };
   private trackAvailable: Partial<Record<MusicTrackId, boolean | 'checking'>> = {};
   private fadeTimerId: number | null = null;
 
@@ -170,9 +205,24 @@ class SoundSynth {
       this.thrustGain = this.ctx.createGain();
       this.thrustGain.gain.value = 0;
 
+      // 4-Bus Mixing Console Architecture
+      this.masterBusGain = this.ctx.createGain();
+      this.masterBusGain.connect(this.ctx.destination);
+
+      this.sfxBusGain = this.ctx.createGain();
+      this.sfxBusGain.connect(this.masterBusGain);
+
+      this.musicBusGain = this.ctx.createGain();
+      this.musicBusGain.connect(this.masterBusGain);
+
+      this.engineBusGain = this.ctx.createGain();
+      this.engineBusGain.connect(this.masterBusGain);
+
+      this.updateBusGains();
+
       noise.connect(this.thrustFilter);
       this.thrustFilter.connect(this.thrustGain);
-      this.thrustGain.connect(this.ctx.destination);
+      this.thrustGain.connect(this.engineBusGain);
       noise.start(0);
 
       this.ctx.onstatechange = () => {
@@ -224,13 +274,46 @@ class SoundSynth {
     };
   }
 
+  private getSfxDestination(): AudioNode {
+    return this.sfxBusGain ?? this.ctx!.destination;
+  }
+
+  private getEngineDestination(): AudioNode {
+    return this.engineBusGain ?? this.ctx!.destination;
+  }
+
+  private getMusicDestination(): AudioNode {
+    return this.musicBusGain ?? this.ctx!.destination;
+  }
+
+  private updateBusGains() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const masterTarget = this.settings.muted ? 0 : this.settings.masterVolume;
+    this.masterBusGain?.gain.setTargetAtTime(masterTarget, now, 0.03);
+    this.sfxBusGain?.gain.setTargetAtTime(this.settings.sfxVolume, now, 0.03);
+    this.musicBusGain?.gain.setTargetAtTime(
+      this.musicState.musicEnabled ? this.settings.ambienceVolume * this.musicState.musicVolume : 0,
+      now,
+      0.03
+    );
+    this.engineBusGain?.gain.setTargetAtTime(this.settings.engineVolume, now, 0.03);
+  }
+
   setMusicModeForPhase(phase: GamePhase) {
-    const nextTrack: MusicTrackId | null =
-      phase === 'title' || phase === 'briefing' || phase === 'inspector' || phase === 'victory'
-        ? 'menu'
-        : phase === 'space' || phase === 'launch' || phase === 'landing' || phase === 'rover'
-          ? 'space'
-          : null;
+    let nextTrack: MusicTrackId = 'menu';
+    if (phase === 'launch') {
+      nextTrack = 'launch';
+    } else if (phase === 'space') {
+      nextTrack = 'space';
+    } else if (phase === 'landing') {
+      nextTrack = 'descent';
+    } else if (phase === 'rover') {
+      nextTrack = 'surface';
+    } else {
+      nextTrack = 'menu';
+    }
+
     if (this.desiredTrack === nextTrack && this.musicState.activeTrack === nextTrack) {
       return;
     }
@@ -376,7 +459,7 @@ class SoundSynth {
     delayFeedback.connect(delay);
     delayFilter.connect(gain);
 
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMusicDestination());
 
     this.padFilter = filter;
     this.padGain = gain;
@@ -575,7 +658,18 @@ class SoundSynth {
   }
 
   updateSettings(partial: Partial<AudioSettings>) {
-    this.settings = { ...this.settings, ...partial };
+    const clamp = (v: number | undefined, current: number) =>
+      typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : current;
+
+    this.settings = {
+      ...this.settings,
+      ...partial,
+      masterVolume: clamp(partial.masterVolume, this.settings.masterVolume),
+      sfxVolume: clamp(partial.sfxVolume, this.settings.sfxVolume),
+      ambienceVolume: clamp(partial.ambienceVolume, this.settings.ambienceVolume),
+      engineVolume: clamp(partial.engineVolume, this.settings.engineVolume),
+    };
+    this.updateBusGains();
     if (this.settings.muted) {
       this.setThrustVolume(0);
     } else if (this.musicState.musicEnabled) {
@@ -627,7 +721,7 @@ class SoundSynth {
 
   setThrustVolume(level: number) {
     if (!this.ctx || !this.thrustGain) return;
-    const scale = this.settings.masterVolume * this.settings.ambienceVolume * this.altitudeScale;
+    const scale = this.settings.masterVolume * this.settings.engineVolume * this.altitudeScale;
     const v = this.settings.muted ? 0 : Math.max(0, Math.min(0.42, level * 0.36 * scale));
     this.thrustGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.06);
   }
@@ -661,7 +755,7 @@ class SoundSynth {
       this.launchBusPreFilter.connect(this.launchCockpitFilter);
       this.launchCockpitFilter.connect(this.launchAirAbsorptionFilter);
       this.launchAirAbsorptionFilter.connect(this.launchMasterGain);
-      this.launchMasterGain.connect(this.ctx.destination);
+      this.launchMasterGain.connect(this.getEngineDestination());
 
       if (this.noiseBuffer) {
         this.subBassFilter = this.ctx.createBiquadFilter();
@@ -892,7 +986,7 @@ class SoundSynth {
     gain.gain.setValueAtTime(effVol, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getSfxDestination());
     osc.start();
     osc.stop(this.ctx.currentTime + duration);
   }
@@ -917,7 +1011,7 @@ class SoundSynth {
     oscGain.gain.setValueAtTime(effVol * 0.9, now);
     oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
     osc.connect(oscGain);
-    oscGain.connect(this.ctx.destination);
+    oscGain.connect(this.getSfxDestination());
     osc.start(now);
     osc.stop(now + 0.46);
 
@@ -935,7 +1029,7 @@ class SoundSynth {
       noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
       noise.connect(bp);
       bp.connect(noiseGain);
-      noiseGain.connect(this.ctx.destination);
+      noiseGain.connect(this.getSfxDestination());
       noise.start(now + 0.04);
       noise.stop(now + 0.36);
     }
@@ -1024,7 +1118,7 @@ class SoundSynth {
     gain.gain.linearRampToValueAtTime(effVol, this.ctx.currentTime + 0.25);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.9);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMusicDestination());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.9);
   }

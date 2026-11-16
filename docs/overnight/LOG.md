@@ -224,3 +224,22 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **Zero-Allocation 3D Line Rendering**: Added `earthParking`, `freeReturn`, and `moonSoi` line buffers to `SolarSystemVisuals` in `src/three/models.ts` and updated them in-place during `syncSpaceScene` in `src/three/SpaceSceneManager.ts` without per-frame garbage collector allocations.
   - **Multi-Frame Telemetry Physics**: Extended `SpaceFlightState` and computed surface altitude $r - R_{body}$, real-time speed of light comms delay $\tau = d/c$, deep space radiation dose rate (geomagnetically shielded in LEO, elevated during solar flares, attenuated ~72% by water-wall storm shelter), and active trajectory frame switching.
   - **Space Flight HUD Aerospace Styling**: Overhauled telemetry cards using design tokens (`font-mono-tech`, `border-slate-800`, `bg-[#070D1B]/95`), displaying active reference frame badges (`EARTH INERTIAL`, `EARTH-MOON ROTATING`, `LUNAR SOI`), altitude, speed of light delay, and radiation rate.
+
+## 2026-11-16T10:40:00+05:00 - Phase 10 Completed: Cinematic Audio, Procedural Music & Settings Overhaul
+- **Phase Objective**: Implement professional 4-bus audio mixing console architecture with smooth parameter ramping; extend procedural music synthesizer across 5 distinct game phases with harmonic chord progressions; develop resilient user preferences system with NIST SP 811 aerospace units conversions; overhaul Settings modal tab into a comprehensive multi-panel flight deck console with 4 graphics presets, accessibility toggles, flight deck keybindings reference, and default reset; verify via automated tests, production build, and Puppeteer visual inspection.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 115 tests passing, 0 failing (duration 1002 ms).
+  - `npm run build`: built in 1.42s (dist/index.html 1.18 kB, dist/assets/index.css 117.49 kB, dist/assets/index.js 1697.51 kB).
+  - Puppeteer browser verification: opened Settings modal, inspected and validated 4-bus mixing sliders, visual fidelity presets, unit switches, accessibility toggles, and flight deck keybindings.
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/cinematic_audio_and_settings.md`: Web Audio 4-bus routing architecture, pop-free crossfading, modal harmony chord progressions across 5 mission phases, NIST SP 811 aerospace conversion factors, and WCAG accessibility standards.
+  - Test suites:
+    - `src/sim/audio/cinematicAudioAndSettings.test.ts`: 4 comprehensive unit tests verifying 4-bus volume clamping and mute toggling, 5-phase procedural music chords and track paths, user preferences schema validation, corruption recovery, persistence, and NIST SP 811 aerospace units formatting.
+- **Features Implemented & Verified**:
+  - **4-Bus Audio Mixing Console**: Implemented submaster gain architecture (`masterBusGain` -> `sfxBusGain`, `musicBusGain`, `engineBusGain`) in `src/game/audio.ts` with linear parameter ramping to eliminate audio clicks and pops.
+  - **5-Phase Procedural Music Moods**: Designed authentic modal chord sets (`MENU_CHORDS`, `LAUNCH_CHORDS`, `SPACE_CHORDS`, `DESCENT_CHORDS`, `SURFACE_CHORDS`) with frequencies >100 Hz to prevent low-end hum.
+  - **User Preferences & NIST SP 811 Units**: Created `src/game/userPreferences.ts` with schema validation, default fallbacks, and unit formatting functions for speed, altitude, distance, and propulsion force.
+  - **Flight Deck Settings Console**: Transformed Settings tab in `GameMenuModal.tsx` into a multi-panel engineering interface with 4-bus sliders, 4 visual presets (`Low`, `Med`, `High`, `Ultra`), units selector (`Metric (SI)` vs `Aerospace (US)`), accessibility toggles (`Reduced Motion`, `High-Contrast Borders`), flight deck keybindings reference, and reset action.
+

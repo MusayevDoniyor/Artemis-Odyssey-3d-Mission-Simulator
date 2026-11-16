@@ -115,6 +115,7 @@ export interface SceneSimulationBridge {
   spaceCameraMode?: SpaceCameraMode;
   localAnchorId?: string;
   quality?: QualityPreset;
+  reducedMotion?: boolean;
   panOffset?: { x: number; y: number; z: number };
 }
 
@@ -423,7 +424,7 @@ export class SpaceSceneManager {
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = !this.isSoftwareGl;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -1421,10 +1422,18 @@ export class SpaceSceneManager {
     } else if (quality === 'med') {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.BasicShadowMap;
+      this.sunLight.castShadow = true;
+    } else if (quality === 'ultra') {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
       this.sunLight.castShadow = true;
     } else {
+      // high
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
       this.sunLight.castShadow = true;
     }
   }

@@ -31,8 +31,6 @@ const BASE_RESOURCES: ResourceState = {
   power: 100,
   oxygen: 100,
   shield: 100,
-  sampleCapacity: 10,
-  samplesCollected: 0,
 };
 
 test('PHASE 9: Low Earth Parking Orbit (28.5 deg LC-39B) geometry and inclination verification', () => {

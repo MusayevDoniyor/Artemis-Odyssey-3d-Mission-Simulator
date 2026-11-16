@@ -545,9 +545,24 @@ export interface AudioSettings {
   masterVolume: number;
   sfxVolume: number;
   ambienceVolume: number;
+  engineVolume: number;
 }
 
-export type QualityPreset = 'low' | 'med' | 'high';
+export type QualityPreset = 'low' | 'med' | 'high' | 'ultra';
+
+export type UnitsSystem = 'metric' | 'imperial';
+
+export interface UserPreferencesState {
+  audio: AudioSettings;
+  graphics: {
+    quality: QualityPreset;
+    reducedMotion: boolean;
+    highContrastBorders: boolean;
+    bloomEnabled: boolean;
+  };
+  units: UnitsSystem;
+  speedScale: TelemetrySpeedScale;
+}
 
 export interface InspectorLabelPoint {
   partId: string;

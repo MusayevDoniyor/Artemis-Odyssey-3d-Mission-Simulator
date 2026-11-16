@@ -256,3 +256,43 @@ This file records all architectural, engineering, and asset decisions made auton
 - **Alternatives Considered**:
   - Full numeric 3-body Runge-Kutta 4th order integrator on every animation frame (rejected: prone to numerical divergence and high CPU overhead; analytical Keplerian and rotating synodic conics provide stable, continuous, 60 FPS performance while accurately depicting real Apollo/Artemis trajectory geometry).
 
+---
+
+## Decision D10: Cinematic Audio, Procedural Music & Settings Overhaul (Phase 10)
+- **Date**: 2026-11-16T10:35:00+05:00
+- **Decision**:
+  1. **Web Audio 4-Bus Console Routing Architecture**:
+     - Built dedicated submaster gain routing topology in `src/game/audio.ts`: `masterBusGain` connecting to `ctx.destination`, which receives three dedicated parallel buses:
+       - `sfxBusGain`: Systems UI clicks, alerts, radar pings, docking clamps, staging cues.
+       - `musicBusGain`: Atmospheric procedural chords, ambient space piano, and soundtrack playback.
+       - `engineBusGain`: Heavy acoustics, RS-25 rocket rumble, SRB acoustic noise, and RCS thruster bursts.
+     - Implemented exponential/linear parameter ramping (`linearRampToValueAtTime`) over 0.03s for gain sliders and 1.8s for smooth phase-to-phase track crossfades to completely eradicate clicks, pops, and discontinuities.
+  2. **5-Mood Procedural Chord Progressions**:
+     - Extended procedural synthesizer across 5 game phases:
+       - `menu`: Dm9, Bbmaj9, Cmaj9, Am9 celestial piano progressions (>196 Hz to prevent low-end hum).
+       - `launch`: Dm, F, C, G ascent tension and orbital insertion cadence.
+       - `space`: Asus2/Am9, Fmaj7, Gmaj7, Dm9 deep cosmos and cislunar drift harmonies.
+       - `descent`: Gm, Eb, F, Dm descent focus and touchdown radar locking tension.
+       - `surface`: Cmaj7, Em7, Fmaj7, G cold trap stillness and sunlit Shackleton rim serenity.
+  3. **User Preferences & Aerospace Units**:
+     - Created `src/game/userPreferences.ts` with schema-validated `loadUserPreferences`, `saveUserPreferences`, and `resetUserPreferences` with graceful error recovery from corrupt JSON or browser storage restrictions.
+     - Implemented NIST SP 811 compliant units conversion utility functions:
+       - `formatSpeed`: Metric (m/s, km/s) vs Imperial (ft/s, nmi/s).
+       - `formatAltitude`: Metric (m, km) vs Imperial (ft, nmi).
+       - `formatDistance`: Metric (km) vs Imperial (nmi).
+       - `formatForce`: Metric (N, kN, MN) vs Imperial (lbf, klbf, M lbf).
+  4. **Settings Modal Engineering Console**:
+     - Overhauled Settings tab in `GameMenuModal.tsx` into a multi-panel flight deck console:
+       - 4-bus volume sliders (`Master`, `Propulsion/Engine`, `SFX`, `Procedural Score`) with live percentages and instant mute toggle.
+       - 4 Visual Fidelity Presets (`Low`, `Medium`, `High`, `Ultra`) with device pixel ratio scaling and shadow map management.
+       - Telemetry units toggle (`Metric (SI)` vs `Aerospace (US)`).
+       - Accessibility toggles (`Reduced Motion` damping camera shake and launch turbulence; `High-Contrast Borders` for HUD readability).
+       - Flight deck keybindings reference table (`W/S`, `A/D`, `Space`, `C`, `Tab/Esc`, `M`).
+       - "Reset All Settings to Defaults" action button.
+  5. **Verification**:
+     - Author test suite `src/sim/audio/cinematicAudioAndSettings.test.ts` (4 unit tests covering 4-bus clamping, procedural music, schema validation/corruption recovery, and NIST units formatting). Total tests now 115 passing green.
+- **Why**: Delivers professional-grade acoustic mixing, player-controlled accessibility, and authentic aerospace units conversion while eliminating audio clicks and dead controls.
+- **Alternatives Considered**:
+  - Global single-volume multiplier (rejected: rocket engine roar would overpower procedural music or dialogue without granular bus control).
+
+

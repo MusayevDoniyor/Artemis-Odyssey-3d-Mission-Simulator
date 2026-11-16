@@ -129,8 +129,15 @@ import type {
   SurfacePlanet,
   SurfaceWorldPrompt,
   TelemetrySpeedScale,
+  UnitsSystem,
+  UserPreferencesState,
   VehicleShowcaseId,
 } from './game/types';
+import {
+  loadUserPreferences,
+  saveUserPreferences,
+  resetUserPreferences,
+} from './game/userPreferences';
 import {
   getLandingWarnings,
   getLaunchWarnings,
@@ -287,9 +294,14 @@ export default function App() {
   const [paused, setPaused] = useState<boolean>(false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [menuTab, setMenuTab] = useState<GameMenuTab>('map');
-  const [muted, setMuted] = useState<boolean>(false);
-  const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => soundSynth.getSettings());
-  const [qualityPreset, setQualityPreset] = useState<QualityPreset>('high');
+  const [userPreferences, setUserPreferences] = useState<UserPreferencesState>(() => {
+    const loaded = loadUserPreferences();
+    soundSynth.updateSettings(loaded.audio);
+    return loaded;
+  });
+  const [muted, setMuted] = useState<boolean>(() => loadUserPreferences().audio.muted);
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => loadUserPreferences().audio);
+  const [qualityPreset, setQualityPreset] = useState<QualityPreset>(() => loadUserPreferences().graphics.quality);
   const [freeExploreMode, setFreeExploreMode] = useState<boolean>(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>('chase');
   const [showcase, setShowcase] = useState<VehicleShowcaseId>('outpost');
@@ -2396,7 +2408,13 @@ export default function App() {
   const toggleMute = () => {
     const next = soundSynth.toggleMute();
     setMuted(next);
-    setAudioSettings(soundSynth.getSettings());
+    const updated = soundSynth.getSettings();
+    setAudioSettings(updated);
+    setUserPreferences((prev) => {
+      const n = { ...prev, audio: updated };
+      saveUserPreferences(n);
+      return n;
+    });
   };
 
   const handleUpdateAudio = useCallback((partial: Partial<AudioSettings>) => {
@@ -2405,12 +2423,64 @@ export default function App() {
     const updated = soundSynth.getSettings();
     setAudioSettings(updated);
     setMuted(updated.muted);
+    setUserPreferences((prev) => {
+      const n = { ...prev, audio: updated };
+      saveUserPreferences(n);
+      return n;
+    });
   }, []);
 
   const handleChangeQuality = useCallback((quality: QualityPreset) => {
     simRef.current.quality = quality;
     setQualityPreset(quality);
     soundSynth.playClick();
+    setUserPreferences((prev) => {
+      const n = { ...prev, graphics: { ...prev.graphics, quality } };
+      saveUserPreferences(n);
+      return n;
+    });
+  }, []);
+
+  const handleChangeUnits = useCallback((units: UnitsSystem) => {
+    soundSynth.playClick();
+    setUserPreferences((prev) => {
+      const n = { ...prev, units };
+      saveUserPreferences(n);
+      return n;
+    });
+  }, []);
+
+  const handleToggleReducedMotion = useCallback(() => {
+    soundSynth.playClick();
+    setUserPreferences((prev) => {
+      const nextVal = !prev.graphics.reducedMotion;
+      simRef.current.reducedMotion = nextVal;
+      const n = { ...prev, graphics: { ...prev.graphics, reducedMotion: nextVal } };
+      saveUserPreferences(n);
+      return n;
+    });
+  }, []);
+
+  const handleToggleHighContrast = useCallback(() => {
+    soundSynth.playClick();
+    setUserPreferences((prev) => {
+      const nextVal = !prev.graphics.highContrastBorders;
+      const n = { ...prev, graphics: { ...prev.graphics, highContrastBorders: nextVal } };
+      saveUserPreferences(n);
+      return n;
+    });
+  }, []);
+
+  const handleResetPreferences = useCallback(() => {
+    soundSynth.playClick();
+    const def = resetUserPreferences();
+    soundSynth.updateSettings(def.audio);
+    setAudioSettings(def.audio);
+    setMuted(def.audio.muted);
+    setQualityPreset(def.graphics.quality);
+    simRef.current.quality = def.graphics.quality;
+    simRef.current.reducedMotion = def.graphics.reducedMotion;
+    setUserPreferences(def);
   }, []);
 
   const handleUpdateInspectorUi = useCallback(
@@ -3051,6 +3121,9 @@ export default function App() {
         solarScaleMode={solarScaleMode}
         solarTimeSpeed={solarTimeSpeed}
         focusedSolarBodyId={focusedSolarBodyId}
+        unitsSystem={userPreferences.units}
+        reducedMotion={userPreferences.graphics.reducedMotion}
+        highContrastBorders={userPreferences.graphics.highContrastBorders}
         onSelectTab={setMenuTab}
         onClose={closeMenu}
         onRestartStage={() => {
@@ -3065,7 +3138,13 @@ export default function App() {
         onJumpToInspector={() => jumpToPhase('inspector')}
         onToggleSpeedScale={() => {
           soundSynth.playClick();
-          setSpeedScale((prev) => (prev === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X'));
+          const next: TelemetrySpeedScale = speedScale === 'KID_25X' ? 'REAL_SPEED' : 'KID_25X';
+          setSpeedScale(next);
+          setUserPreferences((prev) => {
+            const n = { ...prev, speedScale: next };
+            saveUserPreferences(n);
+            return n;
+          });
         }}
         onUpdateAudio={handleUpdateAudio}
         onToggleMusic={() => {
@@ -3080,6 +3159,10 @@ export default function App() {
           soundSynth.setMusicVolume(v);
         }}
         onChangeQuality={handleChangeQuality}
+        onChangeUnits={handleChangeUnits}
+        onToggleReducedMotion={handleToggleReducedMotion}
+        onToggleHighContrast={handleToggleHighContrast}
+        onResetPreferences={handleResetPreferences}
         onResetCamera={handleResetCamera}
         onQueueMarsPoint={(wx, wz, label, objectiveId) => {
           marsQueueRef.current = enqueueMarsWaypoint(

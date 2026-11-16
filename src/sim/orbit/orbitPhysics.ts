@@ -798,7 +798,7 @@ export function stepSpaceFlightPhysics(
   } else {
     if (domId === 'earth') {
       const earthVisR = getBodyVisualRadiusUnits('earth', solarScaleMode);
-      const leoLimit = earthVisR * (solarScaleMode === 'scientific' ? 1.05 : 1.08);
+      const leoLimit = earthVisR * 1.08;
       if (domDist <= leoLimit) {
         // Low Earth Orbit (165 - 500 km)
         const altRatio = Math.max(0, (domDist - earthVisR) / Math.max(0.01, leoLimit - earthVisR));
@@ -809,7 +809,7 @@ export function stepSpaceFlightPhysics(
       }
     } else if (domId === 'moon') {
       const moonVisR = getBodyVisualRadiusUnits('moon', solarScaleMode);
-      const lloLimit = moonVisR * (solarScaleMode === 'scientific' ? 1.06 : 1.15);
+      const lloLimit = moonVisR * 1.15;
       if (domDist <= lloLimit) {
         // Low Lunar Orbit (~100 - 250 km)
         const altRatio = Math.max(0, (domDist - moonVisR) / Math.max(0.01, lloLimit - moonVisR));
