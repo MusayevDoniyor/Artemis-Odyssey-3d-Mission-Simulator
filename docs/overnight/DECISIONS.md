@@ -147,3 +147,32 @@ This file records all architectural, engineering, and asset decisions made auton
 - **Alternatives Considered**:
   - Procedural approximations for ISS and Lunar Module (rejected: NASA's official 3D CAD assets provide far higher geometric fidelity and historical accuracy while staying well under 1 MB).
   - Using Google/CDN-hosted Draco wasm (rejected: breaks offline self-contained operation and violates zero-CDN constraints).
+
+---
+
+## Decision D6: KSC LC-39B Pad Layout, 3-Tower Lightning Grid, IOP/SS Deluge, Crawlerway, VAB & Instanced Flora (Phase 6)
+- **Date**: 2026-11-16T06:52:00+05:00
+- **Decision**:
+  1. **Three-Tower Lightning Protection System (LPS)**:
+     - Built 3 massive 182.9 m (600 ft) steel lattice towers in an equilateral triangle configuration (120° angular spacing at 30° NE, 150° NW, 270° S, radius ~52 scene units) surrounding LC-39B.
+     - Modeled 4 tapering lattice columns, 5 tiered horizontal catwalk diaphragms with red FAA obstruction lights, fiberglass insulator masts, copper lightning spires (total height 44 units), and sagging catenary overhead ground shield wires spanning between the 3 tower spires.
+  2. **IOP/SS Water Sound Suppression System**:
+     - Modeled 88.4 m (290 ft) elevated water tower (1.14 million liter / 300,000 gallon capacity) with 4-leg cross-braced steel lattice support.
+     - Added dual 2.1 m (7 ft) large-diameter carbon steel water deluge penstocks curving down from the tank base directly into the flame trench quench manifold to deliver the 4.16M L/min deluge.
+  3. **Mobile Launcher 1 Umbilicals & Aft Tail Masts**:
+     - Equipped umbilical tower with all 5 verified swing arms at authentic heights: Crew Access Arm (CAA) at y=22.46 with articulated White Room cleanroom, OSMU at y=19.8, ICPSU at y=16.8, CSFSU at y=13.5, and CSITU at y=9.8.
+     - Added LH2 and LOX Tail Service Mast Umbilicals (TSMUs) on the MLP deck flanking the core stage aft skirt with angled blast hoods.
+  4. **Dual-Lane Alabama River Stone Crawlerway**:
+     - Built authentic dual 12.2 m wide crushed river stone tracks (`0x8c7853`) separated by a 15.2 m grass median (`0x2d4f1e`) and bordered by compacted limestone shoulders.
+     - Sweeps continuously South-Southwest along bearing ~215° toward the Vehicle Assembly Building.
+  5. **Vehicle Assembly Building (VAB) & Launch Control Center (LCC)**:
+     - Placed at authentic KSC bearing 215° SSW (`x = -168, z = 240`) matching 6.8 km distance scaling.
+     - Proportioned to real dimensions (160.3 m high, 218.2 m long, 157.9 m wide), 139 m tall high-bay roll-up doors, low-bay annex, and vertical stripes.
+     - Added adjoining 4-story Launch Control Center (LCC) with canted green-tinted observation windows facing northeast toward LC-39B.
+  6. **Florida Space Coast Terrain & Instanced Vegetation**:
+     - Modeled Atlantic Ocean surf plane to the East (`x > 38`), sandy coastal dunes, and inland Banana River / Mosquito Lagoon wetlands to the West (`x < -55`).
+     - Added `buildFloridaVegetation()` with 100 Sabal palmettos (cabbage palms) and 70 Florida slash pines using `THREE.InstancedMesh` for zero-overhead, 2-draw-call performance.
+- **Why**: Replaces generic pad cylinders with historically and architecturally verified Kennedy Space Center LC-39B infrastructure, establishing authentic spatial presence for SLS launch operations.
+- **Alternatives Considered**:
+  - Full unmerged individual tree meshes (rejected: would incur ~340 additional draw calls and cause mobile/laptop frame rate degradation; `THREE.InstancedMesh` achieves identical visual fidelity with only 2 draw calls).
+  - Single central Apollo-era lightning mast on launcher tower (rejected: modern LC-39B was converted to the 3-tower catenary wire grid specifically for the Constellation and Artemis programs).

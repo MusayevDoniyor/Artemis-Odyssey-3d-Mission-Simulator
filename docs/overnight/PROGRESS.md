@@ -41,10 +41,10 @@
   - [x] 5.2 Materials (MLI gold foil, thermal tiles, radiators) and articulating nodes.
   - [x] 5.3 Verify and tag `overnight-phase-5-green`.
 
-- [ ] **PHASE 6: Launch site, facilities and surroundings**
-  - [ ] 6.1 Research LC-39B layout, flame trench, Mobile Launcher umbilicals, VAB in background (160m at correct distance/bearing).
-  - [ ] 6.2 Florida terrain, coastline, pad lighting, instanced props.
-  - [ ] 6.3 Verify and tag `overnight-phase-6-green`.
+- [x] **PHASE 6: Launch site, facilities and surroundings**
+  - [x] 6.1 Research LC-39B layout, flame trench, Mobile Launcher umbilicals, VAB in background (160m at correct distance/bearing).
+  - [x] 6.2 Florida terrain, coastline, pad lighting, instanced props.
+  - [x] 6.3 Verify and tag `overnight-phase-6-green`.
 
 - [ ] **PHASE 7: Surfaces, landing and rover**
   - [ ] 7.1 Moon Shackleton & Mars Jezero terrain from real elevation datasets (LOLA/MOLA).

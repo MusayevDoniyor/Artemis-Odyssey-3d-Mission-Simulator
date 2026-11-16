@@ -2006,11 +2006,27 @@ function buildMobileLauncherAndTrench(tex: ProceduralTextureSet): THREE.Group {
     mlpBase.add(clampPost);
   });
 
-  [-1.95, 1.95].forEach((tz) => {
-    const tsm = new THREE.Mesh(new THREE.BoxGeometry(0.75, 2.8, 0.75), darkSteelMat);
-    tsm.position.set(-2.35, 3.85, tz);
+  // Tail Service Mast Umbilicals (TSMU-LH2 and TSMU-LOX) flanking Core Stage aft skirt
+  [-1.95, 1.95].forEach((tz, idx) => {
+    const tsmGroup = new THREE.Group();
+    tsmGroup.position.set(-2.35, 2.5, tz);
+    // Steel mast housing
+    const tsm = new THREE.Mesh(new THREE.BoxGeometry(0.85, 3.2, 0.95), darkSteelMat);
+    tsm.position.y = 1.6;
     tsm.castShadow = true;
-    mlpBase.add(tsm);
+    tsmGroup.add(tsm);
+    // Angled blast protective hood over quick-disconnect plate
+    const hood = new THREE.Mesh(new THREE.ConeGeometry(0.65, 0.8, 4), darkSteelMat);
+    hood.rotation.y = Math.PI / 4;
+    hood.rotation.z = -Math.PI / 6;
+    hood.position.set(0.42, 2.9, 0);
+    tsmGroup.add(hood);
+    // Cryogenic fill carrier arm extending to SLS aft skirt
+    const carrierArm = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.28, 0.32), hazardMat);
+    carrierArm.position.set(0.65, 2.3, 0);
+    tsmGroup.add(carrierArm);
+    tsmGroup.userData.partId = idx === 0 ? 'ml-tsmu-lh2' : 'ml-tsmu-lox';
+    mlpBase.add(tsmGroup);
   });
 
   g.add(mlpBase);
@@ -2080,27 +2096,49 @@ function buildLC39BServiceTower(tex: ProceduralTextureSet): {
   elevShaft.position.set(-0.4, towerHeight / 2, 0);
   tower.add(elevShaft);
 
-  // Umbilical Swing Arms connecting Tower -> SLS Core & ICPS (flush with hull wall at local x=5.92)
-  [11.2, 16.5, 20.1].forEach((uy, idx) => {
-    const len = idx === 2 ? 4.02 : 3.74;
+  // Verified Mobile Launcher Flight Service Umbilicals connecting Tower -> SLS Stack
+  // 1. Orion Service Module Umbilical (OSMU) at y=19.8: environmental purge & electrical power
+  // 2. ICPS Umbilical (ICPSU) at y=16.8: LH2/LOX cryo top-off and pneumatics
+  // 3. Core Stage Forward Skirt Umbilical (CSFSU) at y=13.5: avionics and GN2 purge
+  // 4. Core Stage Inter-Tank Umbilical (CSITU) at y=9.8: LOX/LH2 vent lines
+  const umbilicalSpecs = [
+    { uy: 19.8, len: 4.02, name: 'ml-osmu' },
+    { uy: 16.8, len: 3.74, name: 'ml-icpsu' },
+    { uy: 13.5, len: 3.74, name: 'ml-csfsu' },
+    { uy: 9.8, len: 3.74, name: 'ml-csitu' },
+  ];
+  umbilicalSpecs.forEach(({ uy, len, name }) => {
     const uArm = new THREE.Mesh(new THREE.BoxGeometry(len, 0.36, 0.58), steelMat);
     uArm.position.set(1.9 + len / 2, uy, 0);
+    uArm.castShadow = true;
+    uArm.userData.partId = name;
     tower.add(uArm);
     const coupler = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.52, 0.72), darkIron);
     coupler.position.set(1.9 + len, uy, 0);
     tower.add(coupler);
+    // Cryogenic piping flex lines along top of swing arm
+    const cryoPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, len, 8), darkIron);
+    cryoPipe.rotation.z = Math.PI / 2;
+    cryoPipe.position.set(1.9 + len / 2, uy + 0.24, 0);
+    tower.add(cryoPipe);
   });
 
-  // Retractable White Orion Crew Access Arm (aligned flush with Orion Crew Module hatch at y=22.50)
+  // Retractable White Orion Crew Access Arm (CAA) & White Room (aligned flush with Orion hatch at y=22.46)
   const crewAccessArm = new THREE.Group();
   crewAccessArm.position.set(halfW, 22.46, 0);
   const walkway = new THREE.Mesh(new THREE.BoxGeometry(4.05, 0.78, 1.0), armWhite);
   walkway.position.set(2.02, 0, 0);
   walkway.castShadow = true;
   crewAccessArm.add(walkway);
-  const bellows = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.88, 1.1), darkIron);
-  bellows.position.set(4.02, 0, 0);
+  // Environmental Enclosure White Room at distal end
+  const whiteRoom = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.45, 1.3), armWhite);
+  whiteRoom.position.set(4.1, 0.32, 0);
+  whiteRoom.castShadow = true;
+  crewAccessArm.add(whiteRoom);
+  const bellows = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.95, 1.15), darkIron);
+  bellows.position.set(4.65, 0.32, 0);
   crewAccessArm.add(bellows);
+  crewAccessArm.userData.partId = 'ml-caa';
   tower.add(crewAccessArm);
 
   // Top Hammerhead Crane + Lightning Protection Spire
@@ -2120,6 +2158,87 @@ function buildLC39BServiceTower(tex: ProceduralTextureSet): {
   return { tower, crewAccessArm };
 }
 
+function buildFloridaVegetation(): THREE.Group {
+  const g = new THREE.Group();
+
+  // Sabal Palmetto (Florida Cabbage Palm) - 100 instanced trees
+  const palmTrunkGeo = new THREE.CylinderGeometry(0.08, 0.14, 2.8, 6);
+  palmTrunkGeo.translate(0, 1.4, 0);
+  const palmTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.92, metalness: 0.05 });
+  const palmCrownGeo = new THREE.ConeGeometry(1.4, 0.9, 7);
+  palmCrownGeo.translate(0, 2.9, 0);
+  const palmCrownMat = new THREE.MeshStandardMaterial({ color: 0x2e5c1e, roughness: 0.85, metalness: 0.05 });
+
+  const numPalms = 100;
+  const palmTrunkMesh = new THREE.InstancedMesh(palmTrunkGeo, palmTrunkMat, numPalms);
+  const palmCrownMesh = new THREE.InstancedMesh(palmCrownGeo, palmCrownMat, numPalms);
+  palmTrunkMesh.castShadow = true;
+  palmCrownMesh.castShadow = true;
+
+  // Slash Pine (Pinus elliottii) - 70 instanced trees
+  const pineTrunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 4.8, 6);
+  pineTrunkGeo.translate(0, 2.4, 0);
+  const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.95, metalness: 0.02 });
+  const pineFoliageGeo = new THREE.ConeGeometry(1.6, 3.8, 6);
+  pineFoliageGeo.translate(0, 4.6, 0);
+  const pineFoliageMat = new THREE.MeshStandardMaterial({ color: 0x1b4332, roughness: 0.88, metalness: 0.05 });
+
+  const numPines = 70;
+  const pineTrunkMesh = new THREE.InstancedMesh(pineTrunkGeo, pineTrunkMat, numPines);
+  const pineFoliageMesh = new THREE.InstancedMesh(pineFoliageGeo, pineFoliageMat, numPines);
+  pineTrunkMesh.castShadow = true;
+  pineFoliageMesh.castShadow = true;
+
+  const dummy = new THREE.Object3D();
+
+  // Populate Sabal Palms along perimeter berms, crawlerway flanks, and lagoon edges
+  let palmIdx = 0;
+  for (let i = 0; i < numPalms; i++) {
+    const a = (i / numPalms) * Math.PI * 2;
+    const r = 58 + ((i * 17) % 55);
+    let px = Math.cos(a) * r;
+    let pz = Math.sin(a) * r;
+    // Keep clear of pad center and flame trench
+    if (Math.hypot(px, pz) < 38) {
+      px = (px / Math.hypot(px, pz)) * 42;
+      pz = (pz / Math.hypot(px, pz)) * 42;
+    }
+    const scale = 0.75 + ((i * 13) % 40) * 0.01;
+    dummy.position.set(px, -0.3, pz);
+    dummy.rotation.set((((i * 7) % 15) - 7) * 0.01, ((i * 23) % 360) * (Math.PI / 180), (((i * 11) % 15) - 7) * 0.01);
+    dummy.scale.set(scale, scale, scale);
+    dummy.updateMatrix();
+    palmTrunkMesh.setMatrixAt(palmIdx, dummy.matrix);
+    palmCrownMesh.setMatrixAt(palmIdx, dummy.matrix);
+    palmIdx++;
+  }
+
+  // Populate Slash Pines along outer wetlands and distant crawlerway corridor
+  let pineIdx = 0;
+  for (let i = 0; i < numPines; i++) {
+    const angle = 1.8 + ((i * 11) % 50) * 0.06;
+    const dist = 75 + ((i * 29) % 120);
+    const px = Math.cos(angle) * dist - 30;
+    const pz = Math.sin(angle) * dist + 40;
+    const scale = 0.8 + ((i * 19) % 35) * 0.012;
+    dummy.position.set(px, -0.3, pz);
+    dummy.rotation.set(0, ((i * 31) % 360) * (Math.PI / 180), 0);
+    dummy.scale.set(scale, scale, scale);
+    dummy.updateMatrix();
+    pineTrunkMesh.setMatrixAt(pineIdx, dummy.matrix);
+    pineFoliageMesh.setMatrixAt(pineIdx, dummy.matrix);
+    pineIdx++;
+  }
+
+  palmTrunkMesh.instanceMatrix.needsUpdate = true;
+  palmCrownMesh.instanceMatrix.needsUpdate = true;
+  pineTrunkMesh.instanceMatrix.needsUpdate = true;
+  pineFoliageMesh.instanceMatrix.needsUpdate = true;
+
+  g.add(palmTrunkMesh, palmCrownMesh, pineTrunkMesh, pineFoliageMesh);
+  return g;
+}
+
 function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   const g = new THREE.Group();
   const steelMat = new THREE.MeshStandardMaterial({
@@ -2132,29 +2251,81 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
   const xenonMat = new THREE.MeshBasicMaterial({ color: 0xfef3c7 });
 
-  // 4 Catenary Lightning Protection Towers around Pad 39B
-  [
-    [-25, -18],
-    [25, -18],
-    [-27, 17],
-    [27, 17],
-  ].forEach(([lx, lz]) => {
+  // 3 Massive 180-Meter (600 ft) Steel Lattice Lightning Protection Towers in Equilateral Triangle
+  // Radius ~52 units (180m scale) at 30° (NE), 150° (NW), and 270° (S)
+  const lpsTowerCoords: Array<[number, number]> = [
+    [45.0, -26.0],  // Tower 1 (North-East)
+    [-45.0, -26.0], // Tower 2 (North-West)
+    [0.0, 52.0],    // Tower 3 (South)
+  ];
+  const lpsTowerHeight = 38.0;
+  const lpsSpireHeight = 6.0;
+
+  lpsTowerCoords.forEach(([tx, tz], tidx) => {
     const lt = new THREE.Group();
-    lt.position.set(lx, 0, lz);
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.95, 34, 6), steelMat);
-    mast.position.y = 17;
-    mast.castShadow = true;
+    lt.position.set(tx, 0, tz);
+
+    // 4 Tapering Lattice Columns
+    const baseW = 1.8;
+    const topW = 0.5;
+    const corners = [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ];
+    corners.forEach(([cx, cz]) => {
+      lt.add(
+        createStrutBetween(
+          new THREE.Vector3(cx * baseW, 0, cz * baseW),
+          new THREE.Vector3(cx * topW, lpsTowerHeight, cz * topW),
+          0.12,
+          0.22,
+          steelMat
+        )
+      );
+    });
+
+    // Horizontal Platforms & Cross-Bracing every 7 units
+    const tiers = [7, 14, 21, 28, 35];
+    tiers.forEach((ty) => {
+      const s = baseW - (ty / lpsTowerHeight) * (baseW - topW);
+      const plat = new THREE.Mesh(new THREE.BoxGeometry(s * 2.1, 0.22, s * 2.1), steelMat);
+      plat.position.y = ty;
+      lt.add(plat);
+      // Red FAA obstruction light at each tier
+      const rLight = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), beaconMat);
+      rLight.position.set(s * 1.05, ty + 0.2, s * 1.05);
+      lt.add(rLight);
+    });
+
+    // Fiberglass Insulator Mast & Lightning Spire
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.16, lpsSpireHeight, 8), steelMat);
+    mast.position.y = lpsTowerHeight + lpsSpireHeight / 2;
     lt.add(mast);
 
-    const mastTip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.16, 5.2, 6), steelMat);
-    mastTip.position.y = 36.4;
-    lt.add(mastTip);
+    // Apex Strobe Beacon
+    const topLight = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), beaconMat);
+    topLight.position.y = lpsTowerHeight + lpsSpireHeight + 0.15;
+    lt.add(topLight);
 
-    const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), beaconMat);
-    redLight.position.y = 39.1;
-    lt.add(redLight);
+    lt.userData.partId = `lps-tower-${tidx + 1}`;
     g.add(lt);
   });
+
+  // Overhead Catenary Ground Shield Wires Interconnecting the 3 Tower Spires
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x475569 });
+  for (let i = 0; i < 3; i++) {
+    const p1 = lpsTowerCoords[i];
+    const p2 = lpsTowerCoords[(i + 1) % 3];
+    const v1 = new THREE.Vector3(p1[0], lpsTowerHeight + lpsSpireHeight - 0.4, p1[1]);
+    const v2 = new THREE.Vector3(p2[0], lpsTowerHeight + lpsSpireHeight - 0.4, p2[1]);
+    // 3-segment catenary with gentle natural sag over the pad
+    const mid = new THREE.Vector3().addVectors(v1, v2).multiplyScalar(0.5);
+    mid.y -= 2.2;
+    g.add(createStrutBetween(v1, mid, 0.025, 0.025, wireMat));
+    g.add(createStrutBetween(mid, v2, 0.025, 0.025, wireMat));
+  }
 
   // 6 Stadium Xenon Floodlight Masts illuminating Pad 39B
   [
@@ -2182,7 +2353,7 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
     g.add(fl);
   });
 
-  // LC-39B Deluge Water Tower (4-Leg X-Braced Truss + Catwalk Ring + Deluge Drum)
+  // LC-39B IOP/SS Deluge Water Tower (4-Leg X-Braced Truss + 300,000 Gallon Water Drum)
   const waterTower = new THREE.Group();
   waterTower.position.set(-34, 0, -14);
   const wtCorners: Array<[number, number]> = [
@@ -2224,6 +2395,11 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   waterTower.add(wtCap);
   g.add(waterTower);
 
+  // Dual 2.1 m Large-Diameter IOP/SS Water Deluge Penstock Lines to Flame Trench
+  const delugePipeMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.45, roughness: 0.38 });
+  g.add(createStrutBetween(new THREE.Vector3(-32, 1.6, -13.2), new THREE.Vector3(-5.2, 1.6, -1.8), 0.32, 0.32, delugePipeMat));
+  g.add(createStrutBetween(new THREE.Vector3(-32, 1.1, -12.2), new THREE.Vector3(-5.2, 1.1, 1.8), 0.28, 0.28, delugePipeMat));
+
   // Spherical LH2 & LOX Cryo Storage Vessels on Braced Ring Legs
   [
     [32, -16, 3.6],
@@ -2263,18 +2439,26 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   const cryoLegB = createStrutBetween(new THREE.Vector3(36, 1.8, -7.5), new THREE.Vector3(5.6, 1.8, 1.8), 0.18, 0.18, cryoPipeMat);
   g.add(cryoLegA, cryoLegB);
 
-  // Deluge Water Pipe from Elevated Sphere Tank into Flame Trench
-  const delugePipeMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.45, roughness: 0.4 });
-  g.add(createStrutBetween(new THREE.Vector3(-32, 1.4, -12.8), new THREE.Vector3(-4.5, 1.4, -2.2), 0.26, 0.26, delugePipeMat));
-
-  // Crawlerway Road stretching Southwest toward distant Vehicle Assembly Building (VAB)
-  const gravelMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.95, metalness: 0.04 });
+  // Dual-Lane Crawlerway (Two 12.2m lanes separated by a 15.2m grass median)
+  // Sweeping South-Southwest toward distant VAB along bearing 215°
+  const crawlerGravelMat = new THREE.MeshStandardMaterial({ color: 0x8c7853, roughness: 0.96, metalness: 0.03 });
+  const crawlerMedianMat = new THREE.MeshStandardMaterial({ color: 0x2d4f1e, roughness: 0.95, metalness: 0.02 });
   const roadMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, metalness: 0.05 });
-  const crawlerway = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.18, 220), gravelMat);
-  crawlerway.position.set(-22, -0.28, 122);
-  crawlerway.rotation.y = -0.22;
-  crawlerway.receiveShadow = true;
-  g.add(crawlerway);
+
+  const crawlerwayGroup = new THREE.Group();
+  crawlerwayGroup.position.set(-22, -0.28, 122);
+  crawlerwayGroup.rotation.y = -0.24;
+
+  const trackLeft = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 240), crawlerGravelMat);
+  trackLeft.position.x = -2.8;
+  trackLeft.receiveShadow = true;
+  const trackRight = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 240), crawlerGravelMat);
+  trackRight.position.x = 2.8;
+  trackRight.receiveShadow = true;
+  const medianStrip = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.16, 240), crawlerMedianMat);
+  medianStrip.receiveShadow = true;
+  crawlerwayGroup.add(trackLeft, trackRight, medianStrip);
+  g.add(crawlerwayGroup);
 
   // Outer Asphalt Perimeter Road & Pad Turnaround
   const perimRing = new THREE.Mesh(new THREE.RingGeometry(44, 48.5, 48), roadMat);
@@ -2283,45 +2467,87 @@ function buildPerimeterInfrastructure(tex: ProceduralTextureSet): THREE.Group {
   perimRing.receiveShadow = true;
   g.add(perimRing);
 
-  // Atlantic Ocean Surf & Cape Canaveral Dunes along East/North Horizon
+  // Atlantic Ocean Surf & Space Coast Barrier Beach along East Horizon
   const ocean = new THREE.Mesh(
-    new THREE.PlaneGeometry(920, 280),
-    new THREE.MeshStandardMaterial({ color: 0x0c3454, roughness: 0.22, metalness: 0.55 })
+    new THREE.PlaneGeometry(920, 360),
+    new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.28, metalness: 0.42 })
   );
   ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(40, -0.52, -260);
+  ocean.position.set(48, -0.52, -240);
   g.add(ocean);
 
   const beachSand = new THREE.Mesh(
-    new THREE.BoxGeometry(900, 0.28, 26),
-    new THREE.MeshStandardMaterial({ color: 0x7c6f59, roughness: 0.95, metalness: 0 })
+    new THREE.BoxGeometry(900, 0.32, 28),
+    new THREE.MeshStandardMaterial({ color: 0xc2b280, roughness: 0.94, metalness: 0 })
   );
-  beachSand.position.set(20, -0.32, -118);
+  beachSand.position.set(24, -0.32, -112);
   g.add(beachSand);
 
-  // Distant NASA Vehicle Assembly Building (VAB) Silhouette + Launch Control Center
+  // Inland Banana River / Mosquito Lagoon Brackish Wetland Plane (West / South-West)
+  const wetlandWater = new THREE.Mesh(
+    new THREE.PlaneGeometry(360, 480),
+    new THREE.MeshStandardMaterial({ color: 0x0f343a, roughness: 0.35, metalness: 0.35 })
+  );
+  wetlandWater.rotation.x = -Math.PI / 2;
+  wetlandWater.position.set(-180, -0.48, 60);
+  g.add(wetlandWater);
+
+  // Distant NASA Vehicle Assembly Building (VAB) & Launch Control Center (LCC)
+  // Placed at verified KSC bearing 215° SSW (x = -168, z = 240)
   const vabGroup = new THREE.Group();
-  vabGroup.position.set(-76, 0, 232);
-  vabGroup.rotation.y = 0.25;
-  const vabWallMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.72, metalness: 0.15 });
+  vabGroup.position.set(-168, 0, 240);
+  vabGroup.rotation.y = 0.38;
+  const vabWallMat = new THREE.MeshStandardMaterial({ color: 0xa0aec0, roughness: 0.72, metalness: 0.15 });
   const vabDoorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.65, metalness: 0.35 });
+  const vabRedMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.6 });
+  const vabBlueMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 });
+  const lccGlassMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.2, metalness: 0.6, transparent: true, opacity: 0.85 });
+
+  // Main High Bay (160m tall scale: 40 units tall, 36 units wide, 32 units deep)
   const vabMain = new THREE.Mesh(new THREE.BoxGeometry(36, 40, 32), vabWallMat);
   vabMain.position.y = 20;
+  vabMain.castShadow = true;
   vabGroup.add(vabMain);
+
+  // Low Bay Annex (East extension)
   const vabLowBay = new THREE.Mesh(new THREE.BoxGeometry(22, 18, 28), vabWallMat);
   vabLowBay.position.set(26, 9, 0);
   vabGroup.add(vabLowBay);
+
+  // High-Bay Roll-Up Doors (139m scale)
   const vabDoor = new THREE.Mesh(new THREE.BoxGeometry(8.5, 34, 0.6), vabDoorMat);
   vabDoor.position.set(-6, 17, -16.1);
   vabGroup.add(vabDoor);
-  const vabStripe = new THREE.Mesh(
-    new THREE.PlaneGeometry(9, 14),
-    new THREE.MeshBasicMaterial({ map: tex.nasaDecal, transparent: true })
-  );
-  vabStripe.position.set(8, 24, -16.2);
-  vabStripe.rotation.y = Math.PI;
-  vabGroup.add(vabStripe);
+
+  // Vertical Stripes & NASA High-Bay Façade Accents
+  const flagRed = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 14), vabRedMat);
+  flagRed.position.set(5.5, 24, -16.2);
+  flagRed.rotation.y = Math.PI;
+  const flagWhite = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 14), whiteTankMat);
+  flagWhite.position.set(7.7, 24, -16.2);
+  flagWhite.rotation.y = Math.PI;
+  const flagBlue = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 14), vabBlueMat);
+  flagBlue.position.set(10.4, 24, -16.2);
+  flagBlue.rotation.y = Math.PI;
+  vabGroup.add(flagRed, flagWhite, flagBlue);
+
+  // Launch Control Center (LCC) 4-Story Wing with canted observation glass windows
+  const lccGroup = new THREE.Group();
+  lccGroup.position.set(38, 0, -8);
+  const lccBase = new THREE.Mesh(new THREE.BoxGeometry(14, 7.5, 10), vabWallMat);
+  lccBase.position.y = 3.75;
+  lccGroup.add(lccBase);
+  // Canted observation window gallery facing northeast toward LC-39B
+  const lccGlass = new THREE.Mesh(new THREE.BoxGeometry(13.2, 2.2, 1.2), lccGlassMat);
+  lccGlass.position.set(0, 5.8, -5.1);
+  lccGlass.rotation.x = -0.22;
+  lccGroup.add(lccGlass);
+  vabGroup.add(lccGroup);
+
   g.add(vabGroup);
+
+  // Instanced Florida Space Coast Vegetation (Palmettos & Slash Pines)
+  g.add(buildFloridaVegetation());
 
   // S-Band Telemetry Tracking Dish Station (Lattice Pedestal + Elevation Yoke + Tripod Feedhorn)
   const dishBase = new THREE.Group();

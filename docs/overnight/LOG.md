@@ -149,4 +149,24 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **TDRS Satellite**: Replaced fictional relay with official NASA Space Network TDRS satellite specs.
   - **Gateway Status**: Updated Gateway to "paused programme" reflecting March 2026 NASA architecture alignment.
 
+## 2026-11-16T06:53:00+05:00 - Phase 6 Completed: Launch Site, Facilities and Surroundings
+- **Phase Objective**: Rebuild Kennedy Space Center LC-39B and surroundings from verified NASA research: pad structure and flame trench, 3-tower 180m lightning grid with catenary shield wires, IOP/SS water tower with dual 2.1m deluge penstocks, Mobile Launcher 1 umbilicals (CAA with White Room, OSMU, ICPSU, CSFSU, CSITU, and TSMU aft masts), dual-lane crushed river stone Crawlerway, distant VAB (160m tall) and LCC at authentic 215° bearing, Atlantic coastline and wetlands, and instanced Florida vegetation.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 93 tests passing, 0 failing (duration 827 ms).
+  - `npm run build`: built in 907ms (dist/index.html 1.18 kB, dist/assets/index.css 114.63 kB, dist/assets/index.js 1662.37 kB).
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/ksc_lc39b_and_facilities.md`: Comprehensive engineering baseline for LC-39B pad structure (12.8m msl mound), flame trench (137m x 15.2m x 12.8m), 450-ton flame deflector, IOP/SS 1.14M liter water tower, 3-tower 182.9m lightning protection grid with catenary cables, ML-1 umbilicals (CAA, OSMU, ICPSU, CSFSU, CSITU, TSMUs), dual 12.2m Crawlerway tracks, VAB (160.3m x 218.2m x 157.9m) at bearing 215° SSW, and Florida Space Coast ecosystems.
+  - Test suite:
+    - `src/sim/models/launchSiteAndFacilities.test.ts`: 6 unit tests validating LC-39B dimensions, IOP/SS water capacity, 3-tower lightning protection geometry, ML-1 service umbilicals, VAB and Crawlerway alignments, and Florida Space Coast environmental bounds.
+- **Features Implemented & Verified**:
+  - **3-Tower Lightning Protection Grid (LPS)**: Replaced 4 small generic masts with 3 authentic 182.9m lattice towers in an equilateral triangle (30° NE, 150° NW, 270° S) with tapering lattice legs, 5 catwalk tiers with FAA obstruction lights, fiberglass insulator masts, copper spires, and sagging catenary overhead ground shield wires.
+  - **IOP/SS Water Deluge Penstocks**: Upgraded elevated water tower with dual 2.1m diameter penstock pipes curving into the flame trench quench manifold to deliver 4.16M L/min deluge.
+  - **Mobile Launcher 1 Umbilicals**: Equipped tower with Crew Access Arm (CAA) and White Room cleanroom, OSMU, ICPSU, CSFSU, CSITU, and deck-mounted LH2/LOX Tail Service Mast Umbilicals (TSMUs) with blast hoods.
+  - **Dual-Lane Crawlerway**: Modeled dual 12.2m crushed Alabama river rock tracks with a 15.2m grass median, sweeping southwest along bearing 215°.
+  - **VAB & Launch Control Center**: Proportioned to authentic 160.3m height at bearing 215° SSW (`x = -168, z = 240`) with high-bay roll-up doors, low-bay annex, high-bay stripes, and 4-story LCC with canted observation windows.
+  - **Florida Coastline & Instanced Vegetation**: Added Atlantic Ocean surf plane to the East, coastal dunes, Banana River wetlands to the West, and `buildFloridaVegetation()` with 100 Sabal palmettos and 70 Florida slash pines using `THREE.InstancedMesh` for zero-overhead 2-draw-call performance.
+
+
 
