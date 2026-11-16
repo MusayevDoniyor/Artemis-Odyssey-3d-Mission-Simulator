@@ -48,6 +48,7 @@ import type {
 import {
   createCrashFxSystem,
   createFalcon9Showcase,
+  createISSShowcase,
   createJWSTModel,
   createLaunchComplexAndSLS,
   createLunarEnvironment,
@@ -296,6 +297,7 @@ export class SpaceSceneManager {
   private voyagerModel: { group: THREE.Group };
   private saturnVModel: { group: THREE.Group };
   private falcon9Model: { group: THREE.Group };
+  private issModel: { group: THREE.Group };
   private crashFxSys: CrashFxHandles;
 
   private trackIdx = 0;
@@ -554,6 +556,10 @@ export class SpaceSceneManager {
     this.falcon9Model.group.visible = false;
     this.scene.add(this.falcon9Model.group);
 
+    this.issModel = createISSShowcase(this.textures);
+    this.issModel.group.visible = false;
+    this.scene.add(this.issModel.group);
+
     this.crashFxSys = createCrashFxSystem(this.textures);
     this.scene.add(this.crashFxSys.group);
 
@@ -758,6 +764,8 @@ export class SpaceSceneManager {
         return [this.saturnVModel.group];
       case 'falcon-9':
         return [this.falcon9Model.group];
+      case 'iss':
+        return [this.issModel.group];
     }
   }
 
@@ -1452,6 +1460,7 @@ export class SpaceSceneManager {
     const showVoyagerShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'voyager';
     const showSaturnVShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'saturn-v';
     const showFalcon9Showcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'falcon-9';
+    const showIssShowcase = (phase === 'title' || phase === 'inspector') && s.showcase === 'iss';
     const showSpace = phase === 'space' || (phase === 'gameover' && s.crashFx.active && s.crashFx.kind === 'space');
     const showLunar =
       !showLaunch &&
@@ -1460,7 +1469,8 @@ export class SpaceSceneManager {
       !showJwstShowcase &&
       !showVoyagerShowcase &&
       !showSaturnVShowcase &&
-      !showFalcon9Showcase;
+      !showFalcon9Showcase &&
+      !showIssShowcase;
 
     this.launchComplex.group.visible = showLaunch;
     this.solarSystem.group.visible = showSpace;
@@ -1469,6 +1479,7 @@ export class SpaceSceneManager {
     this.voyagerModel.group.visible = showVoyagerShowcase;
     this.saturnVModel.group.visible = showSaturnVShowcase;
     this.falcon9Model.group.visible = showFalcon9Showcase;
+    this.issModel.group.visible = showIssShowcase;
     this.lunarEnv.group.visible = showLunar;
     this.lunarEnv.kilopowerGroup.visible =
       Boolean(s.kilopowerActive) ||
@@ -1500,7 +1511,8 @@ export class SpaceSceneManager {
         s.showcase !== 'jwst' &&
         s.showcase !== 'voyager' &&
         s.showcase !== 'saturn-v' &&
-        s.showcase !== 'falcon-9') ||
+        s.showcase !== 'falcon-9' &&
+        s.showcase !== 'iss') ||
       (phase === 'inspector' && s.showcase === 'lander');
 
     this.roverModel.group.visible =
@@ -1520,10 +1532,10 @@ export class SpaceSceneManager {
         this.bayTurntable.visible = true;
         this.bayTurntable.position.set(0, 1.65, 0);
         this.bayTurntable.scale.setScalar(1.85);
-      } else if (s.showcase === 'satellite' || s.showcase === 'jwst' || s.showcase === 'voyager') {
+      } else if (s.showcase === 'satellite' || s.showcase === 'jwst' || s.showcase === 'voyager' || s.showcase === 'iss') {
         this.bayTurntable.visible = true;
         this.bayTurntable.position.set(0, -3.2, 0);
-        this.bayTurntable.scale.setScalar(1.25);
+        this.bayTurntable.scale.setScalar(s.showcase === 'iss' ? 1.9 : 1.25);
       } else {
         this.bayTurntable.visible = false;
       }
@@ -1585,7 +1597,8 @@ export class SpaceSceneManager {
       showJwstShowcase ||
       showVoyagerShowcase ||
       showSaturnVShowcase ||
-      showFalcon9Showcase
+      showFalcon9Showcase ||
+      showIssShowcase
     ) {
       this.solarSystem.group.position.set(0, 0, 0);
       this.starField.position.set(0, 0, 0);
@@ -1593,11 +1606,13 @@ export class SpaceSceneManager {
         ? 'saturn-v'
         : showFalcon9Showcase
           ? 'falcon-9'
-          : showJwstShowcase
-            ? 'jwst'
-            : showVoyagerShowcase
-              ? 'voyager'
-              : 'satellite';
+          : showIssShowcase
+            ? 'iss'
+            : showJwstShowcase
+              ? 'jwst'
+              : showVoyagerShowcase
+                ? 'voyager'
+                : 'satellite';
       this.syncSpacecraftShowcaseScene(s, dt, kind);
     } else if (showSpace) {
       this.syncSpaceScene(s, dt, elapsedSec);
@@ -1683,7 +1698,7 @@ export class SpaceSceneManager {
   private syncSpacecraftShowcaseScene(
     s: SceneSimulationBridge,
     dt: number,
-    kind: 'satellite' | 'jwst' | 'voyager' | 'saturn-v' | 'falcon-9'
+    kind: 'satellite' | 'jwst' | 'voyager' | 'saturn-v' | 'falcon-9' | 'iss'
   ) {
     const isInspector = s.phase === 'inspector';
     (this.scene.background as THREE.Color).setHex(isInspector ? 0x050914 : 0x020617);
@@ -1720,13 +1735,16 @@ export class SpaceSceneManager {
     } else if (kind === 'falcon-9') {
       this.falcon9Model.group.position.set(0, 0, 0);
       this.falcon9Model.group.rotation.set(0, 0, 0);
+    } else if (kind === 'iss') {
+      this.issModel.group.position.set(0, 0, 0);
+      this.issModel.group.rotation.set(0.12, 0.42, 0);
     }
 
     const focusY =
-      kind === 'saturn-v' ? 12.5 : kind === 'falcon-9' ? 9.5 : kind === 'satellite' ? 0 : 0.2;
+      kind === 'saturn-v' ? 12.5 : kind === 'falcon-9' ? 9.5 : kind === 'iss' ? 0 : kind === 'satellite' ? 0 : 0.2;
     if (isInspector) {
-      const minDist = kind === 'saturn-v' ? 6.0 : kind === 'falcon-9' ? 4.5 : 2.8;
-      const maxDist = kind === 'saturn-v' ? 65 : kind === 'falcon-9' ? 48 : 32;
+      const minDist = kind === 'saturn-v' ? 6.0 : kind === 'falcon-9' ? 4.5 : kind === 'iss' ? 6.0 : 2.8;
+      const maxDist = kind === 'saturn-v' ? 65 : kind === 'falcon-9' ? 48 : kind === 'iss' ? 55 : 32;
       this.applyInspectorOrbitCamera(s, dt, 0, focusY, 0, minDist, maxDist);
     } else if (s.phase === 'title' && !s.userOrbitActive) {
       const dist =
@@ -1734,11 +1752,13 @@ export class SpaceSceneManager {
           ? 32.0
           : kind === 'falcon-9'
             ? 24.0
-            : kind === 'satellite'
-              ? 8.8
-              : kind === 'jwst'
-                ? 10.8
-                : 11.2;
+            : kind === 'iss'
+              ? 26.0
+              : kind === 'satellite'
+                ? 8.8
+                : kind === 'jwst'
+                  ? 10.8
+                  : 11.2;
       const a = this.titleOrbitAngle;
       const camX = Math.sin(a) * dist;
       const camY = focusY + 2.6 + Math.sin(a * 0.5) * 0.45;
@@ -1747,7 +1767,15 @@ export class SpaceSceneManager {
       const rightX = camZ / len;
       const rightZ = -camX / len;
       const leftShift =
-        kind === 'saturn-v' ? 3.5 : kind === 'falcon-9' ? 2.8 : kind === 'satellite' ? 1.8 : 2.1;
+        kind === 'saturn-v'
+          ? 3.5
+          : kind === 'falcon-9'
+            ? 2.8
+            : kind === 'iss'
+              ? 3.0
+              : kind === 'satellite'
+                ? 1.8
+                : 2.1;
       this.camPosTarget.set(camX, camY, camZ);
       this.camLookTarget.set(-rightX * leftShift, focusY, -rightZ * leftShift);
       const rate = 1 - Math.exp(-4.2 * dt);

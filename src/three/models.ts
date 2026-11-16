@@ -29,7 +29,28 @@ import {
   type RealPlanetMaps,
 } from './planetMaps';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import type { ProceduralTextureSet } from './textures';
+
+let sharedDracoLoader: DRACOLoader | null = null;
+function getSharedDracoLoader(): DRACOLoader | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedDracoLoader) {
+    sharedDracoLoader = new DRACOLoader();
+    sharedDracoLoader.setDecoderPath('/draco/');
+  }
+  return sharedDracoLoader;
+}
+
+export function getSharedGLTFLoader(): GLTFLoader | null {
+  if (typeof window === 'undefined') return null;
+  const loader = new GLTFLoader();
+  const draco = getSharedDracoLoader();
+  if (draco) {
+    loader.setDRACOLoader(draco);
+  }
+  return loader;
+}
 
 export function tagPart(
   obj: THREE.Object3D,
@@ -3414,6 +3435,33 @@ export function createJWSTModel(tex: ProceduralTextureSet): { group: THREE.Group
   busGroup.add(solarWing);
   tagPart(busGroup, 'jwst-bus');
 
+  // Load official NASA 3D Model asynchronously
+  if (typeof Image !== 'undefined') {
+    const gltfLoader = getSharedGLTFLoader();
+    if (gltfLoader) {
+      gltfLoader.load('/assets/crafts/jwst.glb', (gltf) => {
+        const m = gltf.scene;
+        m.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            tagPart(child, 'jwst-mirror');
+          }
+        });
+        const bbox = new THREE.Box3().setFromObject(m);
+        const sz = bbox.getSize(new THREE.Vector3());
+        const maxD = Math.max(sz.x, sz.y, sz.z) || 1.0;
+        m.scale.setScalar(6.5 / maxD);
+        m.position.set(0, 0, 0);
+        mirrorGroup.visible = false;
+        secGroup.visible = false;
+        shieldGroup.visible = false;
+        busGroup.visible = false;
+        group.add(m);
+      });
+    }
+  }
+
   group.add(mirrorGroup, secGroup, shieldGroup, busGroup);
   return { group };
 }
@@ -3485,6 +3533,33 @@ export function createVoyagerModel(tex: ProceduralTextureSet): { group: THREE.Gr
   scanGroup.add(scanHead);
   scanGroup.add(createStrutBetween(new THREE.Vector3(0, -0.2, -0.4), new THREE.Vector3(4.8, -0.9, -1.8), 0.03, 0.03, dishMat));
   tagPart(scanGroup, 'voy-scan');
+
+  // Load official NASA 3D Model asynchronously
+  if (typeof Image !== 'undefined') {
+    const gltfLoader = getSharedGLTFLoader();
+    if (gltfLoader) {
+      gltfLoader.load('/assets/crafts/voyager.glb', (gltf) => {
+        const m = gltf.scene;
+        m.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            tagPart(child, 'voy-bus');
+          }
+        });
+        const bbox = new THREE.Box3().setFromObject(m);
+        const sz = bbox.getSize(new THREE.Vector3());
+        const maxD = Math.max(sz.x, sz.y, sz.z) || 1.0;
+        m.scale.setScalar(5.5 / maxD);
+        m.position.set(0, 0.4, 0);
+        dishGroup.visible = false;
+        busGroup.visible = false;
+        rtgGroup.visible = false;
+        scanGroup.visible = false;
+        group.add(m);
+      });
+    }
+  }
 
   group.add(dishGroup, busGroup, rtgGroup, scanGroup);
   return { group };
@@ -3742,6 +3817,123 @@ export function createFalcon9Showcase(tex: ProceduralTextureSet): { group: THREE
   tagPart(fairingGroup, 'falcon-fairing');
 
   group.add(s1Group, gridGroup, legsGroup, interGroup, s2Group, fairingGroup);
+  return { group };
+}
+
+export function createISSShowcase(tex: ProceduralTextureSet): { group: THREE.Group } {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const trussMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.82, roughness: 0.28 });
+  const modMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.65, roughness: 0.32 });
+  const sawMat = new THREE.MeshStandardMaterial({
+    color: 0xd97706,
+    emissive: 0x78350f,
+    emissiveIntensity: 0.18,
+    metalness: 0.88,
+    roughness: 0.18,
+    side: THREE.DoubleSide,
+  });
+  const radMat = new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0,
+    metalness: 0.52,
+    roughness: 0.45,
+    side: THREE.DoubleSide,
+  });
+
+  // 1. Integrated Truss Structure (108.5 m length proxy)
+  const trussGroup = new THREE.Group();
+  const mainSpine = new THREE.Mesh(new THREE.BoxGeometry(18.0, 0.42, 0.42), trussMat);
+  trussGroup.add(mainSpine);
+  tagPart(trussGroup, 'iss-truss');
+  group.add(trussGroup);
+
+  // 2. Pressurized Modules (Zarya, Unity, Zvezda, Destiny, Columbus, Kibo, Cupola)
+  const modGroup = new THREE.Group();
+  const usHab = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 4.2, 18), modMat);
+  usHab.rotation.x = Math.PI / 2;
+  usHab.position.z = 1.2;
+  modGroup.add(usHab);
+
+  const rusHab = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 3.8, 16), modMat);
+  rusHab.rotation.x = Math.PI / 2;
+  rusHab.position.z = -2.6;
+  modGroup.add(rusHab);
+
+  const kiboPorch = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.65, 1.2), modMat);
+  kiboPorch.position.set(1.2, 0, 1.4);
+  modGroup.add(kiboPorch);
+
+  const cupola = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), modMat);
+  cupola.rotation.x = Math.PI;
+  cupola.position.set(0, -0.72, 0.6);
+  modGroup.add(cupola);
+  tagPart(modGroup, 'iss-modules');
+  group.add(modGroup);
+
+  // 3. 8 Solar Array Wings (SAWs)
+  const sawGroup = new THREE.Group();
+  [-7.5, 7.5].forEach((tx) => {
+    [-1.8, 1.8].forEach((tz) => {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.05, 5.2), sawMat);
+      wing.position.set(tx, 0, tz);
+      sawGroup.add(wing);
+    });
+  });
+  tagPart(sawGroup, 'iss-solar-arrays');
+  group.add(sawGroup);
+
+  // 4. Ammonia Thermal Radiator Panels
+  const radGroup = new THREE.Group();
+  [-3.8, 3.8].forEach((rx) => {
+    const rad = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.04, 3.6), radMat);
+    rad.rotation.z = Math.PI / 4;
+    rad.position.set(rx, 1.2, -1.8);
+    radGroup.add(rad);
+  });
+  tagPart(radGroup, 'iss-radiators');
+  group.add(radGroup);
+
+  // 5. Canadarm2 Robotic Arm
+  const armGroup = new THREE.Group();
+  const boom1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 8), modMat);
+  boom1.position.set(0.6, 0.8, 0.8);
+  boom1.rotation.z = -Math.PI / 3;
+  const boom2 = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.4, 8), modMat);
+  boom2.position.set(1.8, 1.4, 0.8);
+  boom2.rotation.z = Math.PI / 6;
+  armGroup.add(boom1, boom2);
+  tagPart(armGroup, 'iss-canadarm');
+  group.add(armGroup);
+
+  // Load official NASA 3D Model asynchronously
+  if (typeof Image !== 'undefined') {
+    const gltfLoader = getSharedGLTFLoader();
+    if (gltfLoader) {
+      gltfLoader.load('/assets/crafts/iss.glb', (gltf) => {
+        const model = gltf.scene;
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            tagPart(child, 'iss-modules');
+          }
+        });
+        const bbox = new THREE.Box3().setFromObject(model);
+        const sz = bbox.getSize(new THREE.Vector3());
+        const maxD = Math.max(sz.x, sz.y, sz.z) || 1.0;
+        model.scale.setScalar(18.0 / maxD);
+        model.position.set(0, 0, 0);
+        trussGroup.visible = false;
+        modGroup.visible = false;
+        sawGroup.visible = false;
+        radGroup.visible = false;
+        armGroup.visible = false;
+        group.add(model);
+      });
+    }
+  }
+
   return { group };
 }
 

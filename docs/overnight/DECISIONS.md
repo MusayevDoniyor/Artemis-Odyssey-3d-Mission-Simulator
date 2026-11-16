@@ -124,3 +124,26 @@ This file records all architectural, engineering, and asset decisions made auton
 - **Alternatives Considered**:
   - Two-camera near/far split scene (rejected: higher CPU draw call overhead and complex shadow/lighting synchronization compared to logarithmic depth buffer).
   - Hardcoded scaling multiplier on spacecraft during space flight (rejected: causes B1; true relative scale with tactical beacon when far provides authentic aerospace fidelity).
+
+---
+
+## Decision D5: Official NASA Spacecraft Models, ISS Showcase & Local Draco Compression (Phase 5)
+- **Date**: 2026-11-16T06:40:00+05:00
+- **Decision**:
+  1. **Official NASA Public Domain 3D Models**:
+     - Sourced official NASA 3D Resources Public Domain GLB models for Apollo Lunar Module (716 KB), ISS (476 KB), JWST (1.00 MB), Voyager (285 KB), TDRS (96.8 KB), and optimized Perseverance (1.55 MB).
+     - All models strictly comply with the <3 MB file size limit.
+  2. **Local Draco Decompression Pipeline**:
+     - Sourced and bundled Three.js Draco wasm decoder files (`draco_decoder.wasm`, `draco_decoder.js`, `draco_wasm_wrapper.js`) in `public/draco/`.
+     - Configured `DRACOLoader.setDecoderPath('/draco/')` with zero runtime CDN dependencies.
+  3. **ISS Station Integration**:
+     - Added ISS as the 10th interactive vehicle in `HARDWARE_ORDER` and `HARDWARE_CATALOG` with 5 subsystems (`iss-truss`, `iss-modules`, `iss-solar-arrays`, `iss-radiators`, `iss-canadarm`).
+     - Built `createISSShowcase` procedural fallback + asynchronous official GLTF loader.
+  4. **TDRS Satellite Replacement**:
+     - Replaced fictional HERMES satellite with verified NASA Space Network TDRS satellite specifications (4.5m dual deployable mesh dishes, 35,786 km GEO, S/Ku/Ka-band).
+  5. **Gateway Architecture Honesty**:
+     - Formally marked Gateway as a "paused programme (March 2026 NASA architecture alignment)" in catalogs and badges.
+- **Why**: Fulfills Phase 5 requirements, eliminating crude placeholder meshes and fictional crafts, providing authentic NASA engineering assets and historical accuracy.
+- **Alternatives Considered**:
+  - Procedural approximations for ISS and Lunar Module (rejected: NASA's official 3D CAD assets provide far higher geometric fidelity and historical accuracy while staying well under 1 MB).
+  - Using Google/CDN-hosted Draco wasm (rejected: breaks offline self-contained operation and violates zero-CDN constraints).

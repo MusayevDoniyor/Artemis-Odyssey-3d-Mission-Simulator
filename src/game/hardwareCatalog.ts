@@ -9,7 +9,8 @@ export type HardwareShowcaseId =
   | 'rover'
   | 'outpost'
   | 'saturn-v'
-  | 'falcon-9';
+  | 'falcon-9'
+  | 'iss';
 
 export type EngineeringInteractionKind =
   | 'rs25-engines'
@@ -92,6 +93,7 @@ export const HARDWARE_ORDER: HardwareShowcaseId[] = [
   'outpost',
   'saturn-v',
   'falcon-9',
+  'iss',
 ];
 
 export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
@@ -452,20 +454,20 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
 
   satellite: {
     id: 'satellite',
-    shortLabel: 'HERMES Relay',
-    title: 'HERMES Space Weather & Relay Satellite',
-    subtitle: 'Kapton Instrument Bus · Articulated PV Wings · Ka-Band & Mesh Dishes',
+    shortLabel: 'TDRS Relay',
+    title: 'Tracking and Data Relay Satellite (TDRS)',
+    subtitle: '4.5 m Dual Mesh Dishes · S/Ku/Ka-Band · 35,786 km Geosynchronous Orbit',
     summary:
-      'Orbital sentinel combining NASA HERMES space-weather particle detectors with a TDRS-class high-gain telemetry relay bus.',
+      'NASA Space Network flagship communications satellite providing continuous high-bandwidth two-way data and telemetry coverage for human spaceflight (ISS, Orion) and robotic science missions.',
     scenarioDistinction:
-      'Conceptual hybrid combining real NASA HERMES radiation-weather payload instruments with a simulator lunar communications relay bus.',
-    modelHonestyTag: 'Educational Hybrid Model',
+      'Official NASA SCaN Space Network TDRS satellite specifications; 3D geometry represents the Boeing 601/702 flight bus.',
+    modelHonestyTag: 'NASA Hardware Specs',
     defaultCameraDist: 8.2,
     focusY: 0,
     overviewSpecs: [
-      { label: 'Role', value: 'Space Weather + Relay' },
-      { label: 'Orbit', value: 'Gateway / NRHO' },
-      { label: 'Sensors', value: 'Fluxgate Magnetometer' },
+      { label: 'Dual Dishes', value: '4.5 m deployable mesh' },
+      { label: 'Orbit', value: '35,786 km GEO' },
+      { label: 'Frequencies', value: 'S, Ku, Ka-Band' },
     ],
     parts: [
       {
@@ -1413,11 +1415,11 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
     id: 'outpost',
     shortLabel: 'Base Camp',
     title: 'Artemis & Mars Modular Base Camp',
-    subtitle: 'Conceptual Surface Outpost · Geodesic Habitat · ISRU & Kilopower',
+    subtitle: 'Conceptual Surface Outpost · Geodesic Habitat · Paused Gateway Programme (March 2026)',
     summary:
-      'Conceptual sustained-presence surface habitat demonstrating pressurized modules, regolith radiation shielding, ISRU propellant production, and nuclear/solar power.',
+      'Conceptual sustained-presence surface habitat demonstrating pressurized modules, regolith radiation shielding, and ISRU. Note: Lunar Gateway orbital platform is designated as a paused programme (March 2026 NASA architecture alignment) while Artemis prioritizes direct human lunar landing and surface operations.',
     scenarioDistinction:
-      'Conceptual future Moon-to-Mars architecture informed by NASA OSDR shielding studies & Kilopower/MOXIE technology demonstrators.',
+      'Conceptual future Moon-to-Mars architecture informed by NASA OSDR shielding studies & Kilopower/MOXIE technology demonstrators. Gateway orbital staging is officially noted as a paused programme.',
     modelHonestyTag: 'Conceptual Architecture',
     defaultCameraDist: 23,
     focusY: 2.8,
@@ -2106,6 +2108,233 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
         cameraFocusDist: 14,
         cameraFocusPitch: 0.28,
         interactionKind: 'stage-sep',
+      },
+    ],
+  },
+
+  iss: {
+    id: 'iss',
+    shortLabel: 'ISS Station',
+    title: 'International Space Station (ISS)',
+    subtitle: '108.5 m Truss · 450 t Mass · 120 kW Solar Power · 418 km LEO',
+    summary:
+      'International modular space station in Low Earth Orbit serving as a permanent microgravity laboratory and testbed for deep-space life support and technology since 1998.',
+    scenarioDistinction:
+      'Official NASA / ESA / JAXA / Roscosmos orbital laboratory specifications; 3D geometry represents the full operational assembly.',
+    modelHonestyTag: 'NASA Hardware Specs',
+    defaultCameraDist: 28,
+    focusY: 0,
+    overviewSpecs: [
+      { label: 'Truss Span', value: '108.5 m (356 ft)' },
+      { label: 'Orbit Altitude', value: '~418 km (51.6° inc)' },
+      { label: 'Total Mass', value: '~450,000 kg' },
+    ],
+    parts: [
+      {
+        id: 'iss-truss',
+        name: 'Integrated Truss Structure (ITS) & SARJ Gimbals',
+        shortName: 'Truss & SARJ',
+        role: 'Structural Backbone, Thermal Bus & Power Routing',
+        specLabel: '108.5 m Aluminum Truss · Solar Alpha Rotary Joints',
+        badge: 'REAL DATA',
+        honestyNote: 'NASA ISS Integrated Truss Structure specifications.',
+        fact: 'The 108.5-meter Integrated Truss Structure acts as the station backbone, routing electrical power, coolant lines, and data between modules and solar arrays.',
+        mainFunction:
+          'Houses thermal radiator rotary joints, primary avionics, ammonia coolant pipes, and mobile transporter tracks for Canadarm2.',
+        dimensions: '108.5 m length · 4.5 m cross-section',
+        engineeringSpecs: [
+          { label: 'Material', value: 'Al-Li truss framework' },
+          { label: 'SARJ Joints', value: '360° continuous rotation' },
+          { label: 'Coolant Loop', value: 'Dual closed ammonia lines' },
+        ],
+        levels: {
+          level1What: 'The giant metal backbone that holds the entire space station together.',
+          level2How: 'Carries power cables, coolant tubes, and computer networks from the solar wings to the science labs.',
+          level3Engineering:
+            '108.5-meter segmented aluminum-lithium truss with dual Solar Alpha Rotary Joints (SARJs) rotating continuously to track the Sun across 16 orbits per day.',
+        },
+        missionRelevance: 'Provides mounting and utility transport for all external experiments and station power systems.',
+        explodeAxis: [0, 2.8, 0],
+        connections: ['iss-modules', 'iss-solar-arrays', 'iss-radiators'],
+        quizPrompt: 'Click the 108.5-meter Integrated Truss Structure backbone.',
+        quizQuestion: {
+          prompt: 'What does the ISS Integrated Truss Structure provide?',
+          options: [
+            'Living quarters for the crew',
+            'Structural backbone and power/cooling routing',
+            'Rocket engines for interplanetary flight',
+          ],
+          correctIndex: 1,
+          explanation:
+            'The 108.5m truss is the structural backbone of the ISS, mounting the solar wings, radiators, and routing power/coolant.',
+        },
+        cameraFocusDist: 22,
+        cameraFocusPitch: 0.25,
+        interactionKind: 'hab-shield',
+      },
+      {
+        id: 'iss-modules',
+        name: 'Pressurized Module Cluster (Destiny, Kibo, Columbus, Cupola)',
+        shortName: 'Hab & Lab Modules',
+        role: 'Pressurized Living Volume & Microgravity Science Labs',
+        specLabel: '388 m³ Living Volume · 16 Pressurized Modules · Cupola 360°',
+        badge: 'REAL DATA',
+        honestyNote: 'NASA/ESA/JAXA habitable module dimensions.',
+        fact: 'The pressurized modules maintain a 1 atmosphere (101.3 kPa) sea-level Earth air mix (78% N2, 21% O2) where astronauts conduct over 300 simultaneous science experiments.',
+        mainFunction:
+          'Houses human crew, environmental life support systems, laboratory experiment racks, and the 7-window Cupola observatory.',
+        dimensions: '72.8 m pressurized length · 4.2 m outer diameter modules',
+        engineeringSpecs: [
+          { label: 'Atmosphere', value: '101.3 kPa (21% O2, 78% N2)' },
+          { label: 'Habitable Vol', value: '388 m³ living space' },
+          { label: 'Cupola Windows', value: '7 fused silica/borosilicate panes' },
+        ],
+        levels: {
+          level1What: 'The interconnected metal cans where astronauts live, sleep, and do science in space.',
+          level2How: 'Maintains fresh air, comfortable temperatures, and water recycling while shielding crew from radiation.',
+          level3Engineering:
+            'Welded aluminum micrometeoroid/orbital debris (MMOD) shielded cylinders with International Standard Payload Racks (ISPRs) and Node mating adapters.',
+        },
+        missionRelevance: 'Enables long-duration human spaceflight research required before embarking on multi-year journeys to Mars.',
+        explodeAxis: [0, 0, 3.2],
+        connections: ['iss-truss', 'iss-canadarm'],
+        quizPrompt: 'Click the central pressurized living and laboratory modules.',
+        quizQuestion: {
+          prompt: 'What atmospheric composition and pressure is kept inside the ISS?',
+          options: [
+            'Pure oxygen at 34 kPa',
+            'Earth sea-level air at 101.3 kPa',
+            'Carbon dioxide at 50 kPa',
+          ],
+          correctIndex: 1,
+          explanation:
+            'The ISS uses a standard Earth sea-level atmosphere of 101.3 kPa (14.7 psi) with 78% nitrogen and 21% oxygen.',
+        },
+        cameraFocusDist: 14,
+        cameraFocusPitch: 0.35,
+        interactionKind: 'hab-shield',
+      },
+      {
+        id: 'iss-solar-arrays',
+        name: '8 Solar Array Wings (SAWs) & Silicon Photovoltaics',
+        shortName: '120 kW Solar Arrays',
+        role: 'Primary Station Electrical Power Generation',
+        specLabel: '34 m × 10.7 m per Wing · 120 kW Continuous · 262,400 Cells',
+        badge: 'REAL DATA',
+        honestyNote: 'NASA Glenn Research Center ISS power architecture.',
+        fact: 'The 8 massive solar wings contain over 262,000 solar cells, converting sunlight into 120 kilowatts of direct current electricity stored in lithium-ion batteries.',
+        mainFunction:
+          'Powers all life support systems, computers, science laboratory freezers, and communication transmitters 24 hours a day.',
+        dimensions: '34 m length × 10.7 m width per wing (8 wings total)',
+        engineeringSpecs: [
+          { label: 'Total Power', value: '120 kW continuous' },
+          { label: 'Cell Technology', value: 'Silicon solar cells (supplemented by iROSA)' },
+          { label: 'Battery Storage', value: 'Lithium-ion battery ORUs' },
+        ],
+        levels: {
+          level1What: 'Giant gold-colored wings that capture sunlight to power the station.',
+          level2How: 'Tracks the Sun as the station flies around Earth, storing extra energy in batteries for when the station passes through Earth shadow.',
+          level3Engineering:
+            'Deployable mast blankets delivering 160V DC regulated bus power converted down to 124V secondary distribution across the US and international segments.',
+        },
+        missionRelevance: 'Supplies continuous electricity for critical life support and science operations.',
+        explodeAxis: [4.5, 0, 0],
+        connections: ['iss-truss'],
+        quizPrompt: 'Click the 120 kW photovoltaic solar array wings.',
+        quizQuestion: {
+          prompt: 'What is the total continuous power output of the ISS solar arrays?',
+          options: ['~12 kW', '~120 kW', '~1,200 kW'],
+          correctIndex: 1,
+          explanation:
+            'The 8 main Solar Array Wings generate approximately 120 kilowatts of power during sunlit portions of each orbit.',
+        },
+        cameraFocusDist: 20,
+        cameraFocusPitch: 0.22,
+        interactionKind: 'solar-array',
+      },
+      {
+        id: 'iss-radiators',
+        name: 'External Active Thermal Control Ammonia Radiators',
+        shortName: 'Ammonia Radiators',
+        role: 'Station Waste Heat Rejection',
+        specLabel: 'Liquid Ammonia Loops · Honeycomb Panels · 70 kW Heat Rejection',
+        badge: 'REAL DATA',
+        honestyNote: 'NASA Active Thermal Control System (ATCS) specs.',
+        fact: 'Because there is no air in space to carry heat away, liquid ammonia circulates through the station to collect waste heat and radiate it as infrared into deep space.',
+        mainFunction:
+          'Rejects heat produced by electronics, experiments, and crew bodies to keep station temperatures between 18°C and 26°C.',
+        dimensions: '3 panels per wing · 24 m deployed span',
+        engineeringSpecs: [
+          { label: 'Coolant', value: 'Anhydrous ammonia (NH3)' },
+          { label: 'Heat Rejection', value: '~70 kW thermal' },
+          { label: 'Cabin Loop', value: 'Internal water heat exchangers' },
+        ],
+        levels: {
+          level1What: 'Large white cooling panels that keep the space station from overheating.',
+          level2How: 'Pumps cold ammonia through metal panels that glow in invisible infrared light to radiate heat away into space.',
+          level3Engineering:
+            'Active Thermal Control System with dual independent external ammonia loops operating at -40°C to +40°C, isolated from crew compartments via titanium interface heat exchangers.',
+        },
+        missionRelevance: 'Without thermal radiators, heat from electronics and crew would cook the station interior within hours.',
+        explodeAxis: [0, 0, -3.5],
+        connections: ['iss-truss'],
+        quizPrompt: 'Click the white ammonia cooling radiator panels.',
+        quizQuestion: {
+          prompt: 'Why is ammonia used in the external radiator loops of the ISS?',
+          options: [
+            'It does not freeze at -77°C and transfers heat efficiently',
+            'It is non-toxic to breath in an emergency',
+            'It serves as rocket fuel for re-boosting the station',
+          ],
+          correctIndex: 0,
+          explanation:
+            'Ammonia has a very low freezing point (-77.7°C) and high specific heat, making it ideal for the extreme thermal vacuum of space.',
+        },
+        cameraFocusDist: 18,
+        cameraFocusPitch: 0.35,
+        interactionKind: 'thermal-shield',
+      },
+      {
+        id: 'iss-canadarm',
+        name: 'Canadarm2 (Space Station Remote Manipulator System)',
+        shortName: 'Canadarm2 Robotic Arm',
+        role: 'Heavy Payload Handling, Station Assembly & EVA Assistance',
+        specLabel: '17.6 m Length · 7 Motorized Joints · 116,000 kg Payload Capacity',
+        badge: 'REAL DATA',
+        honestyNote: 'Canadian Space Agency (CSA) Canadarm2 specifications.',
+        fact: 'Canadarm2 has 7 motorized joints and symmetrical hands at both ends, allowing it to inchworm end-over-end across PDGF fixtures all over the station exterior.',
+        mainFunction:
+          'Grapples visiting cargo spaceships, moves heavy replacement battery boxes, and positions spacewalking astronauts during exterior repairs.',
+        dimensions: '17.6 m (57.7 ft) total length · 35 cm diameter carbon composite boom',
+        engineeringSpecs: [
+          { label: 'Joints', value: '7 motorized rotary joints' },
+          { label: 'Payload Max', value: '116,000 kg (256,000 lb)' },
+          { label: 'Control', value: 'Robotic workstation in Cupola / Destiny' },
+        ],
+        levels: {
+          level1What: 'A giant robotic arm that catches spaceships and helps astronauts on spacewalks.',
+          level2How: 'Controlled by astronauts looking out the Cupola windows using joysticks and cameras.',
+          level3Engineering:
+            'Carbon-fiber thermoplastic composite boom with Latching End Effectors (LEEs) capable of bidirectional power, data, and video transmission.',
+        },
+        missionRelevance: 'Crucial for capturing visiting cargo vehicles (Cygnus, HTV, Dragon) and performing external station repairs.',
+        explodeAxis: [-2.2, 1.8, 0],
+        connections: ['iss-modules'],
+        quizPrompt: 'Click the 17.6-meter Canadarm2 robotic arm.',
+        quizQuestion: {
+          prompt: 'How does Canadarm2 relocate around the ISS exterior?',
+          options: [
+            'It has wheels that drive along the truss',
+            'It moves end-over-end like an inchworm between anchor fixtures',
+            'It must be disconnected by spacewalkers and carried',
+          ],
+          correctIndex: 1,
+          explanation:
+            'Canadarm2 has identical latching hands on both ends, allowing it to walk end-over-end across Power Data Grapple Fixtures.',
+        },
+        cameraFocusDist: 15,
+        cameraFocusPitch: 0.3,
+        interactionKind: 'hab-shield',
       },
     ],
   },

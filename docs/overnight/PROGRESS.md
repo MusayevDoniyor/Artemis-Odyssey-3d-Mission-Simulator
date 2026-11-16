@@ -36,10 +36,10 @@
   - [x] 4.3 Web Audio buses (master, sfx, music) strictly under budget (<1.5 MB per file; `rocket-launch-roar.ogg` is 947 KB, `rocket-launch-distant.ogg` is 1.08 MB).
   - [x] 4.4 Verify and tag `overnight-phase-4-green`.
 
-- [ ] **PHASE 5: Capsule, spacecraft and other hardware**
-  - [ ] 5.1 Research & source: Orion + ESM (solar wings, RCS), Apollo LM, concept lander, VIPER / Perseverance, JWST, Voyager, ISS, satellites.
-  - [ ] 5.2 Materials (MLI gold foil, thermal tiles, radiators) and articulating nodes.
-  - [ ] 5.3 Verify and tag `overnight-phase-5-green`.
+- [x] **PHASE 5: Capsule, spacecraft and other hardware**
+  - [x] 5.1 Research & source: Orion + ESM (solar wings, RCS), Apollo LM, concept lander, VIPER / Perseverance, JWST, Voyager, ISS, satellites.
+  - [x] 5.2 Materials (MLI gold foil, thermal tiles, radiators) and articulating nodes.
+  - [x] 5.3 Verify and tag `overnight-phase-5-green`.
 
 - [ ] **PHASE 6: Launch site, facilities and surroundings**
   - [ ] 6.1 Research LC-39B layout, flame trench, Mobile Launcher umbilicals, VAB in background (160m at correct distance/bearing).

@@ -22,3 +22,9 @@ All production assets are optimized (`gltf-transform`, WebP compression, audio n
 | 2026-11-16 | Saturn V Launch Vehicle | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Saturn%20V/Saturn%20V.glb | GLB / 927 KB | Public Domain (NASA) |
 | 2026-11-16 | STS-82 Launch Audio Roar | https://archive.org/download/NasaLaunchAudio/sts-82_launch.ogg | OGG / 947 KB | Public Domain (NASA / Internet Archive) |
 | 2026-11-16 | STS-61 Distant Launch Audio | https://archive.org/download/NasaLaunchAudio/sts-61_launch.ogg | OGG / 1.08 MB | Public Domain (NASA / Internet Archive) |
+| 2026-11-16 | Apollo Lunar Module | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Apollo%2011%20Lunar%20Module/Apollo%2011%20Lunar%20Module.glb | GLB / 716 KB | Public Domain (NASA) |
+| 2026-11-16 | International Space Station | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/International%20Space%20Station%20(ISS)/International%20Space%20Station%20(ISS).glb | GLB / 476 KB | Public Domain (NASA) |
+| 2026-11-16 | James Webb Space Telescope | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/James%20Webb%20Space%20Telescope/James%20Webb%20Space%20Telescope.glb | GLB / 1.00 MB | Public Domain (NASA) |
+| 2026-11-16 | TDRS Communication Satellite | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Tracking%20and%20Data%20Relay%20Satellite%20(TDRS)/Tracking%20and%20Data%20Relay%20Satellite%20(TDRS).glb | GLB / 96.8 KB | Public Domain (NASA) |
+| 2026-11-16 | Voyager 1 & 2 Probe | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Voyager/Voyager.glb | GLB / 285 KB | Public Domain (NASA) |
+| 2026-11-16 | Perseverance Mars Rover | https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Perseverance/Perseverance.glb | GLB / 1.55 MB (optimized) | Public Domain (NASA) |

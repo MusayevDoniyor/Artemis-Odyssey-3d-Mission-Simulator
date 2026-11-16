@@ -56,13 +56,11 @@ The following fonts are bundled locally under the SIL Open Font License 1.1 (OFL
 - **NASA LRO & MGS Planetary Datasets (Public Domain)**:
   - Moon LROC WAC mosaic and LOLA altimetry (NASA GSFC / Arizona State University).
   - Mars MGS MOC / Viking MDIM 2.1 mosaic (NASA JPL / Malin Space Science Systems).
-- **NASA 3D Resources — Apollo Saturn V Launch Vehicle (Public Domain)**:
-  - 3D model of the Apollo Saturn V launch vehicle.
-  - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Saturn%20V)
+- **NASA 3D Resources — Spacecraft & Launch Vehicles (Public Domain)**:
+  - Official 3D models of Apollo Saturn V, Apollo 11 Lunar Module, International Space Station (ISS), James Webb Space Telescope (JWST), Voyager 1 & 2, Tracking and Data Relay Satellite (TDRS), and Perseverance Mars Rover.
+  - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources)
   - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
-- **NASA Space Launch System Audio Recordings (Public Domain)**:
-  - Authentic acoustic launch recordings of Space Shuttle missions (STS-82 twin solid rocket boosters + RS-25 cluster acoustic roar, and STS-61 distant acoustic recording).
-  - Source: NASA Audio Collection / Internet Archive (https://archive.org/details/NasaLaunchAudio)
-  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
-  - Source: NASA 3D Resources (https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Models/Saturn%20V)
-  - License: Public Domain (U.S. Government Work, 17 U.S.C. § 105).
+- **Google Draco 3D Geometry Decompression (Apache 2.0)**:
+  - Local Draco WebAssembly decoder files (`public/draco/`).
+  - Source: Google Draco (https://github.com/google/draco)
+  - License: Apache License, Version 2.0.

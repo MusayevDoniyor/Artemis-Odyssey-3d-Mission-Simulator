@@ -528,8 +528,36 @@ export const SPACECRAFT_CATALOG_SI: Record<string, SpacecraftSpecSI> = {
     thrustN: 2.5, // Hall-effect electric propulsion (approximation)
     ispVacuumS: 2600,
     provenance: 'SCIENTIFIC MODEL',
-    approximationNote: 'Gateway dimensions/mass combine NASA PPE + HALO + i-HAB published baseline concepts.',
+    approximationNote: 'Gateway dimensions/mass combine NASA PPE + HALO + i-HAB published baseline concepts. Note: designated as a paused programme (March 2026 NASA architecture update).',
     sourceCitation: 'NASA Lunar Gateway Program Overview',
+  },
+  tdrs: {
+    id: 'tdrs',
+    name: 'Tracking and Data Relay Satellite (TDRS)',
+    heightM: 4.2,
+    diameterM: 2.8,
+    wingspanM: 14.8, // Across deployed dual 4.5m mesh reflectors and solar arrays
+    dryMassKg: 1_780,
+    propellantMassKg: 1_620,
+    wetMassKg: 3_400,
+    thrustN: 440,
+    ispVacuumS: 310,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA SCaN TDRS Spacecraft Fleet Reference',
+  },
+  iss: {
+    id: 'iss',
+    name: 'International Space Station (ISS)',
+    heightM: 72.8, // Pressurized module axis length
+    diameterM: 108.5, // Integrated Truss Structure span
+    wingspanM: 73.0, // Across Solar Array Wings
+    dryMassKg: 440_000,
+    propellantMassKg: 10_000,
+    wetMassKg: 450_000,
+    thrustN: 0,
+    ispVacuumS: 0,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA International Space Station Facts and Figures (NP-2022-02-001-JSC)',
   },
   'hermes-relay': {
     id: 'hermes-relay',

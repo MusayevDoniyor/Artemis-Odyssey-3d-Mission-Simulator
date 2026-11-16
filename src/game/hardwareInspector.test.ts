@@ -34,6 +34,13 @@ test('SLS Block 1, Saturn V, and Falcon 9 define required aerospace subsystems a
     ['falcon-stage1', 'falcon-grid-fins', 'falcon-landing-legs', 'falcon-interstage', 'falcon-stage2', 'falcon-fairing']
   );
 
+  const iss = HARDWARE_CATALOG.iss;
+  assert.ok(iss);
+  assert.deepEqual(
+    iss.parts.map((p) => p.id),
+    ['iss-truss', 'iss-modules', 'iss-solar-arrays', 'iss-radiators', 'iss-canadarm']
+  );
+
   for (const craftId of HARDWARE_ORDER) {
     const spec = HARDWARE_CATALOG[craftId];
     assert.ok(spec.overviewSpecs.length >= 3);

@@ -128,3 +128,25 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
   - **Authentic NASA Audio**: Sourced and integrated STS-82 twin SRB + SSME launch recording (`public/audio/rocket-launch-roar.ogg`) and distant pad acoustic recording (`public/audio/rocket-launch-distant.ogg`) from Internet Archive Public Domain collections.
   - **Mechanical SFX Polish**: Upgraded `playStageSep()` with heavy pyrotechnic 120->36 Hz low-end thud + pneumatic venting hiss + metallic ping; added `playRcsPuff()` for attitude control thruster firing.
 
+## 2026-11-16T06:42:00+05:00 - Phase 5 Completed: Capsule, Spacecraft and Other Hardware
+- **Phase Objective**: Integrate official NASA Public Domain 3D models for all major spacecraft, capsules, rovers, and satellites, replacing crude procedural placeholders; build local Draco decompression pipeline; add International Space Station (ISS) showcase with 5 subsystems; update Gateway status honestly to reflect current NASA programme architecture.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 87 tests passing, 0 failing (duration 1051 ms).
+  - `npm run build`: built in 1.35s (dist/index.html 1.18 kB, dist/assets/index.css 114.63 kB, dist/assets/index.js 1658.89 kB).
+  - Asset size limits: all GLBs strictly < 3 MB (`apollo_lunar_module.glb` 716 KB, `iss.glb` 476 KB, `jwst.glb` 1.00 MB, `perseverance.glb` 1.55 MB, `tdrs.glb` 96.8 KB, `voyager.glb` 285 KB).
+- **Artifacts Generated**:
+  - Research docs:
+    - `docs/overnight/research/orion_and_esm.md`: Detailed engineering breakdown of Orion MPCV, European Service Module, solar array wings, AJ10 engine, LAS, and ICPS.
+    - `docs/overnight/research/apollo_lunar_module.md`: Ascent and Descent stage structure, DPS throttling, APS, RCS quads, and landing gear.
+    - `docs/overnight/research/spacecraft_hardware.md`: James Webb Space Telescope, Voyager 1 & 2, International Space Station, TDRS Space Network relay, and Gateway architecture alignment.
+  - Test suites:
+    - `src/sim/models/spacecraftHardware.test.ts`: 5 unit tests covering Orion/ESM specs, ISS 108.5m truss and 5 subsystems, TDRS satellite specifications, Gateway paused programme status, and completeness of all 10 vehicles in `HARDWARE_ORDER`.
+- **Features Implemented & Verified**:
+  - **Official NASA 3D Models**: Downloaded and integrated official NASA 3D Resources Public Domain GLB assets for Apollo LM, ISS, JWST, Voyager, TDRS, and Perseverance.
+  - **Local Draco Decompression**: Bundled Three.js Draco wasm decoder files in `public/draco/` with zero runtime external CDN requests.
+  - **ISS Showcase**: Built `createISSShowcase` and added ISS to `HARDWARE_ORDER` and `HARDWARE_CATALOG` with 5 subsystems (`iss-truss`, `iss-modules`, `iss-solar-arrays`, `iss-radiators`, `iss-canadarm`).
+  - **TDRS Satellite**: Replaced fictional relay with official NASA Space Network TDRS satellite specs.
+  - **Gateway Status**: Updated Gateway to "paused programme" reflecting March 2026 NASA architecture alignment.
+
+
