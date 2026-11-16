@@ -198,3 +198,31 @@ This file records all architectural, engineering, and asset decisions made auton
   - Only slowing down visual wheel spin animation in REAL_SPEED (rejected: fails simulation truthfulness; physical motion must match telemetry).
   - Delaying velocity zeroing by one frame (rejected: unstable; creates physics glitches if user continues providing inputs while crashed; latching dedicated impact telemetry fields is cleanly immutable).
 
+---
+
+## Decision D8: Rebuilt Vehicle Inspector, Multi-Stage Exploded Views, Guided Systems Tours & 100% Node Coverage Audit (Phase 8)
+- **Date**: 2026-11-16T07:18:00+05:00
+- **Decision**:
+  1. **Multi-Stage Exploded Views along Assembly Axes**:
+     - Added quick explosion preset triggers (`0%` Assembled, `35%` Separated, `100%` Full Exploded) alongside continuous range slider in `VehicleInspectorOverlay.tsx`.
+     - Subsystems displace strictly along verified physical manufacturing and mate/demate axes (e.g. radial outward for solid boosters, axial downward for core stages, axial upward for upper stages, radial blooming for payload fairings and solar wings).
+     - Added `this.issModel.group` to `SpaceSceneManager.ts` `applyExplodeAndIsolate` traversal so ISS explodes consistently with all other crafts.
+  2. **Automated Node Coverage Audit**:
+     - Created `src/sim/models/vehicleInspectorAudit.test.ts` asserting 100% node coverage across all 10 vehicles in `HARDWARE_ORDER` (45 subsystems).
+     - Zero empty or placeholder parts ("Part 1" banned). Every subsystem contains verified dimensions, main function, 3+ technical specs, 3-level educational copy, interactive multiple-choice quiz questions, and primary aerospace citations.
+  3. **Guided Systems Tours**:
+     - Integrated 5 linear guided systems walkthroughs in `src/game/hardwareInspector.ts`:
+       - *How SLS Works* (5 steps: Boosters -> Core -> RS-25 -> ICPS -> Orion)
+       - *How Orion Keeps Crew Alive* (3 steps: Cabin & ECLSS -> ESM -> LAS)
+       - *How LM Landed on the Moon* (3 steps: DPS -> Ascent Stage -> RCS)
+       - *How Perseverance Samples Mars* (4 steps: MMRTG -> Rocker-Bogie -> Coring Drill -> HGA)
+       - *How ISS Sustains Human Life in LEO* (5 steps: Integrated Truss -> Solar Wings -> Pressurized Labs -> Radiators -> Canadarm2)
+     - Added Guided Tour Banner in `VehicleInspectorOverlay.tsx` with step counter, narrative card, camera focus zoom, next/previous step navigation, and seamless quiz launch upon tour completion.
+  4. **Primary Aerospace Source Citations**:
+     - Added `sources` array to each craft and `sourceCitation` attribution badge on subsystem cards, citing official NASA, ESA, and SpaceX technical manuals (e.g. NASA SLS ESD 30000, NASA SP-4029, Grumman LM-5 Handbook, NASA JPL Perseverance Press Kit, NASA ISS Reference Guide).
+- **Why**: Fulfills Phase 8 requirements for rigorous aerospace education, eliminating crude models, placeholder text, and unguided exploration in favor of authentic engineering depth and guided discovery.
+- **Alternatives Considered**:
+  - Radial explosion in all directions regardless of vehicle (rejected: violates physical reality; rockets assemble and separate axially, not in random 3D spheroids).
+  - Standalone modal popups for guided tours (rejected: keeps player connected to the real-time 3D interactive model with synchronous camera moves and subsystem highlights).
+
+

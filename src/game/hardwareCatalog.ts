@@ -67,6 +67,7 @@ export interface HardwareSubPart {
   cameraFocusPitch?: number;
   interactionKind: EngineeringInteractionKind;
   unlockNoteId?: string;
+  sourceCitation?: string;
 }
 
 export interface HardwareCraftSpec {
@@ -81,6 +82,7 @@ export interface HardwareCraftSpec {
   focusY: number;
   overviewSpecs: EngineeringSpecRow[];
   parts: HardwareSubPart[];
+  sources?: string[];
 }
 
 export const HARDWARE_ORDER: HardwareShowcaseId[] = [
@@ -113,6 +115,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Total Height', value: '98.3 m' },
       { label: 'Liftoff Thrust', value: '39.1 MN' },
       { label: 'TLI Payload', value: '> 27 t' },
+    ],
+    sources: [
+      "NASA SLS Mission Planner's Guide (ESD 30000)",
+      "NASA Marshall Space Flight Center SLS Fact Sheet",
     ],
     parts: [
       {
@@ -469,6 +475,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Orbit', value: '35,786 km GEO' },
       { label: 'Frequencies', value: 'S, Ku, Ka-Band' },
     ],
+    sources: [
+      "NASA Space Network Users' Guide (SNUG)",
+      "NASA TDRS Constellation Fact Sheet",
+    ],
     parts: [
       {
         id: 'sat-bus',
@@ -633,6 +643,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Primary Aperture', value: '6.5 m' },
       { label: 'Cold Side Temp', value: '-233 °C' },
       { label: 'Orbit Distance', value: '1.5M km (L2)' },
+    ],
+    sources: [
+      'NASA Goddard JWST Technical Fact Sheet',
+      'ESA Webb Science Mission Specifications',
     ],
     parts: [
       {
@@ -843,6 +857,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Launch Mass', value: '721.9 kg' },
       { label: 'Power Source', value: '3× Pu-238 RTG' },
     ],
+    sources: [
+      'NASA JPL Voyager Mission Technical Description',
+      'NASA SP-4225: To The Outer Planets',
+    ],
     parts: [
       {
         id: 'voy-dish',
@@ -1052,6 +1070,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Descent Engine', value: '46.7 kN' },
       { label: 'Trainer Gravity', value: '0.165g / 0.38g' },
     ],
+    sources: [
+      'Grumman Apollo 11 Lunar Module Operations Handbook (LM 5)',
+      'NASA SP-4029 Apollo by the Numbers',
+    ],
     parts: [
       {
         id: 'lm-descent',
@@ -1214,6 +1236,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Rover Mass', value: '430 kg' },
       { label: 'Max Real Speed', value: '0.20 m/s' },
       { label: 'TRIDENT Drill', value: '100 cm depth' },
+    ],
+    sources: [
+      'NASA JPL Perseverance Mars 2020 Press Kit',
+      'NASA VIPER Rover Instrumentation Architecture',
     ],
     parts: [
       {
@@ -1428,6 +1454,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Regolith Shield', value: '-62% Dose (OSD-489)' },
       { label: 'Architecture', value: 'Conceptual Moon/Mars' },
     ],
+    sources: [
+      'NASA Lunar Living & Working Architecture Study',
+      'NASA Kilopower & MOXIE Demonstrator Reports',
+    ],
     parts: [
       {
         id: 'base-habitat',
@@ -1593,6 +1623,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Payload to LEO', value: '140,000 kg (140 t)' },
       { label: 'Payload to TLI', value: '48,600 kg (Apollo CSM/LM)' },
       { label: 'Launch Pad', value: 'KSC LC-39A / LC-39B' },
+    ],
+    sources: [
+      'NASA SP-4029: Apollo by the Numbers',
+      'Saturn V Flight Manual SA-503 (MSFC)',
     ],
     parts: [
       {
@@ -1862,6 +1896,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Payload to GTO', value: '8,300 kg (Expendable) / 5,500 kg (Reusable)' },
       { label: 'Booster Recovery', value: 'Autonomous Spaceport Drone Ship (ASDS) / RTLS' },
     ],
+    sources: [
+      "SpaceX Falcon 9 Launch Vehicle User's Guide (Rev 3.0)",
+      'NASA Launch Services Program (LSP) Falcon 9 Advisory',
+    ],
     parts: [
       {
         id: 'falcon-stage1',
@@ -2128,6 +2166,10 @@ export const HARDWARE_CATALOG: Record<HardwareShowcaseId, HardwareCraftSpec> = {
       { label: 'Truss Span', value: '108.5 m (356 ft)' },
       { label: 'Orbit Altitude', value: '~418 km (51.6° inc)' },
       { label: 'Total Mass', value: '~450,000 kg' },
+    ],
+    sources: [
+      'NASA Reference Guide to the International Space Station',
+      'ISS On-Orbit Assembly Technical Documentation',
     ],
     parts: [
       {

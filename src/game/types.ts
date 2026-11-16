@@ -576,6 +576,8 @@ export interface InspectorUiState {
   propulsionThrottlePct?: number;
   focusNonce?: number;
   doubleClickZoom?: boolean;
+  activeTourId?: string | null;
+  tourStepIndex?: number;
 }
 
 export interface LandedPose {

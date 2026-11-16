@@ -52,12 +52,12 @@
   - [x] 7.3 Rover speed fix (B3): real scientific speed + time compression, rocker-bogie suspension with ground raycasts.
   - [x] 7.4 Verify and tag `overnight-phase-7-green`.
 
-- [ ] **PHASE 8: Vehicle Inspector (exploded view, every part explained)**
-  - [ ] 8.1 Rebuild inspector in design tokens with multi-stage exploded views along assembly axes.
-  - [ ] 8.2 Part deep-dives: real names, function descriptions, verified facts, sources for every visible node.
-  - [ ] 8.3 Automated node coverage audit (no empty parts).
-  - [ ] 8.4 Guided systems tours and interactive quizzes.
-  - [ ] 8.5 Verify and tag `overnight-phase-8-green`.
+- [x] **PHASE 8: Vehicle Inspector (exploded view, every part explained)**
+  - [x] 8.1 Rebuild inspector in design tokens with multi-stage exploded views along assembly axes (presets 0%, 35%, 100%).
+  - [x] 8.2 Part deep-dives: real names, function descriptions, verified facts, sources for every visible node.
+  - [x] 8.3 Automated node coverage audit (100% coverage, zero placeholder or empty parts).
+  - [x] 8.4 Guided systems tours: "How SLS works", "How Orion keeps crew alive", "How LM landed on the Moon", "How Perseverance samples Mars", "How ISS sustains human life in LEO", and interactive quizzes.
+  - [x] 8.5 Verify and tag `overnight-phase-8-green`.
 
 - [ ] **PHASE 9: Space flight views, trajectories and orbit lines**
   - [ ] 9.1 Trajectory lines for parking orbit, TLI, cislunar free return, SOI transfers.

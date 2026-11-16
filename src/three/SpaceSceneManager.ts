@@ -1325,6 +1325,7 @@ export class SpaceSceneManager {
       this.lunarEnv.habGroup,
       this.saturnVModel.group,
       this.falcon9Model.group,
+      this.issModel.group,
     ];
 
     craftList.forEach((root) => {

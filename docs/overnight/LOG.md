@@ -188,3 +188,21 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
 
 
 
+
+
+## 2026-11-16T07:18:00+05:00 - Phase 8 Completed: Vehicle Inspector Rebuild, Multi-Stage Exploded Views, Guided Tours & 100% Node Coverage Audit
+- **Phase Objective**: Rebuild the vehicle inspector with design tokens; add multi-stage exploded views along verified mechanical assembly axes; create 5 linear guided systems walkthroughs ("How SLS Works", "How Orion Keeps Crew Alive", "How LM Landed on the Moon", "How Perseverance Samples Mars", "How ISS Sustains Human Life in LEO"); implement automated node coverage audit verifying 100% of visible nodes across all 10 vehicles in `HARDWARE_ORDER` have complete 3-level explanations, 3+ technical specifications, interactive 3-choice quizzes, and primary aerospace citations.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 106 tests passing, 0 failing (duration 740 ms).
+  - `npm run build`: built in 1.88s (dist/index.html 1.18 kB, dist/assets/index.css 116.37 kB, dist/assets/index.js 1679.80 kB).
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/vehicle_inspector_and_guided_tours.md`: Assembly axes analysis for all 10 vehicles (SLS, Saturn V, Falcon 9, Apollo LM, Perseverance/VIPER, ISS, JWST, Voyager, TDRS, Base Camp), primary source catalog (NASA SLS ESD 30000, NASA SP-4029, Grumman LM-5 Handbook, NASA JPL Perseverance Press Kit, NASA ISS Reference Guide), and guided systems tour pedagogical architecture.
+  - Test suites:
+    - `src/sim/models/vehicleInspectorAudit.test.ts`: 7 unit tests covering automated node coverage audit (100% coverage, 45 subsystems, 0 issues), multi-stage exploded view displacement along assembly axes, completeness of all 5 guided tours, craft filtering, 3-level explanations, 3-choice quizzes, and primary aerospace source citations.
+- **Features Implemented & Verified**:
+  - **Multi-Stage Exploded View**: Added `0%` (Assembled), `35%` (Separated), and `100%` (Full Exploded) preset triggers alongside the range slider. Displaced parts along authentic mechanical assembly axes. Added `this.issModel.group` to `SpaceSceneManager.ts` explode traversal.
+  - **Guided Systems Tours**: Built 5 sequenced walkthrough tours with an interactive banner, step progress indicator, camera focus zoom, next/previous step navigation, and seamless quiz launch upon tour completion.
+  - **100% Node Coverage**: Verified all 10 vehicles in `HARDWARE_ORDER` (45 subsystems) have complete copy, 3 educational levels (>25 chars), 3+ technical specs, multiple-choice quizzes, and primary source citations.
+  - **Aerospace Source Citations**: Displayed verified source attributions on craft overview cards and subsystem details panels.
