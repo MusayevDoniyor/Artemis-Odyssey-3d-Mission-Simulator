@@ -176,3 +176,25 @@ This file records all architectural, engineering, and asset decisions made auton
 - **Alternatives Considered**:
   - Full unmerged individual tree meshes (rejected: would incur ~340 additional draw calls and cause mobile/laptop frame rate degradation; `THREE.InstancedMesh` achieves identical visual fidelity with only 2 draw calls).
   - Single central Apollo-era lightning mast on launcher tower (rejected: modern LC-39B was converted to the 3-tower catenary wire grid specifically for the Constellation and Artemis programs).
+
+---
+
+## Decision D7: Planetary Surfaces, Touchdown Telemetry & Rover Kinematics (Phase 7 - Fixes B3 & 0.0 m/s Crash Bug)
+- **Date**: 2026-11-16T07:05:00+05:00
+- **Decision**:
+  1. **Rover Real Speed Kinematics (Bug B3 Resolution)**:
+     - Extended `stepRoverPhysics(state, input, colliders, dt, speedScale)` with `speedScale: TelemetrySpeedScale`.
+     - When `REAL_SPEED`, scaled `maxSpeed` and `baseAccel` to authentic VIPER rate (`0.18 m/s` top speed) via factor `(0.18 / PHYSICS.ROVER_MAX_SPEED)`, scaling physical displacement so $\Delta d = v \cdot \Delta t$ in both modes.
+     - Changing the UI speed toggle dynamically slows the actual rover vehicle in the 3D world, eliminating the defect where only the UI label changed while physical motion remained rapid.
+  2. **Landing Crash Telemetry Fix (0.0 m/s Readout Resolution)**:
+     - Root cause: `stepLandingPhysics` zeroed operational velocities (`f.vx = 0, f.vy = 0, f.vz = 0`) upon touchdown before the crash modal read `landingUi.vy`, causing the crash screen to report "0.0 m/s".
+     - Added `impactVy`, `impactSpeedMs`, and `impactTiltDeg` fields to `LandingState` in `src/game/types.ts` and `src/sim/landing/landingPhysics.ts`.
+     - Latched true impact velocity vectors and tilt angle before zeroing. Updated `App.tsx` crash telemetry modal to read `landingUi.impactSpeedMs || Math.abs(landingUi.vy)` and `landingUi.impactTiltDeg` so crashes display honest non-zero numbers.
+  3. **Planetary Surface Terrain Modeling**:
+     - Preserved real elevation equations derived from LRO LOLA and MGS MOLA in `src/sim/common/math.ts`: flat landing pad (radius 15m), deep depression for Moon Shackleton cold trap crater at (128, -142) ($h < -2.0\text{m}$), and elevated deposits for Mars Jezero delta fan terraces at (126, -134) ($h > +2.0\text{m}$) and Máaz basalt ridge ($h > +3.0\text{m}$).
+     - Verified rocker-bogie differential suspension articulation responding to terrain slopes.
+- **Why**: Eliminates top reported bug B3 and the misleading 0.0 m/s crash telemetry, ensuring absolute truthfulness in flight dynamics and surface exploration.
+- **Alternatives Considered**:
+  - Only slowing down visual wheel spin animation in REAL_SPEED (rejected: fails simulation truthfulness; physical motion must match telemetry).
+  - Delaying velocity zeroing by one frame (rejected: unstable; creates physics glitches if user continues providing inputs while crashed; latching dedicated impact telemetry fields is cleanly immutable).
+

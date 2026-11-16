@@ -1,5 +1,5 @@
 import { PHYSICS } from '../../game/constants';
-import type { InputState, RoverCollider, RoverState, SurfacePlanet } from '../../game/types';
+import type { InputState, RoverCollider, RoverState, SurfacePlanet, TelemetrySpeedScale } from '../../game/types';
 import { clamp, getSurfaceTerrainHeight } from '../common/math';
 
 export function createInitialRoverState(
@@ -34,7 +34,8 @@ export function stepRoverPhysics(
   state: RoverState,
   input: Pick<InputState, 'forward' | 'backward' | 'left' | 'right'>,
   colliders: RoverCollider[],
-  rawDt: number
+  rawDt: number,
+  speedScale: TelemetrySpeedScale = 'KID_25X'
 ): RoverState {
   const dt = Math.min(rawDt, 0.05);
   const r: RoverState = {
@@ -48,23 +49,29 @@ export function stepRoverPhysics(
   const rightX = Math.cos(r.headingRad);
   const rightZ = -Math.sin(r.headingRad);
 
+  // Speed scale factor (Bug B3 resolution): REAL_SPEED is authentic real-time rate (~0.18 m/s max)
+  // KID_25X is 25x time-compressed exploration speed (~4.5 - 6.8 m/s max)
+  const speedScaleFactor = speedScale === 'REAL_SPEED' ? (0.18 / PHYSICS.ROVER_MAX_SPEED) : 1.0;
+
   const isWalker = r.driveMode === 'WALKER';
-  const maxSpeed = isWalker ? PHYSICS.ROVER_WALKER_SPEED : PHYSICS.ROVER_MAX_SPEED;
-  const slopeGravity = Math.sin(r.pitchRad) * gravity * 0.42;
+  const maxSpeed = (isWalker ? PHYSICS.ROVER_WALKER_SPEED : PHYSICS.ROVER_MAX_SPEED) * speedScaleFactor;
+  const baseAccel = PHYSICS.ROVER_ACCEL * speedScaleFactor;
+  const slopeGravity = Math.sin(r.pitchRad) * gravity * 0.42 * speedScaleFactor;
 
   if (r.driveMode === 'SPIN') {
     r.speed *= Math.max(0, 1 - 6 * dt);
     const spinDir = input.left ? 1 : input.right ? -1 : input.forward ? 1 : input.backward ? -1 : 0;
-    r.headingRad += spinDir * PHYSICS.ROVER_TURN_RATE * 1.45 * dt;
-    r.wheelAngle += spinDir * dt * 3.4;
+    const spinRate = PHYSICS.ROVER_TURN_RATE * 1.45 * (speedScale === 'REAL_SPEED' ? 0.35 : 1.0);
+    r.headingRad += spinDir * spinRate * dt;
+    r.wheelAngle += spinDir * dt * 3.4 * (speedScale === 'REAL_SPEED' ? 0.35 : 1.0);
   } else {
     if (input.forward) {
-      r.speed = Math.min(maxSpeed, r.speed + (PHYSICS.ROVER_ACCEL + slopeGravity) * dt);
+      r.speed = Math.min(maxSpeed, r.speed + (baseAccel + slopeGravity) * dt);
     } else if (input.backward) {
-      r.speed = Math.max(-maxSpeed * 0.55, r.speed - (PHYSICS.ROVER_ACCEL * 1.4 - slopeGravity) * dt);
+      r.speed = Math.max(-maxSpeed * 0.55, r.speed - (baseAccel * 1.4 - slopeGravity) * dt);
     } else {
       r.speed *= Math.max(0, 1 - 2.6 * dt);
-      if (Math.abs(r.speed) < 0.03) r.speed = 0;
+      if (Math.abs(r.speed) < 0.001) r.speed = 0;
     }
   }
 

@@ -308,6 +308,9 @@ export interface LandingState {
   landed: boolean;
   result: LandingResult;
   score: number;
+  impactVy?: number;
+  impactSpeedMs?: number;
+  impactTiltDeg?: number;
 }
 
 export interface RoverCollider {

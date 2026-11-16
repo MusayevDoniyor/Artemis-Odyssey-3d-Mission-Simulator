@@ -46,11 +46,11 @@
   - [x] 6.2 Florida terrain, coastline, pad lighting, instanced props.
   - [x] 6.3 Verify and tag `overnight-phase-6-green`.
 
-- [ ] **PHASE 7: Surfaces, landing and rover**
-  - [ ] 7.1 Moon Shackleton & Mars Jezero terrain from real elevation datasets (LOLA/MOLA).
-  - [ ] 7.2 Ballistic lunar dust particles, vacuum descent plume, honest touchdown speed/tilt telemetry.
-  - [ ] 7.3 Rover speed fix (B3): real scientific speed + time compression, rocker-bogie suspension with ground raycasts.
-  - [ ] 7.4 Verify and tag `overnight-phase-7-green`.
+- [x] **PHASE 7: Surfaces, landing and rover**
+  - [x] 7.1 Moon Shackleton & Mars Jezero terrain from real elevation datasets (LOLA/MOLA).
+  - [x] 7.2 Ballistic lunar dust particles, vacuum descent plume, honest touchdown speed/tilt telemetry (fixes 0.0 m/s crash bug).
+  - [x] 7.3 Rover speed fix (B3): real scientific speed + time compression, rocker-bogie suspension with ground raycasts.
+  - [x] 7.4 Verify and tag `overnight-phase-7-green`.
 
 - [ ] **PHASE 8: Vehicle Inspector (exploded view, every part explained)**
   - [ ] 8.1 Rebuild inspector in design tokens with multi-stage exploded views along assembly axes.

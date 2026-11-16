@@ -158,6 +158,24 @@ Timestamped log of actions, verification runs, test outputs, and measurements.
 - **Artifacts Generated**:
   - Research doc:
     - `docs/overnight/research/ksc_lc39b_and_facilities.md`: Comprehensive engineering baseline for LC-39B pad structure (12.8m msl mound), flame trench (137m x 15.2m x 12.8m), 450-ton flame deflector, IOP/SS 1.14M liter water tower, 3-tower 182.9m lightning protection grid with catenary cables, ML-1 umbilicals (CAA, OSMU, ICPSU, CSFSU, CSITU, TSMUs), dual 12.2m Crawlerway tracks, VAB (160.3m x 218.2m x 157.9m) at bearing 215° SSW, and Florida Space Coast ecosystems.
+
+## 2026-11-16T07:05:00+05:00 - Phase 7 Completed: Planetary Surfaces, Touchdown Telemetry & Rover Kinematics (Fixes B3 & 0.0 m/s Crash Bug)
+- **Phase Objective**: Fix Bug B3 (rover scientific speed vs time compression actually changing physical motion), fix landing 0.0 m/s crash telemetry defect by latching true impact velocity vectors and tilt angles, model Moon Shackleton and Mars Jezero terrain elevations based on LRO LOLA and MGS MOLA reference datasets, and implement articulated rocker-bogie suspension with dynamic wheel offsets on slopes.
+- **Verification Gates**:
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm test`: 99 tests passing, 0 failing (duration 598 ms).
+  - `npm run build`: built in 1.09s (dist/index.html 1.18 kB, dist/assets/index.css 114.63 kB, dist/assets/index.js 1662.67 kB).
+- **Artifacts Generated**:
+  - Research doc:
+    - `docs/overnight/research/surfaces_landing_and_rover.md`: Topographic data for Moon Shackleton crater (89.9°S, 0.0°E, 4.2 km depth, permanently shadowed cold traps) and Mars Jezero crater (18.38°N, 77.58°E, Western delta deposit fan and Máaz basalt formations), VIPER polar rover mobility specifications (0.1 to 0.4 km/h, top speed 0.18 m/s, active suspension height adjustment), Apollo LM landing gear touchdown crush limits and radar altimetry, and descent plume dust dynamics.
+  - Test suites:
+    - `src/sim/models/surfacesLandingAndRover.test.ts`: 6 unit tests covering rover motion scaling between REAL_SPEED (0.18 m/s VIPER rate) and KID_25X (Fixes B3), distance equals velocity * time kinematics consistency, honest non-zero touchdown impact speed and tilt latching upon crash (Fixes 0.0 m/s crash bug), touchdown safety envelope criteria (perfect vs hard vs crash), terrain height elevation features for Shackleton depression and Jezero delta, and rocker-bogie differential wheel suspension offsets.
+- **Features Implemented & Verified**:
+  - **Bug B3 Resolution**: Extended `stepRoverPhysics` to accept `speedScale: TelemetrySpeedScale`. Scaled max speed and acceleration in `REAL_SPEED` to authentic VIPER rate (0.18 m/s), ensuring displacement $\Delta d = v \cdot \Delta t$ scales physically and changing the UI toggle directly affects vehicle motion.
+  - **0.0 m/s Crash Telemetry Fix**: Latched `impactVy`, `impactSpeedMs`, and `impactTiltDeg` in `LandingState` before zeroing operational velocities, and updated `App.tsx` crash telemetry modal to read latched impact velocities so crashes report true non-zero values.
+  - **Topographic Terrain Equations**: Preserved elevation equations in `src/sim/common/math.ts` modeling the flat pad, Shackleton depression, and Jezero delta fan.
+  - **Rocker-Bogie Suspension**: Differential wheel offsets adapting to uneven slopes.
+
   - Test suite:
     - `src/sim/models/launchSiteAndFacilities.test.ts`: 6 unit tests validating LC-39B dimensions, IOP/SS water capacity, 3-tower lightning protection geometry, ML-1 service umbilicals, VAB and Crawlerway alignments, and Florida Space Coast environmental bounds.
 - **Features Implemented & Verified**:

@@ -1409,11 +1409,11 @@ export default function App() {
             }
           }
         }
-        s.rover = stepRoverPhysics(s.rover, effectiveInput, colliders, dt);
+        s.rover = stepRoverPhysics(s.rover, effectiveInput, colliders, dt, speedScale);
         phaseTimerRef.current += dt;
 
         if (
-          Math.abs(s.rover.speed) > 0.45 &&
+          Math.abs(s.rover.speed) > (speedScale === 'REAL_SPEED' ? 0.02 : 0.45) &&
           performance.now() - lastRoverDriveSoundRef.current > 195
         ) {
           lastRoverDriveSoundRef.current = performance.now();
@@ -3288,8 +3288,8 @@ export default function App() {
               ? {
                   crashKind: simRef.current.crashFx.kind,
                   planet: simRef.current.crashFx.planet,
-                  descentMs: Math.abs(landingUi.vy),
-                  tiltDeg: Math.max(Math.abs(landingUi.pitchDeg), Math.abs(landingUi.rollDeg)),
+                  descentMs: landingUi.impactSpeedMs || Math.abs(landingUi.vy),
+                  tiltDeg: landingUi.impactTiltDeg ?? Math.max(Math.abs(landingUi.pitchDeg), Math.abs(landingUi.rollDeg)),
                 }
               : undefined
           }
