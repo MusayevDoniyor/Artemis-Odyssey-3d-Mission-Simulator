@@ -233,7 +233,7 @@ export type SpacecraftTrajectoryType =
   | 'Landing Trajectory'
   | 'Station-Keeping';
 
-export type SpaceTimeWarp = 1 | 2 | 5 | 10 | 50 | 100 | 500 | 1000;
+export type SpaceTimeWarp = 0.5 | 1 | 2 | 5 | 10 | 50 | 100 | 500 | 1000;
 export type SpaceSasMode = 'MANUAL' | 'PROGRADE' | 'RETROGRADE' | 'TARGET';
 
 export interface SpaceFlightState {
@@ -271,6 +271,7 @@ export interface SpaceFlightState {
   timeWarp?: SpaceTimeWarp;
   throttle?: number;
   sasMode?: SpaceSasMode;
+  prevDistToTarget?: number;
 }
 
 export interface LandingZone {

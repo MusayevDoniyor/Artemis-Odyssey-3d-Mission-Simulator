@@ -559,20 +559,26 @@ export function stepSpaceFlightPhysics(
               ? 0.45 // Moon capture orbit (~1.09u, at the boundary of scaled 1.00u Moon SOI)
               : 1.5);
 
-  // Automatic drop-out of time warp to 1x on maneuvers, SOI transition, or arrival
-  const manualBurnInput = Boolean(input.forward || (s.throttle && s.throttle > 0.02) || input.boost);
+  // Automatic drop-out of time warp to 1x on active keyboard maneuvers, SOI transition, or arrival
+  const manualBurnInput = Boolean(input.forward || input.boost);
   const manualSteerInput = Boolean(input.left || input.right);
   const manualBrakeInput = Boolean(input.backward);
 
+  const justEnteredCapture =
+    distToTarget <= captureRadius &&
+    s.prevDistToTarget !== undefined &&
+    s.prevDistToTarget > captureRadius;
+
+  let warpNotice: string | null = null;
   if (s.timeWarp > 1 && (manualBurnInput || manualSteerInput || manualBrakeInput)) {
     s.timeWarp = 1;
-    s.statusText = 'Time warp dropped to 1x for flight maneuver';
+    warpNotice = 'Time warp dropped to 1x for flight maneuver';
   } else if (s.timeWarp > 1 && s.dominantBodyName && s.dominantBodyName !== domName) {
     s.timeWarp = 1;
-    s.statusText = `SOI Transition: entered ${domName} Sphere of Influence (1x)`;
-  } else if (s.timeWarp > 1 && distToTarget <= captureRadius) {
+    warpNotice = `SOI Transition: entered ${domName} Sphere of Influence (1x)`;
+  } else if (s.timeWarp > 1 && justEnteredCapture) {
     s.timeWarp = 1;
-    s.statusText = `Arrived at ${targetLabel} capture zone (1x)`;
+    warpNotice = `Arrived at ${targetLabel} capture zone (1x)`;
   }
 
   const activeWarp = s.timeWarp ?? 1;
@@ -668,16 +674,16 @@ export function stepSpaceFlightPhysics(
         : (s.boostActive ? 0.16 : 0.09)) * throttleVal;
 
   if (thrusting && s.fuelPct > 0) {
-    s.vx += fwdX * accel * dt;
-    s.vz += fwdZ * accel * dt;
-    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 1.4 : 0.55) * throttleVal * fuelFactor * dt);
+    s.vx += fwdX * accel * simDt;
+    s.vz += fwdZ * accel * simDt;
+    s.fuelPct = Math.max(0, s.fuelPct - (s.boostActive ? 1.4 : 0.55) * throttleVal * fuelFactor * simDt);
     if (s.boostActive) {
-      res.power = Math.max(0, res.power - 2.0 * dt);
+      res.power = Math.max(0, res.power - 2.0 * simDt);
     }
   } else if (braking) {
     // RCS retro-thruster braking
-    s.vx *= Math.max(0, 1 - 4.0 * dt);
-    s.vz *= Math.max(0, 1 - 4.0 * dt);
+    s.vx *= Math.max(0, 1 - 4.0 * simDt);
+    s.vz *= Math.max(0, 1 - 4.0 * simDt);
   }
 
   // Central gravitational acceleration toward active dominant Sphere of Influence (SOI)
@@ -942,6 +948,7 @@ export function stepSpaceFlightPhysics(
   });
 
   s.dominantBodyName = domName;
+  s.prevDistToTarget = distToTarget;
   s.escapeVelocityKmS = Math.round((vEscPhysMs / 1000) * 100) / 100;
   s.orbitalEccentricity = Math.round(eccWell * 100) / 100;
   s.orbitalSpeedKmS = Math.round((vPhysMs / 1000) * 100) / 100;
@@ -1005,7 +1012,9 @@ export function stepSpaceFlightPhysics(
       : Math.round(metersToKm((distToTarget / 38.5) * SI.AU_M));
   }
 
-  if (s.orbitalSat.linkLocked && s.arrivedGateway) {
+  if (warpNotice) {
+    s.statusText = warpNotice;
+  } else if (s.orbitalSat.linkLocked && s.arrivedGateway) {
     s.statusText = 'Gateway NRHO Link Online! Ready to transfer ISRU payload.';
   } else if (s.orbitalSat.linkLocked && s.targetId === 'relay-orbit' && !navSpec) {
     s.statusText = 'HERMES Relay Satellite Locked! High-Res Surface Maps Unlocked.';

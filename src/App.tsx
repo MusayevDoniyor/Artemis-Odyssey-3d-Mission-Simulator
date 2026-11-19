@@ -1469,8 +1469,9 @@ export default function App() {
         );
         s.space = result.space;
         s.resources = result.resources;
+        const activeWarp = s.space.timeWarp ?? 1;
         s.solarEpochYears =
-          (s.solarEpochYears ?? 0) + dt * solarTimeSpeedRef.current * 0.008;
+          (s.solarEpochYears ?? 0) + dt * activeWarp * solarTimeSpeedRef.current * 0.008;
         phaseTimerRef.current += dt;
 
         // Trigger orbital Applied Knowledge Anomaly in Artemis II or Artemis IV
@@ -2286,7 +2287,7 @@ export default function App() {
       }
 
       if (s.phase === "space") {
-        const warpLadder: SpaceTimeWarp[] = [1, 2, 5, 10, 50, 100, 500, 1000];
+        const warpLadder: SpaceTimeWarp[] = [0.5, 1, 2, 5, 10, 50, 100, 500, 1000];
         const curWarp = s.space.timeWarp ?? 1;
         const curIdx = warpLadder.indexOf(curWarp);
         if (e.code === "BracketLeft") {
@@ -2307,7 +2308,6 @@ export default function App() {
         }
         if (e.code === "KeyZ") {
           s.space.throttle = 1.0;
-          if ((s.space.timeWarp ?? 1) > 1) s.space.timeWarp = 1;
           syncUiNow();
           return;
         }
@@ -2318,7 +2318,6 @@ export default function App() {
         }
         if (e.code === "KeyW" || e.code === "ArrowUp") {
           s.space.throttle = Math.min(1.0, (s.space.throttle ?? 0) + 0.15);
-          if ((s.space.timeWarp ?? 1) > 1) s.space.timeWarp = 1;
           syncUiNow();
           return;
         }
@@ -2373,7 +2372,6 @@ export default function App() {
           e.code === "NumpadAdd"
         ) {
           s.space.throttle = Math.min(1.0, (s.space.throttle ?? 0) + 0.1);
-          if ((s.space.timeWarp ?? 1) > 1) s.space.timeWarp = 1;
           syncUiNow();
           return;
         }
@@ -3560,9 +3558,6 @@ export default function App() {
           }}
           onSetThrottle={(thr) => {
             simRef.current.space.throttle = thr;
-            if (thr > 0.02 && (simRef.current.space.timeWarp ?? 1) > 1) {
-              simRef.current.space.timeWarp = 1;
-            }
             syncUiNow();
           }}
           onSetSasMode={(mode) => {

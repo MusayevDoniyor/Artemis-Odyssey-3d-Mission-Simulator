@@ -1079,12 +1079,12 @@ export function SpaceFlightHUD({
                 >
                   <div
                     className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-slate-300"
-                    title={`Simulation Rate: ${currentWarp}x (~${(currentWarp * 70).toLocaleString()}x real time)`}
+                    title={`Simulation Rate: ${currentWarp}x (~${Math.round(currentWarp * 70).toLocaleString()}x real time)`}
                   >
                     <Clock className="h-3 w-3 text-cyan-300" />
                     <span className="font-bold text-white">{currentWarp}x</span>
                   </div>
-                  {([1, 2, 5, 10, 50, 100, 500, 1000] as const).map((tw) => (
+                  {([0.5, 1, 2, 5, 10, 50, 100, 500, 1000] as const).map((tw) => (
                     <button
                       key={tw}
                       type="button"
@@ -1112,12 +1112,31 @@ export function SpaceFlightHUD({
               {/* Throttle Controls */}
               <div
                 className="flex items-center gap-1.5"
-                title="Fine Throttle: [Shift]/[+] Up (+10%) · [C]/[-] Down (-10%) · [Z] Full (100%) · [X] Cut (0%)"
+                title="Fine Throttle: Click/drag bar · [-]/[C] Down (-10%) · [+]/[Shift] Up (+10%) · [Z] Full · [X] Cut"
               >
                 <span className="text-[10px] font-bold text-slate-400">
                   THR:
                 </span>
-                <div className="relative h-2 w-14 overflow-hidden rounded-full bg-slate-800 border border-white/10">
+                <button
+                  type="button"
+                  data-testid="throttle-minus-btn"
+                  onClick={() => onSetThrottle?.(Math.max(0, Math.round(((space.throttle ?? 0) - 0.1) * 10) / 10))}
+                  title="Throttle -10% [C]"
+                  className="rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[9px] font-bold text-slate-300 hover:text-white hover:bg-white/15"
+                >
+                  -
+                </button>
+                <div
+                  data-testid="throttle-slider"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const pct = Math.min(1, Math.max(0, clickX / rect.width));
+                    onSetThrottle?.(Math.round(pct * 20) / 20);
+                  }}
+                  className="group relative h-2.5 w-16 cursor-pointer overflow-hidden rounded-full bg-slate-800 border border-white/15 hover:border-cyan-400/60 transition"
+                  title="Click anywhere on slider to set throttle (0% to 100%)"
+                >
                   <div
                     className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-all duration-75"
                     style={{
@@ -1125,6 +1144,15 @@ export function SpaceFlightHUD({
                     }}
                   />
                 </div>
+                <button
+                  type="button"
+                  data-testid="throttle-plus-btn"
+                  onClick={() => onSetThrottle?.(Math.min(1, Math.round(((space.throttle ?? 0) + 0.1) * 10) / 10))}
+                  title="Throttle +10% [Shift]"
+                  className="rounded border border-white/10 bg-white/5 px-1 py-0.5 text-[9px] font-bold text-slate-300 hover:text-white hover:bg-white/15"
+                >
+                  +
+                </button>
                 <span className="w-7 text-right text-[10px] font-bold text-white tabular-nums">
                   {Math.round((space.throttle ?? 0) * 100)}%
                 </span>
