@@ -6,6 +6,8 @@ import {
   Box,
   Camera,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleDot,
   Clock,
   Compass,
@@ -24,6 +26,7 @@ import {
   Wind,
   X,
 } from "lucide-react";
+import { useState } from "react";
 import type { MusicState } from "../game/audio";
 import {
   PRIMARY_SOLAR_BAR_IDS,
@@ -132,6 +135,9 @@ export function SpaceFlightHUD({
   onSetThrottle,
   onSetSasMode,
 }: SpaceFlightHUDProps) {
+  const [showPlanetsStrip, setShowPlanetsStrip] = useState(false);
+  const [objectiveCollapsed, setObjectiveCollapsed] = useState(false);
+
   const navSpec = space.navBodyId
     ? (SOLAR_SYSTEM_BODIES.find((b) => b.id === space.navBodyId) ?? null)
     : null;
@@ -493,32 +499,48 @@ export function SpaceFlightHUD({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <section
             data-testid="hud-group-objective"
-            className="hud-soft pointer-events-auto w-[300px] overflow-hidden rounded-2xl px-3.5 py-2.5 text-slate-100 lg:w-[324px]"
+            className={`hud-soft pointer-events-auto overflow-hidden rounded-2xl transition-all duration-200 text-slate-100 ${
+              objectiveCollapsed ? "w-[240px] px-3 py-1.5" : "w-[300px] px-3.5 py-2.5 lg:w-[324px]"
+            }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-cyan-300 lg:text-sm">
+              <button
+                type="button"
+                onClick={() => setObjectiveCollapsed((c) => !c)}
+                className="flex items-center gap-2 text-xs font-bold tracking-wide text-cyan-300 lg:text-sm text-left hover:text-white transition"
+                title={objectiveCollapsed ? "Expand Objective" : "Collapse Objective"}
+              >
                 <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400" />
                 <span>
                   {freeExploreMode
-                    ? "Exploration Objective"
+                    ? "Objective"
                     : "Deep Space Transit"}
                 </span>
-              </div>
+                {objectiveCollapsed ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                ) : (
+                  <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                )}
+              </button>
               <span className="shrink-0 text-xs font-bold text-white tabular-nums lg:text-sm">
                 {freeExploreMode
                   ? `${Math.min(PRIMARY_SOLAR_BAR_IDS.length, exploredPrimaryCount)} / ${PRIMARY_SOLAR_BAR_IDS.length}`
                   : `${space.visitedTargets.length} / 4`}
               </span>
             </div>
-            <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">
-              {objectiveText}
-            </p>
-            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-400 transition-all duration-300"
-                style={{ width: `${objectiveProgressPct}%` }}
-              />
-            </div>
+            {!objectiveCollapsed && (
+              <>
+                <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">
+                  {objectiveText}
+                </p>
+                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-400 transition-all duration-300"
+                    style={{ width: `${objectiveProgressPct}%` }}
+                  />
+                </div>
+              </>
+            )}
           </section>
 
           {/* Center-Top: Compact Scale Mode, Camera Mode & Data Provenance Controls */}
@@ -1050,7 +1072,6 @@ export function SpaceFlightHUD({
             {/* Time Warp Ladder */}
             {(() => {
               const currentWarp = space.timeWarp ?? 1;
-              const simTimeMultiplier = currentWarp * 70;
               return (
                 <div
                   data-testid="time-warp-ladder"
@@ -1058,13 +1079,10 @@ export function SpaceFlightHUD({
                 >
                   <div
                     className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-slate-300"
-                    title={`Simulation Rate: 1x = ~70x real time (165 km orbit period 75.7s vs 87.7 min real)`}
+                    title={`Simulation Rate: ${currentWarp}x (~${(currentWarp * 70).toLocaleString()}x real time)`}
                   >
                     <Clock className="h-3 w-3 text-cyan-300" />
                     <span className="font-bold text-white">{currentWarp}x</span>
-                    <span className="text-[10px] text-sky-300/90 font-mono tracking-tight inline">
-                      (1x = 70× real)
-                    </span>
                   </div>
                   {([1, 2, 5, 10, 50, 100, 500, 1000] as const).map((tw) => (
                     <button
@@ -1072,7 +1090,7 @@ export function SpaceFlightHUD({
                       type="button"
                       data-testid={`warp-btn-${tw}`}
                       onClick={() => onSetTimeWarp?.(tw)}
-                      title={`Set Time Warp to ${tw}x (Sim Rate: ${(tw * 70).toLocaleString()}x real time) [Use [ and ] keys]`}
+                      title={`Set Time Warp to ${tw}x [Use [ and ] keys]`}
                       className={`rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition ${
                         currentWarp === tw
                           ? "bg-cyan-400/25 border border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.4)]"
@@ -1160,6 +1178,27 @@ export function SpaceFlightHUD({
                 )}
               </div>
             </div>
+
+            {/* Planets Strip Toggle Button */}
+            <button
+              type="button"
+              data-testid="toggle-planet-strip-btn"
+              onClick={() => setShowPlanetsStrip((prev) => !prev)}
+              className={`hud-soft pointer-events-auto flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold transition ${
+                showPlanetsStrip || spaceCameraMode === "overview"
+                  ? "border border-cyan-400 bg-cyan-500/25 text-cyan-200 shadow-[0_0_10px_rgba(34,211,238,0.3)]"
+                  : "border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
+              }`}
+              title="Toggle Solar System Worlds Strip"
+            >
+              <Orbit className="h-3.5 w-3.5 text-cyan-300" />
+              <span>Planets</span>
+              {showPlanetsStrip || spaceCameraMode === "overview" ? (
+                <ChevronDown className="h-3 w-3 text-cyan-300" />
+              ) : (
+                <ChevronUp className="h-3 w-3 text-slate-400" />
+              )}
+            </button>
           </div>
 
           {showContextualRow && (
@@ -1227,189 +1266,150 @@ export function SpaceFlightHUD({
               {(isMoving ||
                 solarScaleMode !== "exploration" ||
                 space.trajectoryRegime) && (
-                <div className="hud-soft flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs tabular-nums font-mono-tech">
-                  <span className="font-bold text-white">
-                    {shipSpeed.toFixed(1)} u/s
+                <div
+                  data-testid="hud-telemetry-pill"
+                  className="hud-soft flex items-center gap-2.5 rounded-full border border-cyan-400/25 bg-slate-950/85 px-4 py-1.5 text-xs font-mono-tech tabular-nums shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md"
+                >
+                  <span className="font-bold tracking-wide text-white">
+                    {space.orbitalSpeedKmS != null
+                      ? `${space.orbitalSpeedKmS.toFixed(2)} km/s`
+                      : `${shipSpeed.toFixed(1)} u/s`}
                   </span>
-                  {space.orbitalSpeedKmS != null && (
-                    <span className="font-semibold text-cyan-300">
-                      {space.orbitalSpeedKmS.toFixed(2)} km/s
-                    </span>
-                  )}
+
                   {space.altitudeKm != null && (
-                    <span className="text-slate-300">
-                      · Alt {space.altitudeKm.toLocaleString()} km
-                    </span>
+                    <>
+                      <span className="h-3 w-px bg-white/20" />
+                      <span className="text-slate-300">
+                        Alt{" "}
+                        <strong className="font-semibold text-white">
+                          {space.altitudeKm.toLocaleString()}
+                        </strong>{" "}
+                        km
+                      </span>
+                    </>
                   )}
-                  {space.dominantBodyName && (
-                    <span className="text-sky-200">
-                      · {space.dominantBodyName} SOI
-                    </span>
+
+                  {(space.trajectoryRegime || space.dominantBodyName) && (
+                    <>
+                      <span className="h-3 w-px bg-white/20" />
+                      <span className="font-semibold text-sky-300">
+                        {space.trajectoryRegime ||
+                          `${space.dominantBodyName} Orbit`}
+                      </span>
+                    </>
                   )}
-                  {space.activeTrajectoryFrame && (
-                    <span className="rounded bg-sky-950/70 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-sky-300 border border-sky-400/30 uppercase">
-                      {space.activeTrajectoryFrame === "moon_centred"
-                        ? "Lunar SOI"
-                        : space.activeTrajectoryFrame === "earth_inertial"
-                          ? "Earth Inertial"
-                          : "Earth-Moon Rotating"}
-                    </span>
-                  )}
-                  {space.trajectoryRegime && (
-                    <span
-                      className={
-                        space.trajectoryRegime === "Hyperbolic Escape"
-                          ? "font-semibold text-amber-300"
-                          : "text-slate-300"
-                      }
-                    >
-                      · {space.trajectoryRegime}
-                    </span>
-                  )}
-                  {space.escapeVelocityKmS != null && (
-                    <span className="text-slate-400">
-                      (v_esc {space.escapeVelocityKmS.toFixed(2)})
-                    </span>
-                  )}
-                  {space.distanceFromSunAu != null && (
-                    <span className="text-slate-300">
-                      · {space.distanceFromSunAu.toFixed(3)} AU
-                    </span>
-                  )}
+
                   {space.distanceToTargetKm != null && (
-                    <span className="text-sky-200">
-                      · {Math.round(space.distanceToTargetKm).toLocaleString()}{" "}
-                      km
+                    <>
+                      <span className="h-3 w-px bg-white/20" />
+                      <span className="text-amber-300">
+                        Target{" "}
+                        {Math.round(
+                          space.distanceToTargetKm,
+                        ).toLocaleString()}{" "}
+                        km
+                      </span>
+                    </>
+                  )}
+
+                  {space.autoPilot && (
+                    <span className="rounded border border-amber-400/40 bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-300 uppercase">
+                      Auto
                     </span>
                   )}
-                  {space.commsDelaySec != null &&
-                    space.commsDelaySec > 0.05 && (
-                      <span className="text-amber-300">
-                        · Comms{" "}
-                        {space.commsDelaySec < 60
-                          ? `${space.commsDelaySec.toFixed(2)}s`
-                          : `${(space.commsDelaySec / 60).toFixed(1)}m`}
+
+                  {space.radiationDoseRateUsvH != null &&
+                    space.radiationDoseRateUsvH > 100 && (
+                      <span className="rounded border border-rose-500/40 bg-rose-500/25 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-rose-300 uppercase">
+                        {space.radiationDoseRateUsvH.toFixed(0)} µSv/h
                       </span>
                     )}
-                  {space.radiationDoseRateUsvH != null && (
-                    <span
-                      className={
-                        space.radiationDoseRateUsvH > 100
-                          ? "text-rose-300 font-bold"
-                          : "text-slate-400"
-                      }
-                    >
-                      · {space.radiationDoseRateUsvH.toFixed(0)} µSv/h
-                    </span>
-                  )}
-                  {space.autoPilot && (
-                    <span className="font-semibold text-amber-300">
-                      · Auto-Pilot
-                    </span>
-                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Compact 11-Body Selector Strip */}
-          <div
-            data-testid="solar-planet-strip"
-            className="hud-soft pointer-events-auto flex max-w-[calc(100vw-310px)] items-center gap-0.5 overflow-x-auto rounded-2xl px-2 py-1.5 lg:max-w-[calc(100vw-350px)]"
-          >
-            {PRIMARY_SOLAR_BAR_IDS.map((bodyId) => {
-              const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
-              if (!spec) return null;
-              const isSelected = focusedSolarBodyId === bodyId;
-              return (
-                <button
-                  key={bodyId}
-                  type="button"
-                  data-testid={`solar-bar-${bodyId}`}
-                  onClick={() => onFocusSolarBody(bodyId)}
-                  className={`group relative flex min-w-[46px] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-all duration-200 lg:min-w-[52px] ${
-                    isSelected
-                      ? "border border-cyan-400/90 bg-cyan-500/18 shadow-[0_0_16px_rgba(34,211,238,0.26)]"
-                      : "border border-transparent hover:bg-white/[0.06]"
-                  }`}
-                >
-                  <span
-                    className={`transition-transform duration-200 ${
-                      isSelected ? "scale-105" : "group-hover:scale-105"
-                    }`}
-                  >
-                    <PlanetThumb bodyId={bodyId} size="xs" />
-                  </span>
-                  <span
-                    className={`text-[10px] font-semibold tracking-wide lg:text-[11px] ${
+          {/* Compact 11-Body Selector Strip (Shown when toggled or in Overview camera mode) */}
+          {(showPlanetsStrip || spaceCameraMode === "overview") && (
+            <div
+              data-testid="solar-planet-strip"
+              className="hud-soft pointer-events-auto flex max-w-[calc(100vw-310px)] items-center gap-0.5 overflow-x-auto rounded-2xl px-2 py-1.5 lg:max-w-[calc(100vw-350px)]"
+            >
+              {PRIMARY_SOLAR_BAR_IDS.map((bodyId) => {
+                const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
+                if (!spec) return null;
+                const isSelected = focusedSolarBodyId === bodyId;
+                return (
+                  <button
+                    key={bodyId}
+                    type="button"
+                    data-testid={`solar-bar-${bodyId}`}
+                    onClick={() => onFocusSolarBody(bodyId)}
+                    className={`group relative flex min-w-[46px] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-all duration-200 lg:min-w-[52px] ${
                       isSelected
-                        ? "text-white"
-                        : "text-slate-300 group-hover:text-white"
+                        ? "border border-cyan-400/90 bg-cyan-500/18 shadow-[0_0_16px_rgba(34,211,238,0.26)]"
+                        : "border border-transparent hover:bg-white/[0.06]"
                     }`}
                   >
-                    {spec.shortName}
-                  </span>
-                  {isSelected && (
                     <span
-                      aria-hidden="true"
-                      className="h-0.5 w-5 rounded-full bg-cyan-300 shadow-[0_0_6px_#22d3ee]"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                      className={`transition-transform duration-200 ${
+                        isSelected ? "scale-105" : "group-hover:scale-105"
+                      }`}
+                    >
+                      <PlanetThumb bodyId={bodyId} size="xs" />
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold tracking-wide lg:text-[11px] ${
+                        isSelected
+                          ? "text-white"
+                          : "text-slate-300 group-hover:text-white"
+                      }`}
+                    >
+                      {spec.shortName}
+                    </span>
+                    {isSelected && (
+                      <span
+                        aria-hidden="true"
+                        className="h-0.5 w-5 rounded-full bg-cyan-300 shadow-[0_0_6px_#22d3ee]"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Bottom-Right: Compact Navigation Controls Card */}
+        {/* Bottom-Right: Streamlined Navigation Controls Hint Pill */}
         <div
           data-testid="hud-group-hints"
-          className="hud-soft pointer-events-auto flex shrink-0 flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 text-xs"
+          className="hud-soft pointer-events-auto flex shrink-0 items-center gap-2 rounded-2xl px-3 py-1.5 text-xs font-mono-tech"
         >
-          <button
-            type="button"
-            data-hold-keys="forward"
-            className="flex items-center gap-2.5 text-left transition hover:text-cyan-200"
-          >
-            <span className="inline-flex items-center gap-0.5">
-              {["W", "A", "S", "D"].map((k) => (
-                <span
-                  key={k}
-                  className="inline-flex h-[18px] w-[18px] items-center justify-center rounded border border-sky-400/45 bg-sky-500/12 text-[10px] font-bold text-white"
-                >
-                  {k}
-                </span>
-              ))}
-            </span>
-            <span className="font-medium text-slate-200">Navigate</span>
-          </button>
-
-          <div className="flex items-center gap-2.5 text-slate-200">
-            <span className="inline-flex w-[78px] items-center gap-1.5 text-cyan-300">
-              <Mouse className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-semibold text-white">Click</span>
-            </span>
-            <span className="font-medium text-slate-300">Select</span>
-          </div>
-
-          <div className="flex items-center justify-between gap-2.5 text-slate-200">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex w-[78px] items-center gap-1.5 text-cyan-300">
-                <Mouse className="h-3.5 w-3.5 shrink-0" />
-                <span className="font-semibold text-white">Scroll</span>
-              </span>
-              <span className="font-medium text-slate-300">Zoom</span>
-            </div>
-            {!freeExploreMode && (
+          <span className="text-[11px] font-bold text-cyan-300">WASD</span>
+          <span className="text-[11px] text-slate-300">Steer</span>
+          <span className="h-3 w-px bg-white/15" />
+          <span className="text-[11px] font-bold text-cyan-300">Shift/C</span>
+          <span className="text-[11px] text-slate-300">Thr</span>
+          <span className="h-3 w-px bg-white/15" />
+          <span className="text-[11px] font-bold text-cyan-300">V</span>
+          <span className="text-[11px] text-slate-300">FPV</span>
+          {!freeExploreMode && (
+            <>
+              <span className="h-3 w-px bg-white/15" />
               <button
                 type="button"
                 onClick={onToggleAutoPilot}
-                className="rounded-md border border-amber-400/45 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-bold text-amber-300 transition hover:bg-amber-500/25"
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold transition ${
+                  space.autoPilot
+                    ? "border-amber-400/50 bg-amber-400/25 text-amber-200 shadow-[0_0_8px_rgba(251,191,36,0.3)]"
+                    : "border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
+                }`}
+                title="Toggle Orion Autopilot [G key]"
               >
                 G {space.autoPilot ? "Auto On" : "Auto"}
               </button>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

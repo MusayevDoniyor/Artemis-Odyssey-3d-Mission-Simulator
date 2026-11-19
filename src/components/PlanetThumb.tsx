@@ -1,67 +1,19 @@
-const PLANET_ART_STYLE: Record<string, { background: string; ring?: boolean; sunGlow?: boolean }> = {
-  sun: {
-    background:
-      'radial-gradient(circle at 38% 35%, #fffbeb 0%, #fde047 26%, #f97316 68%, #c2410c 100%)',
-    sunGlow: true,
-  },
-  mercury: {
-    background:
-      'radial-gradient(circle at 35% 32%, #e2e8f0 0%, #94a3b8 52%, #475569 100%)',
-  },
-  venus: {
-    background:
-      'radial-gradient(circle at 35% 32%, #fef3c7 0%, #eab308 48%, #b45309 100%)',
-  },
-  earth: {
-    background:
-      'radial-gradient(circle at 36% 34%, #e0f2fe 0%, #38bdf8 30%, #1d4ed8 68%, #0f172a 100%)',
-  },
-  moon: {
-    background:
-      'radial-gradient(circle at 36% 32%, #f8fafc 0%, #cbd5e1 46%, #475569 100%)',
-  },
-  mars: {
-    background:
-      'radial-gradient(circle at 35% 34%, #fdba74 0%, #ea580c 52%, #7c2d12 100%)',
-  },
-  jupiter: {
-    background:
-      'linear-gradient(165deg, #fde68a 0%, #d97706 24%, #fef3c7 42%, #b45309 58%, #f59e0b 78%, #78350f 100%)',
-  },
-  saturn: {
-    background:
-      'radial-gradient(circle at 38% 34%, #fef9c3 0%, #eab308 55%, #a16207 100%)',
-    ring: true,
-  },
-  uranus: {
-    background:
-      'radial-gradient(circle at 35% 32%, #ecfeff 0%, #67e8f9 48%, #0e7490 100%)',
-    ring: true,
-  },
-  neptune: {
-    background:
-      'radial-gradient(circle at 35% 32%, #93c5fd 0%, #2563eb 50%, #1e3a8a 100%)',
-  },
-  pluto: {
-    background:
-      'radial-gradient(circle at 35% 34%, #f1f5f9 0%, #cbd5e1 44%, #78716c 100%)',
-  },
-  ceres: {
-    background:
-      'radial-gradient(circle at 35% 34%, #e2e8f0 0%, #64748b 65%, #334155 100%)',
-  },
-  eris: {
-    background:
-      'radial-gradient(circle at 35% 34%, #ecfeff 0%, #a5f3fc 55%, #475569 100%)',
-  },
-  halley: {
-    background:
-      'radial-gradient(circle at 35% 34%, #f0f9ff 0%, #38bdf8 58%, #1e293b 100%)',
-  },
-  bennu: {
-    background:
-      'radial-gradient(circle at 35% 34%, #cbd5e1 0%, #64748b 54%, #18181b 100%)',
-  },
+const PLANET_THUMB_MAP: Record<string, string> = {
+  sun: '/assets/planets/thumbs/sun.png',
+  mercury: '/assets/planets/thumbs/mercury.png',
+  venus: '/assets/planets/thumbs/venus.png',
+  earth: '/assets/planets/thumbs/earth.png',
+  moon: '/assets/planets/thumbs/moon.png',
+  mars: '/assets/planets/thumbs/mars.png',
+  jupiter: '/assets/planets/thumbs/jupiter.png',
+  saturn: '/assets/planets/thumbs/saturn.png',
+  uranus: '/assets/planets/thumbs/uranus.png',
+  neptune: '/assets/planets/thumbs/neptune.png',
+  pluto: '/assets/planets/thumbs/pluto.png',
+  ceres: '/assets/planets/thumbs/ceres.png',
+  eris: '/assets/planets/thumbs/pluto.png',
+  halley: '/assets/planets/thumbs/ceres.png',
+  bennu: '/assets/planets/thumbs/ceres.png',
 };
 
 export function PlanetThumb({
@@ -71,7 +23,7 @@ export function PlanetThumb({
   bodyId: string;
   size?: 'xs' | 'sm' | 'md' | 'lg';
 }) {
-  const art = PLANET_ART_STYLE[bodyId] ?? PLANET_ART_STYLE.earth;
+  const thumbUrl = PLANET_THUMB_MAP[bodyId] ?? `/assets/planets/thumbs/${bodyId}.png`;
   const dim =
     size === 'lg'
       ? 'h-12 w-12'
@@ -80,98 +32,36 @@ export function PlanetThumb({
         : size === 'xs'
           ? 'h-7 w-7'
           : 'h-8 w-8';
-  const ringDim =
-    size === 'lg'
-      ? 'h-4 w-16'
-      : size === 'md'
-        ? 'h-3 w-13'
-        : size === 'xs'
-          ? 'h-2 w-9'
-          : 'h-2.5 w-11';
-  const ringTiltClass =
-    bodyId === 'uranus' ? '-rotate-[74deg] border-[1.5px]' : '-rotate-[22deg] border-2';
+
+  const isSun = bodyId === 'sun';
+  const isEarth = bodyId === 'earth';
 
   return (
     <span className={`relative inline-flex shrink-0 items-center justify-center ${dim}`}>
-      {art.sunGlow && (
+      {isSun && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-1 rounded-full bg-amber-400/30 shadow-[0_0_12px_rgba(251,191,36,0.45)]"
+          className="pointer-events-none absolute -inset-1 rounded-full bg-amber-400/30 blur-sm"
         />
       )}
-      <span
-        className={`relative block ${dim} overflow-hidden rounded-full shadow-[inset_-4px_-4px_10px_rgba(2,6,23,0.72),inset_1px_1px_3px_rgba(255,255,255,0.22)]`}
-        style={{ background: art.background }}
-      >
-        {bodyId === 'earth' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-95"
-            style={{
-              background:
-                'radial-gradient(circle at 58% 42%, rgba(34,197,94,0.85) 0%, transparent 32%), radial-gradient(circle at 34% 62%, rgba(74,222,128,0.8) 0%, transparent 26%), radial-gradient(circle at 46% 24%, rgba(255,255,255,0.82) 0%, transparent 26%)',
-            }}
-          />
-        )}
-        {bodyId === 'moon' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-65"
-            style={{
-              background:
-                'radial-gradient(circle at 30% 42%, rgba(30,41,59,0.58) 0%, transparent 25%), radial-gradient(circle at 65% 58%, rgba(51,65,85,0.48) 0%, transparent 23%), radial-gradient(circle at 52% 28%, rgba(30,41,59,0.42) 0%, transparent 18%)',
-            }}
-          />
-        )}
-        {bodyId === 'mars' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-85"
-            style={{
-              background:
-                'radial-gradient(circle at 50% 6%, rgba(248,250,252,0.82) 0%, transparent 22%), radial-gradient(circle at 64% 58%, rgba(69,26,18,0.55) 0%, transparent 28%)',
-            }}
-          />
-        )}
-        {bodyId === 'jupiter' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-85"
-            style={{
-              background:
-                'radial-gradient(ellipse at 62% 62%, rgba(220,38,38,0.85) 0%, rgba(234,88,12,0.4) 16%, transparent 28%)',
-            }}
-          />
-        )}
-        {bodyId === 'neptune' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-75"
-            style={{
-              background:
-                'linear-gradient(155deg, transparent 36%, rgba(219,234,254,0.42) 44%, transparent 52%), radial-gradient(circle at 60% 60%, rgba(15,23,42,0.55) 0%, transparent 24%)',
-            }}
-          />
-        )}
-        {bodyId === 'mercury' && (
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 opacity-55"
-            style={{
-              background:
-                'radial-gradient(circle at 38% 36%, rgba(51,65,85,0.55) 0%, transparent 20%), radial-gradient(circle at 64% 62%, rgba(71,85,105,0.45) 0%, transparent 18%)',
-            }}
-          />
-        )}
-      </span>
-      {art.ring && (
+      {isEarth && (
         <span
           aria-hidden="true"
-          className={`pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${ringTiltClass} ${
-            bodyId === 'uranus' ? 'border-cyan-200/80' : 'border-amber-200/85'
-          } ${ringDim}`}
+          className="pointer-events-none absolute -inset-0.5 rounded-full bg-cyan-400/25 blur-[2px]"
         />
       )}
+      <img
+        src={thumbUrl}
+        alt={bodyId}
+        loading="lazy"
+        decoding="async"
+        className="relative z-1 h-full w-full object-contain pointer-events-none select-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] transition-transform duration-200"
+        onError={(e) => {
+          // Fallback if image fails to load
+          const target = e.currentTarget as HTMLImageElement;
+          target.style.display = 'none';
+        }}
+      />
     </span>
   );
 }
