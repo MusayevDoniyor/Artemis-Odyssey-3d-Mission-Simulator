@@ -312,6 +312,47 @@ export function SpaceFlightHUD({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-3.5 lg:px-6 lg:py-4">
+      {/* Orion First-Person Cockpit Visor & Head-Up Display Overlay */}
+      {spaceCameraMode === "cockpit" && (
+        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
+          {/* Cockpit Window Frame Silhouette / Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_52%,rgba(2,6,23,0.72)_85%,rgba(2,6,23,0.96)_100%)]" />
+          <div className="absolute inset-x-0 top-0 h-10 border-b border-cyan-500/20 bg-gradient-to-b from-slate-950/80 to-transparent" />
+          <div className="absolute inset-y-0 left-0 w-12 border-r border-cyan-500/15 bg-gradient-to-r from-slate-950/70 to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-12 border-l border-cyan-500/15 bg-gradient-to-l from-slate-950/70 to-transparent" />
+
+          {/* Central Optical Flight Reticle */}
+          <div className="relative flex flex-col items-center">
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              <div className="h-2 w-2 rounded-full border border-cyan-300 bg-cyan-400/30" />
+              <div className="absolute h-px w-8 bg-cyan-400/50" />
+              <div className="absolute h-8 w-px bg-cyan-400/50" />
+              <div className="absolute h-12 w-12 rounded-full border border-dashed border-cyan-400/30" />
+            </div>
+
+            {/* Flight Attitude & Target Callouts */}
+            <div className="mt-2 flex flex-col items-center gap-0.5 font-mono-tech text-[10px] text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]">
+              <span className="font-bold tracking-widest uppercase">
+                ORION CM-002 · COCKPIT FPV
+              </span>
+              <span>
+                HDG{" "}
+                {Math.round(
+                  ((space.headingRad * 180) / Math.PI + 360) % 360,
+                )}
+                ° · SAS: {space.sasMode ?? "MANUAL"}
+              </span>
+              {space.distanceToTargetKm != null && (
+                <span className="text-amber-300">
+                  RNG TO {space.targetId.toUpperCase()}:{" "}
+                  {Math.round(space.distanceToTargetKm).toLocaleString()} KM
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating In-World Pin over Selected Planet */}
       {selectedBody && selectedBodyPin?.visible && (
         <div
@@ -538,6 +579,7 @@ export function SpaceFlightHUD({
                     { id: "focus", label: "Focus" },
                     { id: "orbit", label: "Orbit" },
                     { id: "track", label: "Track" },
+                    { id: "cockpit", label: "Cockpit (FPV)" },
                     { id: "free", label: "Free" },
                   ] as const
                 ).map((cam) => (

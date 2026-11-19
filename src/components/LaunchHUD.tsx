@@ -455,7 +455,7 @@ export function LaunchHUD({
                 onClick={onSkipToSpace}
                 className="rounded-xl border border-sky-400/25 bg-slate-900/75 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-300 transition hover:border-cyan-400 hover:text-white"
               >
-                Skip
+                Enter LEO Orbit
               </button>
             </div>
           )}

@@ -15,7 +15,7 @@ export type SurfacePlanet = 'moon' | 'mars';
 
 export type CameraMode = 'chase' | 'cockpit' | 'overhead' | 'orbit';
 
-export type SpaceCameraMode = 'overview' | 'focus' | 'orbit' | 'track' | 'free';
+export type SpaceCameraMode = 'overview' | 'focus' | 'orbit' | 'track' | 'free' | 'cockpit';
 
 export type VehicleShowcaseId =
   | 'rocket'

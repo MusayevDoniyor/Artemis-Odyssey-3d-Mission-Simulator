@@ -2139,6 +2139,7 @@ export class SpaceSceneManager {
       lc.abortTower.visible = true;
       lc.abortTower.rotation.set(0, 0, 0);
       lc.machCone.visible = false;
+      lc.thermalGlowCone.visible = false;
       lc.flameGroup.visible = false;
       lc.rs25Emitters.forEach((em) => {
         em.visible = false;
@@ -2194,6 +2195,7 @@ export class SpaceSceneManager {
       lc.srbRightBsm.visible = false;
       lc.icpsFlame.visible = false;
       lc.machCone.visible = false;
+      lc.thermalGlowCone.visible = false;
       lc.flameGroup.visible = false;
       lc.rs25Emitters.forEach((em) => {
         em.visible = false;
@@ -2280,6 +2282,7 @@ export class SpaceSceneManager {
       lc.srbRightBsm.visible = false;
       lc.icpsFlame.visible = false;
       lc.machCone.visible = false;
+      lc.thermalGlowCone.visible = false;
       lc.flameGroup.visible = false;
       lc.rs25Emitters.forEach((em) => {
         em.visible = false;
@@ -2574,6 +2577,44 @@ export class SpaceSceneManager {
         (lc.machCone.material as THREE.MeshBasicMaterial).opacity = Math.max(
           0.12,
           0.42 * transonicPeak,
+        );
+      }
+    }
+
+    // Hypersonic Aerothermal Shockwave Compression Heating (Mach 1.3 to 4.8 / Max-Q)
+    const qKpa = L.dynamicPressureKpa ?? 0;
+    const isHypersonicHeating =
+      thrusting &&
+      !L.orbitReached &&
+      machNum >= 1.25 &&
+      alt <= 68.0;
+    const heatFactor = Math.min(
+      1.0,
+      Math.max(0, (qKpa / 30.0) * ((machNum - 1.2) / 2.5)),
+    );
+    lc.thermalGlowCone.visible = isHypersonicHeating && heatFactor > 0.02;
+    if (lc.thermalGlowCone.visible) {
+      const tgMat = lc.thermalGlowCone.material as THREE.MeshBasicMaterial;
+      tgMat.opacity = Math.min(0.85, heatFactor * 0.95);
+      tgMat.color.setHex(heatFactor > 0.65 ? 0xffea75 : 0xff5500);
+      const heatFlicker = 0.96 + Math.sin(elapsedSec * 48) * 0.08;
+      lc.thermalGlowCone.scale.set(
+        heatFlicker * (1 + heatFactor * 0.12),
+        1 + heatFactor * 0.18,
+        heatFlicker * (1 + heatFactor * 0.12),
+      );
+      if (!s.paused && Math.random() < 0.65 * heatFactor) {
+        this.emitParticle(
+          nozzleX + (Math.random() - 0.5) * 1.2,
+          nozzleY + 16.5 + (Math.random() - 0.5) * 2.0,
+          (Math.random() - 0.5) * 1.2,
+          exDirX * (3.0 + Math.random() * 5.0),
+          exDirY * (3.0 + Math.random() * 5.0),
+          (Math.random() - 0.5) * 1.5,
+          0.32,
+          0.92,
+          0.45,
+          0.85,
         );
       }
     }
@@ -3468,7 +3509,21 @@ export class SpaceSceneManager {
       );
       bodyObj.position.set(pos.x, pos.y, pos.z);
 
-      if (isLocal) {
+      const isOverview = spaceCamMode === "overview";
+      const isCislunarLocal =
+        !isOverview &&
+        !s.focusedSolarBodyId &&
+        (sp.targetId === "moon" ||
+          sp.targetId === "relay-orbit" ||
+          sp.targetId === "gateway");
+
+      if (isCislunarLocal) {
+        // In local cislunar flight, show only Earth and Moon, keeping distant planetary clutter hidden
+        bodyObj.visible = b.id === "earth" || b.id === "moon";
+        if (orbitLine) {
+          orbitLine.visible = b.id === "moon";
+        }
+      } else if (isLocal) {
         const distFromAnchorLocal = Math.hypot(pos.x, pos.y, pos.z);
         bodyObj.visible = distFromAnchorLocal < 12000;
       } else {
@@ -3599,6 +3654,30 @@ export class SpaceSceneManager {
       );
       this.camLookTarget.set(anchorX, anchorY, anchorZ);
       activeDistForNear = dist;
+    } else if (spaceCamMode === "cockpit") {
+      // First-Person View (FPV / Cockpit View) inside Orion capsule forward command viewport
+      const fwdX = Math.sin(sp.headingRad);
+      const fwdZ = Math.cos(sp.headingRad);
+      const cockpitUp = isSci ? 0.04 : isLocal ? 0.10 : 0.16;
+      const cockpitFwd = isSci ? 0.06 : isLocal ? 0.14 : 0.22;
+      const eyeX = shipCamSpaceX + fwdX * cockpitFwd;
+      const eyeY = shipCamSpaceY + cockpitUp;
+      const eyeZ = shipCamSpaceZ + fwdZ * cockpitFwd;
+
+      // Pilot free-look head orientation from mouse drag
+      const lookYaw = sp.headingRad + (s.orbitYaw || 0);
+      const lookPitch = s.orbitPitch || 0;
+      const lookDirX = Math.sin(lookYaw) * Math.cos(lookPitch);
+      const lookDirY = Math.sin(lookPitch);
+      const lookDirZ = Math.cos(lookYaw) * Math.cos(lookPitch);
+
+      this.camPosTarget.set(eyeX, eyeY, eyeZ);
+      this.camLookTarget.set(
+        eyeX + lookDirX * 100,
+        eyeY + lookDirY * 100,
+        eyeZ + lookDirZ * 100,
+      );
+      activeDistForNear = 0.01;
     } else {
       // Hero 3/4 aft-quarter Orion chase camera scaled naturally for Exploration, Scientific & Local
       const fwdX = Math.sin(sp.headingRad);

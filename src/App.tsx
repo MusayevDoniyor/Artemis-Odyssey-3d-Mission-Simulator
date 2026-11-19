@@ -130,6 +130,7 @@ import type {
   RoverState,
   SpaceCameraMode,
   SpaceFlightState,
+  SpaceSasMode,
   SpaceTargetId,
   SpaceTimeWarp,
   SurfacePlanet,
@@ -2315,6 +2316,56 @@ export default function App() {
           syncUiNow();
           return;
         }
+        if (e.code === "KeyW" || e.code === "ArrowUp") {
+          s.space.throttle = Math.min(1.0, (s.space.throttle ?? 0) + 0.15);
+          if ((s.space.timeWarp ?? 1) > 1) s.space.timeWarp = 1;
+          syncUiNow();
+          return;
+        }
+        if (e.code === "KeyS" || e.code === "ArrowDown") {
+          s.space.throttle = Math.max(0.0, (s.space.throttle ?? 0) - 0.15);
+          syncUiNow();
+          return;
+        }
+        if (e.code === "KeyT" && !e.repeat) {
+          const sasCycle: SpaceSasMode[] = [
+            "MANUAL",
+            "PROGRADE",
+            "RETROGRADE",
+            "TARGET",
+          ];
+          const curMode = s.space.sasMode ?? "MANUAL";
+          const nextIdx = (sasCycle.indexOf(curMode) + 1) % sasCycle.length;
+          s.space.sasMode = sasCycle[nextIdx];
+          soundSynth.playClick();
+          syncUiNow();
+          return;
+        }
+        if (e.code === "KeyV" && !e.repeat) {
+          const camCycle: SpaceCameraMode[] = [
+            "track",
+            "cockpit",
+            "orbit",
+            "overview",
+          ];
+          const curCam = s.spaceCameraMode ?? "track";
+          const nextIdx = (camCycle.indexOf(curCam) + 1) % camCycle.length;
+          const nextCam = camCycle[nextIdx];
+          s.spaceCameraMode = nextCam;
+          setSpaceCameraMode(nextCam);
+          soundSynth.playClick();
+          syncUiNow();
+          return;
+        }
+        if (e.code === "KeyM" && !e.repeat) {
+          const nextCam =
+            s.spaceCameraMode === "overview" ? "track" : "overview";
+          s.spaceCameraMode = nextCam;
+          setSpaceCameraMode(nextCam);
+          soundSynth.playClick();
+          syncUiNow();
+          return;
+        }
         if (
           e.code === "ShiftLeft" ||
           e.code === "ShiftRight" ||
@@ -3398,7 +3449,23 @@ export default function App() {
             }
             syncUiNow();
           }}
-          onSkipToSpace={() => jumpToPhase("space")}
+          onSkipToSpace={() => {
+            const handoff = computeLaunchOrbitHandoffState(
+              simRef.current.launch,
+              simRef.current.campaignMission,
+              simRef.current.solarScaleMode ?? "exploration",
+              simRef.current.solarEpochYears ?? 0,
+              simRef.current.localAnchorId ?? "earth",
+              false,
+              0,
+            );
+            simRef.current.space = createInitialSpaceFlightState(
+              simRef.current.campaignMission,
+              carryoverRef.current,
+              handoff,
+            );
+            jumpToPhase("space");
+          }}
           onResetLaunch={() => {
             soundSynth.init();
             soundSynth.playClick();

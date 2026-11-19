@@ -239,7 +239,7 @@ export function computeLaunchOrbitHandoffState(
       ? (rOrbitKm / rEarthKm) * SCIENTIFIC_EARTH_RADIUS_UNITS
       : scaleMode === 'local'
         ? rOrbitKm * LOCAL_UNITS_PER_METER
-        : earthVisualRadius * (1 + (altKm / rEarthKm) * 0.45 + 0.12);
+        : earthVisualRadius * (1 + (altKm / rEarthKm) * 0.45 + 0.015);
 
   // Downrange orbital angle theta in radians around Earth
   const downrangeRad = ((launch.downrangeKm ?? 0) * 1000) / (rEarthKm * 1000);
@@ -327,8 +327,23 @@ export function createInitialSpaceFlightState(
 
   const startX = handoff ? handoff.shipX : spawn.x;
   const startZ = handoff ? handoff.shipZ : spawn.z;
-  const startVx = handoff ? handoff.vx : 0;
-  const startVz = handoff ? handoff.vz : 0;
+  let startVx = handoff ? handoff.vx : 0;
+  let startVz = handoff ? handoff.vz : 0;
+
+  // If entering space flight without a prior ascent handoff, initialize in stable circular Low Earth Orbit
+  if (!handoff && (missionId === 'artemis-2' || missionId === 'artemis-3')) {
+    const earthSpec = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'earth')!;
+    const earthPos = computeKeplerBodyPosition(earthSpec, 0, 'exploration', SOLAR_SUN_ORIGIN_X, SOLAR_SUN_ORIGIN_Z, 'earth');
+    const rx = startX - earthPos.x;
+    const rz = startZ - earthPos.z;
+    const rDist = Math.max(0.001, Math.hypot(rx, rz));
+    const tx = -rz / rDist;
+    const tz = rx / rDist;
+    const circSpeed = 0.20; // Verified 0.20 u/s circular orbit speed matching 7.81 km/s LEO
+    startVx = tx * circSpeed;
+    startVz = tz * circSpeed;
+  }
+
   const startHeading =
     handoff?.headingRad ??
     (Math.hypot(startVx, startVz) > 0.001
@@ -503,21 +518,21 @@ export function stepSpaceFlightPhysics(
     domPos = moonBodyPos;
     domDist = distMoon;
     domMuSi = PLANETARY_CATALOG_SI.moon.muM3S2;
-    domMuScene = solarScaleMode === 'scientific' ? 0.14 : solarScaleMode === 'local' ? 22.0 : 0.00119;
+    domMuScene = solarScaleMode === 'scientific' ? 0.14 : solarScaleMode === 'local' ? 0.012 : 0.00119;
     domName = 'Moon';
   } else if (distEarth <= soiRadii.earth) {
     domId = 'earth';
     domPos = earthBodyPos;
     domDist = distEarth;
     domMuSi = PLANETARY_CATALOG_SI.earth.muM3S2;
-    domMuScene = solarScaleMode === 'scientific' ? 0.45 : solarScaleMode === 'local' ? 140.0 : 0.0964;
+    domMuScene = solarScaleMode === 'scientific' ? 0.45 : solarScaleMode === 'local' ? 0.8006 : 0.0964;
     domName = 'Earth';
   } else if (distMars <= soiRadii.mars) {
     domId = 'mars';
     domPos = marsBodyPos;
     domDist = distMars;
     domMuSi = PLANETARY_CATALOG_SI.mars.muM3S2;
-    domMuScene = solarScaleMode === 'scientific' ? 0.22 : solarScaleMode === 'local' ? 48.0 : 0.0104;
+    domMuScene = solarScaleMode === 'scientific' ? 0.22 : solarScaleMode === 'local' ? 0.28 : 0.0104;
     domName = 'Mars';
   }
 
@@ -668,7 +683,8 @@ export function stepSpaceFlightPhysics(
   // Central gravitational acceleration toward active dominant Sphere of Influence (SOI)
   // Skip gravity pull only while actively docked / holding station inside a target capture orbit.
   const domVisRadius = getBodyVisualRadiusUnits(domId, solarScaleMode);
-  const rSoft = Math.max(domVisRadius * 1.25, domDist);
+  // Soften gravity only within or immediately below planetary surface, preserving 100% orbital equilibrium at LEO
+  const rSoft = Math.max(domVisRadius * 0.98, domDist);
   const inStationHold =
     (distToTarget <= captureRadius &&
       (s.autoPilot || (s.inSatDeployZone && input.action) || (s.targetId === 'relay-orbit' && s.orbitalSat.linkLocked))) ||

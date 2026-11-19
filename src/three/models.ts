@@ -2506,6 +2506,7 @@ export interface LaunchComplexHandles {
   esmSolarPivots: THREE.Group[];
   orionGroup: THREE.Group;
   machCone: THREE.Mesh;
+  thermalGlowCone: THREE.Mesh;
   abortTower: THREE.Group;
   lasFlame: THREE.Mesh;
   flameGroup: THREE.Group;
@@ -4422,6 +4423,22 @@ export function createLaunchComplexAndSLS(
   machCone.visible = false;
   orionStack.add(machCone);
 
+  // Hypersonic Aerothermal Shock Glow Mesh (Max-Q / Mach 1.3 to 4.5)
+  const thermalGlowCone = new THREE.Mesh(
+    new THREE.ConeGeometry(1.65, 4.8, 28, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xff5500,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  thermalGlowCone.position.y = 23.8;
+  thermalGlowCone.visible = false;
+  orionStack.add(thermalGlowCone);
+
   // Launch Abort System (LAS) Ogive Fairing & Escape Tower -> Tip reaches y = 25.47 (height = 24.57u = 98.3m)
   const abortTower = new THREE.Group();
   abortTower.position.y = 23.02;
@@ -4656,6 +4673,7 @@ export function createLaunchComplexAndSLS(
     esmSolarPivots,
     orionGroup,
     machCone,
+    thermalGlowCone,
     abortTower,
     lasFlame,
     flameGroup,
