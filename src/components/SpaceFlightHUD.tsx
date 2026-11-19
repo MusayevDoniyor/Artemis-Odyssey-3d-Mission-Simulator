@@ -10,6 +10,7 @@ import {
   Clock,
   Compass,
   Database,
+  ExternalLink,
   Mouse,
   Orbit,
   Radio,
@@ -22,8 +23,8 @@ import {
   Volume2,
   Wind,
   X,
-} from 'lucide-react';
-import type { MusicState } from '../game/audio';
+} from "lucide-react";
+import type { MusicState } from "../game/audio";
 import {
   PRIMARY_SOLAR_BAR_IDS,
   SOLAR_SUN_ORIGIN_X,
@@ -32,18 +33,21 @@ import {
   type SolarScaleMode,
   computeKeplerBodyPosition,
   getLiveSolarTargetPosition,
-} from '../game/solarSystemData';
-import type { DataProvenance } from '../game/planetaryCatalog';
+  getNasaFactSheetUrl,
+} from "../game/solarSystemData";
+import type { DataProvenance } from "../game/planetaryCatalog";
 import type {
   CampaignMissionId,
   GameMenuTab,
   ResourceState,
   SpaceCameraMode,
   SpaceFlightState,
+  SpaceSasMode,
   SpaceTargetId,
-} from '../game/types';
-import { NASAInsignia } from './NASAInsignia';
-import { PlanetThumb } from './PlanetThumb';
+  SpaceTimeWarp,
+} from "../game/types";
+import { NASAInsignia } from "./NASAInsignia";
+import { PlanetThumb } from "./PlanetThumb";
 
 interface SpaceFlightHUDProps {
   space: SpaceFlightState;
@@ -57,8 +61,12 @@ interface SpaceFlightHUDProps {
   selectedBodyPin: { xPct: number; yPct: number; visible: boolean } | null;
   solarScaleMode: SolarScaleMode;
   spaceCameraMode: SpaceCameraMode;
-  localAnchorId: 'earth' | 'moon' | 'mars';
-  horizonsProvenance: { source: string; provenance: DataProvenance; isLive: boolean };
+  localAnchorId: "earth" | "moon" | "mars";
+  horizonsProvenance: {
+    source: string;
+    provenance: DataProvenance;
+    isLive: boolean;
+  };
   solarEpochYears: number;
   musicState?: MusicState;
   muted?: boolean;
@@ -68,7 +76,7 @@ interface SpaceFlightHUDProps {
   onFlyToSolarBody?: (bodyId: string) => void;
   onChangeSolarScaleMode: (mode: SolarScaleMode) => void;
   onChangeSpaceCameraMode: (mode: SpaceCameraMode) => void;
-  onChangeLocalAnchorId: (anchor: 'earth' | 'moon' | 'mars') => void;
+  onChangeLocalAnchorId: (anchor: "earth" | "moon" | "mars") => void;
   onResetCamera: () => void;
   onOpenMenuTab: (tab: GameMenuTab) => void;
   onOpenBriefing: () => void;
@@ -80,6 +88,9 @@ interface SpaceFlightHUDProps {
   onCompleteGatewayMission: () => void;
   onEnterLunarOrbit: () => void;
   onEnterMarsOrbit: () => void;
+  onSetTimeWarp?: (warp: SpaceTimeWarp) => void;
+  onSetThrottle?: (throttle: number) => void;
+  onSetSasMode?: (mode: SpaceSasMode) => void;
 }
 
 export function SpaceFlightHUD({
@@ -117,9 +128,12 @@ export function SpaceFlightHUD({
   onCompleteGatewayMission,
   onEnterLunarOrbit,
   onEnterMarsOrbit,
+  onSetTimeWarp,
+  onSetThrottle,
+  onSetSasMode,
 }: SpaceFlightHUDProps) {
   const navSpec = space.navBodyId
-    ? SOLAR_SYSTEM_BODIES.find((b) => b.id === space.navBodyId) ?? null
+    ? (SOLAR_SYSTEM_BODIES.find((b) => b.id === space.navBodyId) ?? null)
     : null;
   const activeLivePos = navSpec
     ? computeKeplerBodyPosition(
@@ -128,7 +142,7 @@ export function SpaceFlightHUD({
         solarScaleMode,
         SOLAR_SUN_ORIGIN_X,
         SOLAR_SUN_ORIGIN_Z,
-        localAnchorId
+        localAnchorId,
       )
     : getLiveSolarTargetPosition(
         space.targetId,
@@ -136,56 +150,79 @@ export function SpaceFlightHUD({
         solarScaleMode,
         SOLAR_SUN_ORIGIN_X,
         SOLAR_SUN_ORIGIN_Z,
-        localAnchorId
+        localAnchorId,
       );
-  const distToTarget = Math.hypot(activeLivePos.x - space.shipX, activeLivePos.z - space.shipZ);
+  const distToTarget = Math.hypot(
+    activeLivePos.x - space.shipX,
+    activeLivePos.z - space.shipZ,
+  );
   const shipSpeed = Math.hypot(space.vx, space.vz);
   const sat = space.orbitalSat;
   const isMoving = shipSpeed > 0.4;
 
   const selectedBody = focusedSolarBodyId
-    ? SOLAR_SYSTEM_BODIES.find((b) => b.id === focusedSolarBodyId) ?? null
+    ? (SOLAR_SYSTEM_BODIES.find((b) => b.id === focusedSolarBodyId) ?? null)
     : null;
 
   const targetNames: Record<SpaceTargetId, string> = {
-    'relay-orbit': 'HERMES Relay',
-    moon: 'Moon Orbit',
-    gateway: 'Lunar Gateway',
-    mars: 'Mars Orbit',
+    "relay-orbit": "HERMES Relay",
+    moon: "Moon Orbit",
+    gateway: "Lunar Gateway",
+    mars: "Mars Orbit",
   };
 
   let objectiveText = freeExploreMode
     ? navSpec && space.autoPilot
       ? `Flying Orion to ${navSpec.name}.`
-      : 'Explore the Solar System and learn about the planets!'
+      : "Explore the Solar System and learn about the planets!"
     : `Fly Orion toward ${targetNames[space.targetId]}.`;
   if (!freeExploreMode) {
-    if (space.targetId === 'relay-orbit' && space.inSatDeployZone && !sat.linkLocked) {
-      objectiveText = 'Hold E or Space to deploy HERMES Relay.';
-    } else if (sat.linkLocked && campaignMission === 'artemis-2') {
-      objectiveText = 'HERMES Relay online. Complete mission below.';
-    } else if (space.arrivedGateway && campaignMission === 'artemis-4') {
-      objectiveText = 'Docked with Gateway. Complete mission below.';
+    if (campaignMission === "artemis-2") {
+      if (space.arrivedMoon || space.inSatDeployZone || sat.linkLocked) {
+        objectiveText = "Lunar Free-Return Flyby nominal (~7,400 km). Align Earth entry corridor.";
+      } else {
+        objectiveText = "Fly Orion toward the Moon on Free-Return Trajectory (~7,400 km perilune).";
+      }
+    } else if (
+      space.targetId === "relay-orbit" &&
+      space.inSatDeployZone &&
+      !sat.linkLocked
+    ) {
+      objectiveText = "Hold E or Space to deploy Orbital Relay.";
+    } else if (space.arrivedGateway && campaignMission === "artemis-4") {
+      objectiveText = "Docked with Gateway. Complete mission below.";
     } else if (space.arrivedMoon) {
-      objectiveText = 'Lunar orbit reached. Start powered descent.';
+      objectiveText = "Lunar orbit reached. Start powered descent.";
     } else if (space.arrivedMars) {
-      objectiveText = 'Mars orbit reached. Begin atmospheric entry.';
+      objectiveText = "Mars orbit reached. Begin atmospheric entry.";
     }
   }
 
-  const maxUnits = solarScaleMode === 'local' ? 440 : 165;
+  const maxUnits = solarScaleMode === "local" ? 440 : 165;
   const toRadarRadius = (rUnits: number): number => {
-    if (solarScaleMode === 'scientific') {
-      return Math.min(54, (Math.log1p(Math.max(0, rUnits)) / Math.log1p(6500)) * 54);
+    if (solarScaleMode === "scientific") {
+      return Math.min(
+        54,
+        (Math.log1p(Math.max(0, rUnits)) / Math.log1p(6500)) * 54,
+      );
     }
     return Math.min(54, (Math.max(0, rUnits) / maxUnits) * 54);
   };
 
-  const mapDotPos = (bodyId: string): { rx: number; ry: number; rOrbit: number } => {
+  const mapDotPos = (
+    bodyId: string,
+  ): { rx: number; ry: number; rOrbit: number } => {
     const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === bodyId);
     if (!spec) return { rx: 72, ry: 72, rOrbit: 0 };
-    if (solarScaleMode === 'local') {
-      const pos = computeKeplerBodyPosition(spec, solarEpochYears, 'local', 0, 0, localAnchorId);
+    if (solarScaleMode === "local") {
+      const pos = computeKeplerBodyPosition(
+        spec,
+        solarEpochYears,
+        "local",
+        0,
+        0,
+        localAnchorId,
+      );
       const rDist = Math.hypot(pos.x, pos.z);
       const ang = Math.atan2(pos.z, pos.x);
       const normR = toRadarRadius(rDist);
@@ -195,11 +232,18 @@ export function SpaceFlightHUD({
         rOrbit: normR,
       };
     }
-    if (spec.id === 'sun') return { rx: 72, ry: 72, rOrbit: 0 };
-    const pos = computeKeplerBodyPosition(spec, solarEpochYears, solarScaleMode, 0, 0, localAnchorId);
-    if (spec.id === 'moon') {
-      const earthPt = mapDotPos('earth');
-      const localMoonR = solarScaleMode === 'scientific' ? 2.6 : 3.4;
+    if (spec.id === "sun") return { rx: 72, ry: 72, rOrbit: 0 };
+    const pos = computeKeplerBodyPosition(
+      spec,
+      solarEpochYears,
+      solarScaleMode,
+      0,
+      0,
+      localAnchorId,
+    );
+    if (spec.id === "moon") {
+      const earthPt = mapDotPos("earth");
+      const localMoonR = solarScaleMode === "scientific" ? 2.6 : 3.4;
       return {
         rx: earthPt.rx + Math.cos(pos.angleRad) * localMoonR,
         ry: earthPt.ry + Math.sin(pos.angleRad) * localMoonR,
@@ -212,8 +256,10 @@ export function SpaceFlightHUD({
     return { rx, ry, rOrbit: normR };
   };
 
-  const shipRelX = solarScaleMode === 'local' ? space.shipX : space.shipX - SOLAR_SUN_ORIGIN_X;
-  const shipRelZ = solarScaleMode === 'local' ? space.shipZ : space.shipZ - SOLAR_SUN_ORIGIN_Z;
+  const shipRelX =
+    solarScaleMode === "local" ? space.shipX : space.shipX - SOLAR_SUN_ORIGIN_X;
+  const shipRelZ =
+    solarScaleMode === "local" ? space.shipZ : space.shipZ - SOLAR_SUN_ORIGIN_Z;
   const shipNormDist = toRadarRadius(Math.hypot(shipRelX, shipRelZ));
   const shipAngle = Math.atan2(shipRelZ, shipRelX);
   const shipMapX = 72 + Math.cos(shipAngle) * shipNormDist;
@@ -223,39 +269,46 @@ export function SpaceFlightHUD({
   const showLandMoon =
     (space.arrivedMoon ||
       (freeExploreMode &&
-        (focusedSolarBodyId === 'moon' ||
-          focusedSolarBodyId === 'earth' ||
-          space.navBodyId === 'moon'))) &&
-    campaignMission !== 'mars-pathfinder';
+        (focusedSolarBodyId === "moon" ||
+          focusedSolarBodyId === "earth" ||
+          space.navBodyId === "moon"))) &&
+    campaignMission !== "mars-pathfinder";
   const showLandMars =
     space.arrivedMars ||
-    (freeExploreMode && (focusedSolarBodyId === 'mars' || space.navBodyId === 'mars'));
+    (freeExploreMode &&
+      (focusedSolarBodyId === "mars" || space.navBodyId === "mars"));
 
   const showContextualRow =
     (space.inSatDeployZone && !sat.linkLocked) ||
-    (sat.linkLocked && campaignMission === 'artemis-2') ||
-    (space.arrivedGateway && campaignMission === 'artemis-4') ||
+    (sat.linkLocked && campaignMission === "artemis-2") ||
+    (space.arrivedGateway && campaignMission === "artemis-4") ||
     showLandMoon ||
     showLandMars ||
     isMoving;
 
-  const showMetersGroup = !freeExploreMode || space.inRadiationZone || space.fuelPct < 35;
+  const showMetersGroup =
+    !freeExploreMode || space.inRadiationZone || space.fuelPct < 35;
 
   const exploreButtonLabel =
-    selectedBody?.id === 'moon'
-      ? 'Explore Moon'
-      : selectedBody?.id === 'mars' || selectedBody?.id === 'earth'
-        ? 'Explore Planet'
-        : 'Inspect World';
+    selectedBody?.id === "moon"
+      ? "Explore Moon"
+      : selectedBody?.id === "mars" || selectedBody?.id === "earth"
+        ? "Explore Planet"
+        : "Inspect World";
 
   const exploredPrimaryCount = exploredSolarBodyIds.filter((id) =>
-    (PRIMARY_SOLAR_BAR_IDS as readonly string[]).includes(id)
+    (PRIMARY_SOLAR_BAR_IDS as readonly string[]).includes(id),
   ).length;
   const objectiveProgressPct = freeExploreMode
-    ? Math.min(100, Math.round((exploredPrimaryCount / PRIMARY_SOLAR_BAR_IDS.length) * 100))
+    ? Math.min(
+        100,
+        Math.round((exploredPrimaryCount / PRIMARY_SOLAR_BAR_IDS.length) * 100),
+      )
     : Math.min(100, Math.round((space.visitedTargets.length / 4) * 100));
 
-  const isSelectedBodyExplored = selectedBody ? exploredSolarBodyIds.includes(selectedBody.id) : false;
+  const isSelectedBodyExplored = selectedBody
+    ? exploredSolarBodyIds.includes(selectedBody.id)
+    : false;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex flex-col justify-between p-3.5 lg:px-6 lg:py-4">
@@ -280,8 +333,17 @@ export function SpaceFlightHUD({
         <header className="flex items-center justify-between gap-2 lg:gap-4">
           {/* Left: Brand Logo */}
           <div className="pointer-events-auto flex shrink-0 items-center gap-2.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
-            <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-              <path d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z" fill="#FFFFFF" />
+            <svg
+              width="30"
+              height="30"
+              viewBox="0 0 32 32"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M16 4L27 27H21.5L16 15.5L10.5 27H5L16 4Z"
+                fill="#FFFFFF"
+              />
               <path
                 d="M6.5 22.5C12 18 20 15 28.5 16.5"
                 stroke="#22D3EE"
@@ -307,7 +369,7 @@ export function SpaceFlightHUD({
           >
             <button
               type="button"
-              onClick={() => onFocusSolarBody(focusedSolarBodyId || 'earth')}
+              onClick={() => onFocusSolarBody(focusedSolarBodyId || "earth")}
               className="hud-nav-active inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap lg:gap-2 lg:px-3.5 lg:text-sm"
             >
               <Orbit className="h-3.5 w-3.5 text-cyan-300 lg:h-4 lg:w-4" />
@@ -339,7 +401,7 @@ export function SpaceFlightHUD({
             </button>
             <button
               type="button"
-              onClick={() => onOpenMenuTab('achievements')}
+              onClick={() => onOpenMenuTab("achievements")}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:gap-2 lg:px-3 lg:text-sm"
             >
               <Trophy className="h-3.5 w-3.5 text-cyan-300 lg:h-4 lg:w-4" />
@@ -347,7 +409,7 @@ export function SpaceFlightHUD({
             </button>
             <button
               type="button"
-              onClick={() => onOpenMenuTab('settings')}
+              onClick={() => onOpenMenuTab("settings")}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:gap-2 lg:px-3 lg:text-sm"
             >
               <Settings className="h-3.5 w-3.5 text-slate-300 lg:h-4 lg:w-4" />
@@ -357,25 +419,28 @@ export function SpaceFlightHUD({
 
           {/* Right: Enable Audio (when blocked) + NASA Data Online Status + Insignia */}
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
-            {musicState?.audioBlocked && musicState.musicEnabled && !muted && onUnlockAudio && (
-              <button
-                type="button"
-                onClick={onUnlockAudio}
-                className="hud-cta-cyan inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-hud text-[11px] font-bold tracking-wider uppercase shadow-[0_0_16px_rgba(34,211,238,0.4)]"
-              >
-                <Volume2 className="h-3.5 w-3.5" />
-                Enable Audio
-              </button>
-            )}
-            <div
-              className="hud-soft inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-100 lg:px-3.5 lg:text-sm"
-            >
+            {musicState?.audioBlocked &&
+              musicState.musicEnabled &&
+              !muted &&
+              onUnlockAudio && (
+                <button
+                  type="button"
+                  onClick={onUnlockAudio}
+                  className="hud-cta-cyan inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-hud text-[11px] font-bold tracking-wider uppercase shadow-[0_0_16px_rgba(34,211,238,0.4)]"
+                >
+                  <Volume2 className="h-3.5 w-3.5" />
+                  Enable Audio
+                </button>
+              )}
+            <div className="hud-soft inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-slate-100 lg:px-3.5 lg:text-sm">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  nasaOnline ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
+                  nasaOnline
+                    ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
+                    : "bg-amber-400"
                 }`}
               />
-              <span>{nasaOnline ? 'Online' : 'Archived'}</span>
+              <span>{nasaOnline ? "Online" : "Archived"}</span>
               <span className="text-slate-500">·</span>
               <span className="text-sky-200">NASA Data</span>
             </div>
@@ -392,7 +457,11 @@ export function SpaceFlightHUD({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-cyan-300 lg:text-sm">
                 <span className="inline-block h-2 w-2 rotate-45 rounded-[2px] bg-cyan-400" />
-                <span>{freeExploreMode ? 'Exploration Objective' : 'Deep Space Transit'}</span>
+                <span>
+                  {freeExploreMode
+                    ? "Exploration Objective"
+                    : "Deep Space Transit"}
+                </span>
               </div>
               <span className="shrink-0 text-xs font-bold text-white tabular-nums lg:text-sm">
                 {freeExploreMode
@@ -400,7 +469,9 @@ export function SpaceFlightHUD({
                   : `${space.visitedTargets.length} / 4`}
               </span>
             </div>
-            <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">{objectiveText}</p>
+            <p className="mt-1 text-xs leading-snug text-slate-200 lg:text-sm">
+              {objectiveText}
+            </p>
             <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-400 transition-all duration-300"
@@ -416,9 +487,9 @@ export function SpaceFlightHUD({
               <div className="flex items-center gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
                 {(
                   [
-                    { id: 'exploration', label: 'Explore' },
-                    { id: 'scientific', label: 'Real AU' },
-                    { id: 'local', label: 'Local' },
+                    { id: "exploration", label: "Educational" },
+                    { id: "scientific", label: "True Scale" },
+                    { id: "local", label: "Local" },
                   ] as const
                 ).map((m) => (
                   <button
@@ -428,8 +499,8 @@ export function SpaceFlightHUD({
                     onClick={() => onChangeSolarScaleMode(m.id)}
                     className={`rounded-lg px-2 py-1 font-semibold transition ${
                       solarScaleMode === m.id
-                        ? 'bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-400/60'
-                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                        ? "bg-cyan-500/25 text-cyan-200 ring-1 ring-cyan-400/60"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     {m.label}
@@ -437,17 +508,17 @@ export function SpaceFlightHUD({
                 ))}
               </div>
 
-              {solarScaleMode === 'local' && (
+              {solarScaleMode === "local" && (
                 <div className="flex items-center gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
-                  {(['earth', 'moon', 'mars'] as const).map((anchor) => (
+                  {(["earth", "moon", "mars"] as const).map((anchor) => (
                     <button
                       key={anchor}
                       type="button"
                       onClick={() => onChangeLocalAnchorId(anchor)}
                       className={`rounded-lg px-1.5 py-1 text-[10px] font-bold uppercase transition ${
                         localAnchorId === anchor
-                          ? 'bg-amber-500/25 text-amber-200 ring-1 ring-amber-400/60'
-                          : 'text-slate-400 hover:text-white'
+                          ? "bg-amber-500/25 text-amber-200 ring-1 ring-amber-400/60"
+                          : "text-slate-400 hover:text-white"
                       }`}
                     >
                       {anchor}
@@ -463,11 +534,11 @@ export function SpaceFlightHUD({
                 <Camera className="mr-0.5 h-3.5 w-3.5 text-cyan-300" />
                 {(
                   [
-                    { id: 'overview', label: 'Overview' },
-                    { id: 'focus', label: 'Focus' },
-                    { id: 'orbit', label: 'Orbit' },
-                    { id: 'track', label: 'Track' },
-                    { id: 'free', label: 'Free' },
+                    { id: "overview", label: "Overview" },
+                    { id: "focus", label: "Focus" },
+                    { id: "orbit", label: "Orbit" },
+                    { id: "track", label: "Track" },
+                    { id: "free", label: "Free" },
                   ] as const
                 ).map((cam) => (
                   <button
@@ -477,8 +548,8 @@ export function SpaceFlightHUD({
                     onClick={() => onChangeSpaceCameraMode(cam.id)}
                     className={`rounded-lg px-1.5 py-1 font-semibold transition ${
                       spaceCameraMode === cam.id
-                        ? 'bg-sky-500/25 text-white ring-1 ring-sky-400/60'
-                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                        ? "bg-sky-500/25 text-white ring-1 ring-sky-400/60"
+                        : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
                     }`}
                   >
                     {cam.label}
@@ -503,27 +574,32 @@ export function SpaceFlightHUD({
               <Database className="h-3 w-3 text-cyan-300" />
               <span
                 className={
-                  solarScaleMode === 'exploration'
-                    ? 'text-amber-200'
+                  solarScaleMode === "exploration"
+                    ? "text-amber-200"
                     : horizonsProvenance.isLive
-                      ? 'text-emerald-300'
-                      : 'text-sky-200'
+                      ? "text-emerald-300"
+                      : "text-sky-200"
                 }
               >
-                {solarScaleMode === 'exploration'
-                  ? 'VISUAL REPRESENTATION · Compressed Orbits'
-                  : `${horizonsProvenance.provenance} · ${horizonsProvenance.source}`}
+                {solarScaleMode === "exploration"
+                  ? "Distances compressed 24× (Educational Scale)"
+                  : solarScaleMode === "scientific"
+                    ? "TRUE SCALE · 1:1 ASTRONOMICAL"
+                    : `${horizonsProvenance.provenance} · ${horizonsProvenance.source}`}
               </span>
             </div>
           </div>
 
           {showMetersGroup && (
-            <div data-testid="hud-group-meters" className="flex flex-col items-end gap-2">
+            <div
+              data-testid="hud-group-meters"
+              className="flex flex-col items-end gap-2"
+            >
               {!freeExploreMode && (
                 <div className="hud-soft pointer-events-auto flex items-center divide-x divide-white/10 rounded-2xl px-3.5 py-2 tabular-nums">
                   <div className="flex items-center gap-2 pr-3.5">
                     <Battery
-                      className={`h-4 w-4 lg:h-5 lg:w-5 ${resources.power <= 20 ? 'text-rose-400' : 'text-amber-400'}`}
+                      className={`h-4 w-4 lg:h-5 lg:w-5 ${resources.power <= 20 ? "text-rose-400" : "text-amber-400"}`}
                     />
                     <div>
                       <span className="block text-sm leading-none font-bold text-white lg:text-base">
@@ -543,12 +619,14 @@ export function SpaceFlightHUD({
                   </div>
                   <div className="flex items-center gap-2 px-3.5">
                     <Shield
-                      className={`h-4 w-4 lg:h-5 lg:w-5 ${resources.shield <= 20 ? 'text-rose-400' : 'text-amber-400'}`}
+                      className={`h-4 w-4 lg:h-5 lg:w-5 ${resources.shield <= 20 ? "text-rose-400" : "text-amber-400"}`}
                     />
                     <div>
                       <span
                         className={`block text-sm leading-none font-bold lg:text-base ${
-                          resources.shield <= 20 ? 'text-rose-400' : 'text-white'
+                          resources.shield <= 20
+                            ? "text-rose-400"
+                            : "text-white"
                         }`}
                       >
                         {Math.round(resources.shield)}%
@@ -562,17 +640,25 @@ export function SpaceFlightHUD({
                       <span className="block text-sm leading-none font-bold text-white lg:text-base">
                         {Math.round(distToTarget)} u
                       </span>
-                      <span className="text-[11px] text-slate-400">Target</span>
+                      <span className="text-[11px] text-slate-400">
+                        {solarScaleMode === "exploration"
+                          ? "Target [24× scale]"
+                          : "Target"}
+                      </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {(space.inRadiationZone || space.fuelPct < 35 || (!freeExploreMode && space.targetId === 'mars')) && (
+              {(space.inRadiationZone ||
+                space.fuelPct < 35 ||
+                (!freeExploreMode && (space.commsDelaySec ?? 0) > 1.0)) && (
                 <div className="flex flex-wrap justify-end gap-2">
-                  {!freeExploreMode && space.targetId === 'mars' && (
-                    <span className="hud-soft rounded-xl px-3 py-1 text-xs font-semibold text-amber-200">
-                      14m radio lag
+                  {space.commsDelaySec != null && space.commsDelaySec > 1.0 && (
+                    <span className="hud-soft rounded-xl px-3 py-1 text-xs font-semibold text-amber-200 tabular-nums">
+                      {space.commsDelaySec < 60
+                        ? `${space.commsDelaySec.toFixed(2)}s radio lag`
+                        : `${(space.commsDelaySec / 60).toFixed(1)}m radio lag`}
                     </span>
                   )}
                   {space.fuelPct < 35 && (
@@ -586,8 +672,12 @@ export function SpaceFlightHUD({
                       onClick={onToggleShieldBoost}
                       className="hud-soft-alert pointer-events-auto rounded-xl px-3 py-1 text-xs font-semibold text-rose-200 transition hover:border-rose-300"
                     >
-                      {donkiFlareActive ? 'Solar Storm' : 'Radiation Zone'} ·{' '}
-                      {space.shieldBoostActive ? 'Shield On' : 'Enable Shield'}
+                      {donkiFlareActive ? "Solar Storm" : "Radiation Zone"}
+                      {space.radiationDoseRateUsvH != null
+                        ? ` (${space.radiationDoseRateUsvH.toFixed(0)} µSv/h)`
+                        : ""}{" "}
+                      ·{" "}
+                      {space.shieldBoostActive ? "Shield On" : "Enable Shield"}
                     </button>
                   )}
                 </div>
@@ -646,35 +736,45 @@ export function SpaceFlightHUD({
                 <CircleDot className="h-3.5 w-3.5 text-cyan-300" />
                 Diameter
               </dt>
-              <dd className="text-right font-semibold text-white">{selectedBody.diameterDisplay}</dd>
+              <dd className="text-right font-semibold text-white">
+                {selectedBody.diameterDisplay}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
                 <Scale className="h-3.5 w-3.5 text-cyan-300" />
                 Mass
               </dt>
-              <dd className="text-right font-semibold text-white">{selectedBody.massDisplay}</dd>
+              <dd className="text-right font-semibold text-white">
+                {selectedBody.massDisplay}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
                 <ArrowDown className="h-3.5 w-3.5 text-cyan-300" />
                 Gravity
               </dt>
-              <dd className="text-right font-semibold text-white">{selectedBody.gravityDisplay}</dd>
+              <dd className="text-right font-semibold text-white">
+                {selectedBody.gravityDisplay}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
                 <Clock className="h-3.5 w-3.5 text-cyan-300" />
                 Orbital Period
               </dt>
-              <dd className="text-right font-semibold text-white">{selectedBody.orbitalPeriodDisplay}</dd>
+              <dd className="text-right font-semibold text-white">
+                {selectedBody.orbitalPeriodDisplay}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
                 <Orbit className="h-3.5 w-3.5 text-cyan-300" />
                 Avg. Distance
               </dt>
-              <dd className="text-right font-semibold text-white">{selectedBody.avgDistanceDisplay}</dd>
+              <dd className="text-right font-semibold text-white">
+                {selectedBody.avgDistanceDisplay}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
@@ -690,14 +790,27 @@ export function SpaceFlightHUD({
                 <Orbit className="h-3.5 w-3.5 text-cyan-300" />
                 Eccentricity
               </dt>
-              <dd className="text-right font-semibold text-white">e = {selectedBody.eccentricity.toFixed(4)}</dd>
+              <dd className="text-right font-semibold text-white">
+                e = {selectedBody.eccentricity.toFixed(4)}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-1.5">
               <dt className="inline-flex shrink-0 items-center gap-2 text-slate-400">
                 <Database className="h-3.5 w-3.5 text-cyan-300" />
                 Data Source
               </dt>
-              <dd className="text-right text-[11px] font-bold text-emerald-300">{selectedBody.provenance}</dd>
+              <dd className="text-right text-[11px] font-bold text-emerald-300">
+                <a
+                  href={getNasaFactSheetUrl(selectedBody.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200 underline decoration-cyan-400/50"
+                  title="View official NASA Planetary Fact Sheet"
+                >
+                  <span>{selectedBody.provenance}</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </dd>
             </div>
           </dl>
 
@@ -715,7 +828,7 @@ export function SpaceFlightHUD({
               <span>{exploreButtonLabel}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
-            {onFlyToSolarBody && selectedBody.id !== 'sun' && (
+            {onFlyToSolarBody && selectedBody.id !== "sun" && (
               <button
                 type="button"
                 data-testid="fly-orion-body-btn"
@@ -736,7 +849,7 @@ export function SpaceFlightHUD({
         <button
           type="button"
           data-testid="hud-group-radar"
-          onClick={() => onOpenMenuTab('map')}
+          onClick={() => onOpenMenuTab("map")}
           title="Open Full Solar Map [M]"
           className="hud-soft group pointer-events-auto relative h-28 w-28 shrink-0 rounded-full p-1 transition hover:border-cyan-300/75 lg:h-[120px] lg:w-[120px]"
         >
@@ -749,12 +862,19 @@ export function SpaceFlightHUD({
               stroke="rgba(56,189,248,0.34)"
               strokeWidth="1.2"
             />
-            <text x="72" y="13" textAnchor="middle" fontSize="9.5" fontWeight="700" fill="#cbd5e1">
+            <text
+              x="72"
+              y="13"
+              textAnchor="middle"
+              fontSize="9.5"
+              fontWeight="700"
+              fill="#cbd5e1"
+            >
               N
             </text>
 
             {/* Concentric Orbit Rings (Heliocentric in Explore/Real AU, Range Rings in Local) */}
-            {solarScaleMode === 'local' ? (
+            {solarScaleMode === "local" ? (
               [12, 30, 47.1].map((rRing, idx) => (
                 <circle
                   key={`local-ring-${idx}`}
@@ -762,41 +882,54 @@ export function SpaceFlightHUD({
                   cy="72"
                   r={rRing}
                   fill="none"
-                  stroke={idx === 2 ? 'rgba(34,211,238,0.45)' : 'rgba(148,163,184,0.22)'}
-                  strokeWidth={idx === 2 ? '1.0' : '0.75'}
+                  stroke={
+                    idx === 2
+                      ? "rgba(34,211,238,0.45)"
+                      : "rgba(148,163,184,0.22)"
+                  }
+                  strokeWidth={idx === 2 ? "1.0" : "0.75"}
                 />
               ))
             ) : (
               <>
-                {['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'].map(
-                  (id) => {
-                    const pt = mapDotPos(id);
-                    const isSelectedOrbit = focusedSolarBodyId === id;
-                    const isEarthOrMars = id === 'earth' || id === 'mars';
-                    return (
-                      <circle
-                        key={`ring-${id}`}
-                        cx="72"
-                        cy="72"
-                        r={pt.rOrbit}
-                        fill="none"
-                        stroke={
-                          isSelectedOrbit
-                            ? 'rgba(34,211,238,0.68)'
-                            : isEarthOrMars
-                              ? 'rgba(125,211,252,0.36)'
-                              : 'rgba(148,163,184,0.22)'
-                        }
-                        strokeWidth={isSelectedOrbit ? '1.1' : '0.75'}
-                      />
-                    );
-                  }
-                )}
+                {[
+                  "mercury",
+                  "venus",
+                  "earth",
+                  "mars",
+                  "jupiter",
+                  "saturn",
+                  "uranus",
+                  "neptune",
+                  "pluto",
+                ].map((id) => {
+                  const pt = mapDotPos(id);
+                  const isSelectedOrbit = focusedSolarBodyId === id;
+                  const isEarthOrMars = id === "earth" || id === "mars";
+                  return (
+                    <circle
+                      key={`ring-${id}`}
+                      cx="72"
+                      cy="72"
+                      r={pt.rOrbit}
+                      fill="none"
+                      stroke={
+                        isSelectedOrbit
+                          ? "rgba(34,211,238,0.68)"
+                          : isEarthOrMars
+                            ? "rgba(125,211,252,0.36)"
+                            : "rgba(148,163,184,0.22)"
+                      }
+                      strokeWidth={isSelectedOrbit ? "1.1" : "0.75"}
+                    />
+                  );
+                })}
 
                 {/* Local Lunar Orbit Circle around Earth */}
                 {(() => {
-                  const earthPt = mapDotPos('earth');
-                  const localMoonR = solarScaleMode === 'scientific' ? 2.6 : 3.4;
+                  const earthPt = mapDotPos("earth");
+                  const localMoonR =
+                    solarScaleMode === "scientific" ? 2.6 : 3.4;
                   return (
                     <circle
                       cx={earthPt.rx}
@@ -804,9 +937,10 @@ export function SpaceFlightHUD({
                       r={localMoonR}
                       fill="none"
                       stroke={
-                        focusedSolarBodyId === 'moon' || focusedSolarBodyId === 'earth'
-                          ? 'rgba(34,211,238,0.65)'
-                          : 'rgba(148,163,184,0.38)'
+                        focusedSolarBodyId === "moon" ||
+                        focusedSolarBodyId === "earth"
+                          ? "rgba(34,211,238,0.65)"
+                          : "rgba(148,163,184,0.38)"
                       }
                       strokeWidth="0.7"
                     />
@@ -820,10 +954,12 @@ export function SpaceFlightHUD({
             )}
 
             {/* Planet Dots */}
-            {PRIMARY_SOLAR_BAR_IDS.filter((id) => id !== 'sun').map((id) => {
+            {PRIMARY_SOLAR_BAR_IDS.filter((id) => id !== "sun").map((id) => {
               const pt = mapDotPos(id);
               const spec = SOLAR_SYSTEM_BODIES.find((b) => b.id === id);
-              const hex = spec ? `#${spec.color.toString(16).padStart(6, '0')}` : '#38bdf8';
+              const hex = spec
+                ? `#${spec.color.toString(16).padStart(6, "0")}`
+                : "#38bdf8";
               const isSelected = focusedSolarBodyId === id;
               return (
                 <g key={`dot-${id}`}>
@@ -831,7 +967,7 @@ export function SpaceFlightHUD({
                     <circle
                       cx={pt.rx}
                       cy={pt.ry}
-                      r={id === 'moon' ? 4.0 : 5.6}
+                      r={id === "moon" ? 4.0 : 5.6}
                       fill="none"
                       stroke="#22d3ee"
                       strokeWidth="1.4"
@@ -840,7 +976,7 @@ export function SpaceFlightHUD({
                   <circle
                     cx={pt.rx}
                     cy={pt.ry}
-                    r={id === 'jupiter' ? 3.2 : id === 'moon' ? 1.6 : 2.4}
+                    r={id === "jupiter" ? 3.2 : id === "moon" ? 1.6 : 2.4}
                     fill={hex}
                   />
                 </g>
@@ -848,7 +984,14 @@ export function SpaceFlightHUD({
             })}
 
             {/* Orion Spacecraft Marker */}
-            <circle cx={shipMapX} cy={shipMapY} r="2.6" fill="#ffffff" stroke="#f59e0b" strokeWidth="1.2" />
+            <circle
+              cx={shipMapX}
+              cy={shipMapY}
+              r="2.6"
+              fill="#ffffff"
+              stroke="#f59e0b"
+              strokeWidth="1.2"
+            />
           </svg>
           <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md border border-cyan-400/40 bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-cyan-200 opacity-0 transition group-hover:opacity-100">
             Map [M]
@@ -860,9 +1003,126 @@ export function SpaceFlightHUD({
           data-testid="hud-group-speed"
           className="flex min-w-0 flex-col items-center gap-2"
         >
+          {/* Time Warp Ladder & Flight Control Bar */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {/* Time Warp Ladder */}
+            {(() => {
+              const currentWarp = space.timeWarp ?? 1;
+              const simTimeMultiplier = currentWarp * 70;
+              return (
+                <div
+                  data-testid="time-warp-ladder"
+                  className="hud-soft pointer-events-auto flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-mono-tech"
+                >
+                  <div
+                    className="flex items-center gap-1.5 pr-2 border-r border-white/10 text-slate-300"
+                    title={`Simulation Rate: 1x = ~70x real time (165 km orbit period 75.7s vs 87.7 min real)`}
+                  >
+                    <Clock className="h-3 w-3 text-cyan-300" />
+                    <span className="font-bold text-white">{currentWarp}x</span>
+                    <span className="text-[10px] text-sky-300/90 font-mono tracking-tight inline">
+                      (1x = 70× real)
+                    </span>
+                  </div>
+                  {([1, 2, 5, 10, 50, 100, 500, 1000] as const).map((tw) => (
+                    <button
+                      key={tw}
+                      type="button"
+                      data-testid={`warp-btn-${tw}`}
+                      onClick={() => onSetTimeWarp?.(tw)}
+                      title={`Set Time Warp to ${tw}x (Sim Rate: ${(tw * 70).toLocaleString()}x real time) [Use [ and ] keys]`}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition ${
+                        currentWarp === tw
+                          ? "bg-cyan-400/25 border border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.4)]"
+                          : "text-slate-400 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      {tw}x
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* SAS Modes & Fine Throttle */}
+            <div
+              data-testid="flight-sas-throttle"
+              className="hud-soft pointer-events-auto flex items-center gap-2 rounded-xl px-2.5 py-1 text-xs font-mono-tech"
+            >
+              {/* Throttle Controls */}
+              <div
+                className="flex items-center gap-1.5"
+                title="Fine Throttle: [Shift]/[+] Up (+10%) · [C]/[-] Down (-10%) · [Z] Full (100%) · [X] Cut (0%)"
+              >
+                <span className="text-[10px] font-bold text-slate-400">
+                  THR:
+                </span>
+                <div className="relative h-2 w-14 overflow-hidden rounded-full bg-slate-800 border border-white/10">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-all duration-75"
+                    style={{
+                      width: `${Math.round((space.throttle ?? 0) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <span className="w-7 text-right text-[10px] font-bold text-white tabular-nums">
+                  {Math.round((space.throttle ?? 0) * 100)}%
+                </span>
+                <button
+                  type="button"
+                  data-testid="throttle-cut-btn"
+                  onClick={() => onSetThrottle?.(0)}
+                  title="Cut Throttle [X]"
+                  className="rounded border border-rose-500/40 bg-rose-500/15 px-1 py-0.5 text-[9px] font-bold text-rose-300 hover:bg-rose-500/30"
+                >
+                  CUT
+                </button>
+                <button
+                  type="button"
+                  data-testid="throttle-full-btn"
+                  onClick={() => onSetThrottle?.(1.0)}
+                  title="Full Throttle [Z]"
+                  className="rounded border border-cyan-500/40 bg-cyan-500/15 px-1 py-0.5 text-[9px] font-bold text-cyan-300 hover:bg-cyan-500/30"
+                >
+                  FULL
+                </button>
+              </div>
+
+              <div className="h-3.5 w-px bg-white/15" />
+
+              {/* SAS Modes */}
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-400">
+                  SAS:
+                </span>
+                {(["MANUAL", "PROGRADE", "RETROGRADE", "TARGET"] as const).map(
+                  (mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      data-testid={`sas-btn-${mode.toLowerCase()}`}
+                      onClick={() => onSetSasMode?.(mode)}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition ${
+                        (space.sasMode ?? "MANUAL") === mode
+                          ? "bg-amber-400/25 border border-amber-400 text-amber-200 shadow-[0_0_8px_rgba(251,191,36,0.4)]"
+                          : "text-slate-400 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      {mode === "PROGRADE"
+                        ? "⨁ PRO"
+                        : mode === "RETROGRADE"
+                          ? "⨂ RETRO"
+                          : mode}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          </div>
+
           {showContextualRow && (
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {space.inSatDeployZone && !sat.linkLocked && (
+              {campaignMission !== "artemis-2" && space.inSatDeployZone && !sat.linkLocked && (
                 <button
                   type="button"
                   data-testid="deploy-sat-btn"
@@ -870,22 +1130,24 @@ export function SpaceFlightHUD({
                   className="hud-cta-cyan pointer-events-auto inline-flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold lg:text-sm"
                 >
                   <Radio className="h-4 w-4" />
-                  Hold E to Deploy Relay ({Math.round((sat.solarDeployedPct + sat.dishAlignedPct) / 2)}%)
+                  Hold E to Deploy Relay (
+                  {Math.round((sat.solarDeployedPct + sat.dishAlignedPct) / 2)}
+                  %)
                 </button>
               )}
 
-              {sat.linkLocked && campaignMission === 'artemis-2' && (
+              {campaignMission === "artemis-2" && (space.arrivedMoon || space.inSatDeployZone || sat.linkLocked) && (
                 <button
                   type="button"
                   data-testid="complete-sat-mission-btn"
                   onClick={onCompleteSatelliteMission}
                   className="hud-cta-cyan pointer-events-auto rounded-xl px-4 py-1.5 text-xs font-bold lg:text-sm"
                 >
-                  Relay Locked — Complete Artemis II
+                  Lunar Flyby Complete — Return to Earth
                 </button>
               )}
 
-              {space.arrivedGateway && campaignMission === 'artemis-4' && (
+              {space.arrivedGateway && campaignMission === "artemis-4" && (
                 <button
                   type="button"
                   data-testid="complete-gateway-mission-btn"
@@ -920,23 +1182,43 @@ export function SpaceFlightHUD({
                 </button>
               )}
 
-              {(isMoving || solarScaleMode !== 'exploration' || space.trajectoryRegime) && (
-                <div className="hud-soft flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs tabular-nums">
-                  <span className="font-bold text-white">{shipSpeed.toFixed(1)} u/s</span>
+              {(isMoving ||
+                solarScaleMode !== "exploration" ||
+                space.trajectoryRegime) && (
+                <div className="hud-soft flex flex-wrap items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs tabular-nums font-mono-tech">
+                  <span className="font-bold text-white">
+                    {shipSpeed.toFixed(1)} u/s
+                  </span>
                   {space.orbitalSpeedKmS != null && (
                     <span className="font-semibold text-cyan-300">
                       {space.orbitalSpeedKmS.toFixed(2)} km/s
                     </span>
                   )}
+                  {space.altitudeKm != null && (
+                    <span className="text-slate-300">
+                      · Alt {space.altitudeKm.toLocaleString()} km
+                    </span>
+                  )}
                   {space.dominantBodyName && (
-                    <span className="text-sky-200">· {space.dominantBodyName} SOI</span>
+                    <span className="text-sky-200">
+                      · {space.dominantBodyName} SOI
+                    </span>
+                  )}
+                  {space.activeTrajectoryFrame && (
+                    <span className="rounded bg-sky-950/70 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-sky-300 border border-sky-400/30 uppercase">
+                      {space.activeTrajectoryFrame === "moon_centred"
+                        ? "Lunar SOI"
+                        : space.activeTrajectoryFrame === "earth_inertial"
+                          ? "Earth Inertial"
+                          : "Earth-Moon Rotating"}
+                    </span>
                   )}
                   {space.trajectoryRegime && (
                     <span
                       className={
-                        space.trajectoryRegime === 'Hyperbolic Escape'
-                          ? 'font-semibold text-amber-300'
-                          : 'text-slate-300'
+                        space.trajectoryRegime === "Hyperbolic Escape"
+                          ? "font-semibold text-amber-300"
+                          : "text-slate-300"
                       }
                     >
                       · {space.trajectoryRegime}
@@ -948,15 +1230,40 @@ export function SpaceFlightHUD({
                     </span>
                   )}
                   {space.distanceFromSunAu != null && (
-                    <span className="text-slate-300">· {space.distanceFromSunAu.toFixed(3)} AU</span>
+                    <span className="text-slate-300">
+                      · {space.distanceFromSunAu.toFixed(3)} AU
+                    </span>
                   )}
                   {space.distanceToTargetKm != null && (
                     <span className="text-sky-200">
-                      · {Math.round(space.distanceToTargetKm).toLocaleString()} km
+                      · {Math.round(space.distanceToTargetKm).toLocaleString()}{" "}
+                      km
+                    </span>
+                  )}
+                  {space.commsDelaySec != null &&
+                    space.commsDelaySec > 0.05 && (
+                      <span className="text-amber-300">
+                        · Comms{" "}
+                        {space.commsDelaySec < 60
+                          ? `${space.commsDelaySec.toFixed(2)}s`
+                          : `${(space.commsDelaySec / 60).toFixed(1)}m`}
+                      </span>
+                    )}
+                  {space.radiationDoseRateUsvH != null && (
+                    <span
+                      className={
+                        space.radiationDoseRateUsvH > 100
+                          ? "text-rose-300 font-bold"
+                          : "text-slate-400"
+                      }
+                    >
+                      · {space.radiationDoseRateUsvH.toFixed(0)} µSv/h
                     </span>
                   )}
                   {space.autoPilot && (
-                    <span className="font-semibold text-amber-300">· Auto-Pilot</span>
+                    <span className="font-semibold text-amber-300">
+                      · Auto-Pilot
+                    </span>
                   )}
                 </div>
               )}
@@ -980,20 +1287,22 @@ export function SpaceFlightHUD({
                   onClick={() => onFocusSolarBody(bodyId)}
                   className={`group relative flex min-w-[46px] shrink-0 flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-all duration-200 lg:min-w-[52px] ${
                     isSelected
-                      ? 'border border-cyan-400/90 bg-cyan-500/18 shadow-[0_0_16px_rgba(34,211,238,0.26)]'
-                      : 'border border-transparent hover:bg-white/[0.06]'
+                      ? "border border-cyan-400/90 bg-cyan-500/18 shadow-[0_0_16px_rgba(34,211,238,0.26)]"
+                      : "border border-transparent hover:bg-white/[0.06]"
                   }`}
                 >
                   <span
                     className={`transition-transform duration-200 ${
-                      isSelected ? 'scale-105' : 'group-hover:scale-105'
+                      isSelected ? "scale-105" : "group-hover:scale-105"
                     }`}
                   >
                     <PlanetThumb bodyId={bodyId} size="xs" />
                   </span>
                   <span
                     className={`text-[10px] font-semibold tracking-wide lg:text-[11px] ${
-                      isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                      isSelected
+                        ? "text-white"
+                        : "text-slate-300 group-hover:text-white"
                     }`}
                   >
                     {spec.shortName}
@@ -1021,7 +1330,7 @@ export function SpaceFlightHUD({
             className="flex items-center gap-2.5 text-left transition hover:text-cyan-200"
           >
             <span className="inline-flex items-center gap-0.5">
-              {['W', 'A', 'S', 'D'].map((k) => (
+              {["W", "A", "S", "D"].map((k) => (
                 <span
                   key={k}
                   className="inline-flex h-[18px] w-[18px] items-center justify-center rounded border border-sky-400/45 bg-sky-500/12 text-[10px] font-bold text-white"
@@ -1055,7 +1364,7 @@ export function SpaceFlightHUD({
                 onClick={onToggleAutoPilot}
                 className="rounded-md border border-amber-400/45 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-bold text-amber-300 transition hover:bg-amber-500/25"
               >
-                G {space.autoPilot ? 'Auto On' : 'Auto'}
+                G {space.autoPilot ? "Auto On" : "Auto"}
               </button>
             )}
           </div>

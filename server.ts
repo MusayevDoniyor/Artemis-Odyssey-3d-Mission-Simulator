@@ -195,15 +195,19 @@ async function startServer() {
       return res.json({
         isLive: false,
         status: 'archived',
-        classType: 'M2.4 (Archived Reference)',
-        beginTime: '2025-05-14T14:22Z',
-        sourceLocation: 'AR3664 (Archived DONKI Sample)',
-        link: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/',
+        flrID: '2024-05-10T21:15:00-FLR-001',
+        classType: 'M2.4',
+        beginTime: '2024-05-10T21:15Z',
+        peakTime: '2024-05-10T21:25Z',
+        endTime: '2024-05-10T22:07Z',
+        sourceLocation: 'S20W52 (Active Region AR13664)',
+        activeRegionNum: 13664,
+        link: 'https://ccmc.gsfc.nasa.gov/DONKI/view/FLR/30769/-1',
         totalEvents30d: null,
         cmeCount30d: 4,
         gstCount30d: 2,
         description:
-          'Offline archived NASA DONKI reference flare (M2.4 + 4 CMEs) loaded for radiation-shielding simulation.',
+          'Archived NASA DONKI space weather event: May 10, 2024 M2.4 flare from Active Region AR13664 (flrID: 2024-05-10T21:15:00-FLR-001).',
       });
     }
   });

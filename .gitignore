@@ -7,4 +7,11 @@ coverage/
 .env*
 !.env.example
 docs/SKILLS_INSTALLED.md
+assets-src/*
+!assets-src/SOURCES.md
+public/assets/audio/music/
+public/audio/
+scratch/
+qa-report/
+docs/overnight/screens/
 

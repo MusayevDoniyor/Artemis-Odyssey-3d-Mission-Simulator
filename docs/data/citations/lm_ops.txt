@@ -1,0 +1,7 @@
+ID: lm_ops
+URL: https://history.nasa.gov/alsj/a11/LM05_Operations_Handbook.html
+Final-URL: https://history.nasa.gov/alsj/a11/LM05_Operations_Handbook.html
+HTTP-Status: 500
+Fetch-Date: 2026-11-19
+------------------------------------------------------------------------
+

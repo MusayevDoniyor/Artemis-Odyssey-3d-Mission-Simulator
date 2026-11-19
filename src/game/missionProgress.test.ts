@@ -43,7 +43,7 @@ test('getSpaceMissionProgress computes remaining distance and relay calibration 
   const space = createInitialSpaceFlightState('artemis-2');
   const startInfo = getSpaceMissionProgress(space, 'artemis-2');
   assert.ok(startInfo.progressPct >= 0 && startInfo.progressPct < 5);
-  assert.match(startInfo.remainingLabel, /sim-km remaining/);
+  assert.match(startInfo.remainingLabel, /to Perilune|sim-km remaining/);
 
   const relayTarget = SOLAR_TARGETS['relay-orbit'];
   const atRelay = {
@@ -62,7 +62,7 @@ test('getSpaceMissionProgress computes remaining distance and relay calibration 
   };
   const lockedInfo = getSpaceMissionProgress(atRelay, 'artemis-2');
   assert.equal(lockedInfo.progressPct, 100);
-  assert.match(lockedInfo.remainingLabel, /Complete/);
+  assert.match(lockedInfo.remainingLabel, /Align Earth Corridor|Complete/);
 });
 
 test('getLandingMissionProgress tracks radar altitude remaining to surface touchdown', () => {

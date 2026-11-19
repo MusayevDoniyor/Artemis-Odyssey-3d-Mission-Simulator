@@ -25,23 +25,27 @@ export function StatusPill({
   className = '',
   ...props
 }: StatusPillProps) {
+  // Clean DONKI classType (strip redundant archive substrings if present)
+  const rawClass = donki?.classType || 'M2.4';
+  const cleanClass = rawClass.replace(/\s*\(Archived Reference\)/gi, '').trim() || 'M2.4';
+
   // Determine DONKI state
-  const isDonkiLive = donki?.isLive || donki?.status === 'live';
-  const isDonkiArchived = donki?.status === 'archived' || (!isDonkiLive && !!donki?.classType);
+  const isDonkiLive = Boolean(donki?.isLive || donki?.status === 'live');
+  const isDonkiArchived = donki?.status === 'archived' || (!isDonkiLive && !!cleanClass);
   const donkiDate = formatYearMonth(donki?.beginTime);
 
   let donkiLabel = 'DONKI OFFLINE';
   if (isDonkiLive) {
-    donkiLabel = `DONKI ${donki?.classType || 'FLARE'} LIVE${donkiDate ? ` (${donkiDate})` : ''}`;
+    donkiLabel = `DONKI ${cleanClass} LIVE${donkiDate ? ` (${donkiDate})` : ''}`;
   } else if (isDonkiArchived) {
-    donkiLabel = `DONKI ${donki?.classType || 'M2.4'} ARCHIVED${donkiDate ? ` (${donkiDate})` : ' (Replay)'}`;
+    donkiLabel = `DONKI ${cleanClass} ARCHIVED${donkiDate ? ` (${donkiDate})` : ''}`;
   } else if (donki?.status === 'quiet') {
     donkiLabel = 'DONKI QUIET (No Flares)';
   }
 
-  // Determine OSDR state
+  // Determine OSDR state: "OSDR LIVE" strictly only if live API was fetched/parsed in session
   const osdrCount = osdr?.studies?.length || (osdr?.totalCatalogStudies && osdr.totalCatalogStudies > 0 ? osdr.totalCatalogStudies : 0);
-  const isOsdrLive = !!osdr?.isLive && osdrCount > 0;
+  const isOsdrLive = Boolean(osdr?.isLive && osdrCount > 0);
   const isOsdrArchived = !isOsdrLive && osdrCount > 0;
 
   let osdrLabel = 'OSDR OFFLINE';
@@ -65,7 +69,13 @@ export function StatusPill({
     ? `${isLive ? 'LIVE' : isArchived ? 'ARCHIVE' : 'OFFLINE'} · ${donki?.classType || 'M2.4'}`
     : `${donkiLabel} · ${osdrLabel}`;
 
-  const tooltipText = `Space Weather: ${donkiLabel}. Biological Repository: ${osdrLabel}. Data delivered via local API proxy.`;
+  const donkiRecordId = donki?.flrID || '2024-05-10T21:15:00-FLR-001';
+  const donkiRegion = donki?.activeRegionNum ? `AR${donki.activeRegionNum}` : 'AR13664';
+  const donkiTooltipDetail = isDonkiLive
+    ? `Live NASA DONKI Feed: ${cleanClass}`
+    : `Archived Event Replay · Record: ${donkiRecordId} (${donkiRegion} ${cleanClass})`;
+
+  const tooltipText = `${donkiTooltipDetail}. Biological Repository: ${osdrLabel}. Data delivered via local API proxy.`;
 
   return (
     <div

@@ -53,6 +53,9 @@ export function createInitialLandingState(
     landed: false,
     result: null,
     score: 0,
+    impactVy: 0,
+    impactSpeedMs: 0,
+    impactTiltDeg: 0,
   };
 }
 
@@ -305,6 +308,9 @@ export function stepLandingPhysics(
       f.distToPad <= zone.radius + 3.5 ? 0 : getSurfaceSlopeDeg(f.planet, f.x, f.z);
     f.slopeDeg = Math.round(groundSlope * 10) / 10;
     f.result = evaluateTouchdown(impactVy, horiz, f.tiltDeg, groundSlope);
+    f.impactVy = impactVy;
+    f.impactSpeedMs = Math.hypot(impactVy, horiz);
+    f.impactTiltDeg = f.tiltDeg;
     f.vx = 0;
     f.vy = 0;
     f.vz = 0;

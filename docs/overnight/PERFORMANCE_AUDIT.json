@@ -1,0 +1,86 @@
+[
+  {
+    "id": "title",
+    "name": "Title Screen",
+    "triangles": 16092,
+    "calls": 238,
+    "geometries": 224,
+    "textures": 11,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-title.png"
+  },
+  {
+    "id": "launch-pad",
+    "name": "Launch Pad",
+    "triangles": 20078,
+    "calls": 276,
+    "geometries": 258,
+    "textures": 13,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-launch-pad.png"
+  },
+  {
+    "id": "orbit",
+    "name": "Orbit (Earth Parking Orbit)",
+    "triangles": 23056,
+    "calls": 59,
+    "geometries": 313,
+    "textures": 20,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-orbit.png"
+  },
+  {
+    "id": "solar-system",
+    "name": "Solar System View",
+    "triangles": 42646,
+    "calls": 56,
+    "geometries": 350,
+    "textures": 27,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-solar-system.png"
+  },
+  {
+    "id": "lander",
+    "name": "Lander (Descent/Touchdown)",
+    "triangles": 144860,
+    "calls": 89,
+    "geometries": 434,
+    "textures": 29,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-lander.png"
+  },
+  {
+    "id": "rover",
+    "name": "Rover (Lunar Surface)",
+    "triangles": 142158,
+    "calls": 292,
+    "geometries": 632,
+    "textures": 29,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-rover.png"
+  },
+  {
+    "id": "inspector",
+    "name": "Hardware Inspector",
+    "triangles": 6154,
+    "calls": 81,
+    "geometries": 643,
+    "textures": 29,
+    "trianglesBudget": 185000,
+    "callsBudget": 45,
+    "withinBudget": false,
+    "screenshot": "docs/overnight/screens/stats-inspector.png"
+  }
+]

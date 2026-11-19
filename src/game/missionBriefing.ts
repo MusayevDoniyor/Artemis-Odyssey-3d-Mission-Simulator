@@ -61,55 +61,55 @@ export const MISSION_BRIEFING_META: Record<CampaignMissionId, MissionBriefingMet
   'artemis-2': {
     id: 'artemis-2',
     code: 'MISSION 1 · ARTEMIS II',
-    destination: 'Earth → Cislunar Orbit',
+    destination: 'Earth → Lunar Free-Return',
     gravityLabel: '1.0g Launch → Microgravity',
-    title: 'SLS Launch & HERMES Relay',
+    title: 'Artemis II: Crewed Lunar Flyby',
     summary:
-      'Ascend from LC-39B to 165 km orbit, fire TLI, deploy the HERMES weather satellite, and lock cislunar telemetry.',
+      'Launch from LC-39B to 165 km orbit, execute TLI (~3,050 m/s), fly past the Moon on a free-return trajectory (~7,400 km perilune), and align Earth atmospheric entry corridor (11.0 km/s at -5.9°).',
     educationalNote:
-      'Educational scenario: pairs Artemis II Orion flight with student-operated HERMES relay deployment.',
+      'Flown Mission (April 2026): Orion crewed lunar flyby with passive free-return trajectory bypassing lunar orbit insertion.',
     ctaLabel: 'Proceed to SLS Launch',
     accentHex: '#22d3ee',
-    challengeChips: ['Max-Q & SRB Staging', 'Van Allen / Solar Flare Belt'],
+    challengeChips: ['Max-Q & SRB Staging', 'TLI Burn & Free-Return Bypass'],
   },
   'artemis-3': {
     id: 'artemis-3',
     code: 'MISSION 2 · ARTEMIS III',
-    destination: 'Moon · South Pole',
-    gravityLabel: '0.165g Gravity',
-    title: 'Lunar South Pole & VIPER',
+    destination: 'Low Earth Orbit (185 km LEO)',
+    gravityLabel: 'Microgravity Orbit',
+    title: 'Artemis III: LEO HLS Docking Test',
     summary:
-      'Pilot a precision 0.165g descent to Shackleton Basin and explore 4 sites for water ice, solar power, and regolith shielding.',
+      'Orion rendezvous and docking demonstration with Commercial Human Landing System in 185 km Low Earth Orbit (Target: Mid-2027 manifest). In development.',
     educationalNote:
-      'Combines Artemis III South Pole landing with VIPER ice prospecting & OSDR radiation research.',
-    ctaLabel: 'Begin Lunar Descent',
+      'Re-scoped manifest (as of Nov 2026): LEO docking test with commercial lander prior to lunar surface landing.',
+    ctaLabel: 'Begin LEO Rendezvous',
     accentHex: '#38bdf8',
-    challengeChips: ['Low-Sun Crater Shadows', 'Touchdown < 2.5 m/s'],
+    challengeChips: ['RCS Fine Approach (< 0.1 m/s)', 'Cryo Fluid Transfer'],
   },
   'artemis-4': {
     id: 'artemis-4',
     code: 'MISSION 3 · ARTEMIS IV',
-    destination: 'Lunar Gateway · NRHO',
-    gravityLabel: 'Microgravity Orbit',
-    title: 'Gateway NRHO Fuel Transfer',
+    destination: 'Moon · South Pole',
+    gravityLabel: '0.165g Gravity',
+    title: 'Artemis IV: South Pole Landing',
     summary:
-      'Navigate Orion through lunar halo orbit to rendezvous with Gateway, stage lunar ISRU propellant, and weather solar flares.',
+      'First crewed lunar surface landing (Target: Early 2028). Terminal rocket descent to Shackleton Rim, TRIDENT water ice core drilling, and regolith berm construction. In development.',
     educationalNote:
-      'Tests deep-space orbital station rendezvous, solar storm shielding, and lunar ISRU propellant reuse.',
-    ctaLabel: 'Begin Gateway Operations',
+      'Updated architecture (as of Nov 2026): Gateway paused; Artemis IV serves as the first crewed lunar landing of the Artemis program.',
+    ctaLabel: 'Begin Lunar Descent',
     accentHex: '#facc15',
-    challengeChips: ['Solar Proton Storm', 'Cislunar Rendezvous Burn'],
+    challengeChips: ['Low-Sun Crater Shadows', 'Touchdown < 2.5 m/s'],
   },
   'mars-pathfinder': {
     id: 'mars-pathfinder',
-    code: 'MISSION 4 · MARS EXPEDITION',
-    destination: 'Jezero Crater',
+    code: 'MISSION 4 · MARS',
+    destination: 'Jezero Crater (Concept)',
     gravityLabel: '0.38g Gravity',
-    title: 'Jezero Descent & Sample Cache',
+    title: 'Human Mars Exploration (Concept)',
     summary:
-      'Survive Mars 0.38g entry and powered descent, core ancient river delta rocks, run MOXIE O₂ generation, and manage dust.',
+      'Conceptual 2030s architecture: Martian aerocapture, supersonic parachute descent into Jezero Crater, MOXIE O₂ generation, and long-range sample caching. In development.',
     educationalNote:
-      'Integrates Perseverance Jezero science, MOXIE O₂ generation, and 14-minute delayed rover command queues.',
+      'Conceptual architecture: demonstrates principles of deep-space transit, atmospheric entry at 0.38g, and ISRU oxygen generation.',
     ctaLabel: 'Begin Mars Jezero Descent',
     accentHex: '#fb923c',
     challengeChips: ['2.3× Lunar Gravity (0.38g)', 'Dust & 14m Radio Lag'],
@@ -120,10 +120,11 @@ const MISSION_EQUIPMENT_MAP: Record<CampaignMissionId, Record<PayloadId, Mission
   'artemis-2': {
     'heavy-shield': {
       id: 'heavy-shield',
-      name: 'MARE Water-Wall Shield',
+      name: 'AstroRad Ergonomic Vest (MARE)',
       shortTag: '+35% Shield',
-      description: 'Hydrogen-rich water vest protects Orion crew across Earth radiation belts.',
-      tradeoffHint: 'Heavy (+40% mass) — strong flare defense',
+      description:
+        'StemRad polymer vest (tested on Artemis I phantoms Helga & Zohar; OSD-569). Shields crew vital organs from SPE solar protons.',
+      tradeoffHint: 'Simulation Loadout: +40% mass tradeoff for +35% solar flare defense',
       visualKind: 'shield',
       massMultiplier: PAYLOADS['heavy-shield'].massMultiplier,
       fragile: false,
@@ -162,10 +163,11 @@ const MISSION_EQUIPMENT_MAP: Record<CampaignMissionId, Record<PayloadId, Mission
     },
     'water-drill': {
       id: 'water-drill',
-      name: 'HERMES Optical Relay Kit',
+      name: 'Orion Optical Comms (O2O)',
       shortTag: '+15% Air & Pwr',
-      description: 'Pre-aligned laser transponder deploys & locks HERMES 60% faster.',
-      tradeoffHint: 'Medium (+25% mass) — +60% sat deploy speed',
+      description:
+        'Infrared laser communications terminal streaming 4K video & cislunar flight telemetry at 260 Mbps (https://www.nasa.gov/technology/space-comms/o2o/).',
+      tradeoffHint: 'Simulation Loadout: +25% mass tradeoff for +60% telemetry lock speed',
       visualKind: 'science',
       massMultiplier: PAYLOADS['water-drill'].massMultiplier,
       fragile: false,
@@ -173,16 +175,17 @@ const MISSION_EQUIPMENT_MAP: Record<CampaignMissionId, Record<PayloadId, Mission
       drillBoost: 1.0,
       satDeployBoost: 1.6,
       spaceFuelFactor: 1.0,
-      perkBadge: '+60% Sat Deploy',
+      perkBadge: '+60% Comms Lock',
     },
   },
   'artemis-3': {
     'heavy-shield': {
       id: 'heavy-shield',
-      name: 'Regolith & MARE Shielding',
+      name: 'AstroRad & Regolith Shielding',
       shortTag: '+35% Shield',
-      description: 'Heavy water-wall hull shields crew during South Pole solar storms.',
-      tradeoffHint: 'Heavy (+40% mass) — brake earlier on descent',
+      description:
+        'StemRad polymer crew vests and regolith berm storm shelter attenuate solar proton radiation.',
+      tradeoffHint: 'Simulation Loadout: +40% mass tradeoff for +35% flare defense',
       visualKind: 'shield',
       massMultiplier: PAYLOADS['heavy-shield'].massMultiplier,
       fragile: false,
@@ -238,10 +241,11 @@ const MISSION_EQUIPMENT_MAP: Record<CampaignMissionId, Record<PayloadId, Mission
   'artemis-4': {
     'heavy-shield': {
       id: 'heavy-shield',
-      name: 'Gateway Storm Shelter',
+      name: 'South Pole Storm Shelter',
       shortTag: '+35% Shield',
-      description: 'Water-lined crew shelter attenuates galactic cosmic rays in NRHO.',
-      tradeoffHint: 'Heavy (+40% mass) — peak radiation margin',
+      description:
+        'AstroRad vest gear and compacted lunar regolith storm shelter attenuate galactic cosmic rays.',
+      tradeoffHint: 'Simulation Loadout: +40% mass tradeoff for +35% radiation margin',
       visualKind: 'shield',
       massMultiplier: PAYLOADS['heavy-shield'].massMultiplier,
       fragile: false,
@@ -297,10 +301,11 @@ const MISSION_EQUIPMENT_MAP: Record<CampaignMissionId, Record<PayloadId, Mission
   'mars-pathfinder': {
     'heavy-shield': {
       id: 'heavy-shield',
-      name: 'Deep-Space Water Wall',
+      name: 'Interplanetary Radiation Shelter',
       shortTag: '+35% Shield',
-      description: 'Blocks interplanetary solar flares on Mars while adding entry mass.',
-      tradeoffHint: 'Heavy (+40% mass) — brake earlier at 0.38g',
+      description:
+        'High-density polymer and polyethylene crew storm shelter blocks interplanetary solar flares.',
+      tradeoffHint: 'Simulation Loadout: +40% mass tradeoff for +35% flare defense',
       visualKind: 'shield',
       massMultiplier: PAYLOADS['heavy-shield'].massMultiplier,
       fragile: false,
@@ -420,53 +425,48 @@ export function evaluateBriefingMissionStatus(
       isCleared ||
       (isCurrentActive && Boolean(launch?.orbitReached || (launch && launch.altitudeKm >= PHYSICS.SLS_ORBIT_TARGET_KM)));
     const tliDone =
-      isCleared || (isCurrentActive && Boolean(leoTransfer?.readyForSpaceTransition));
-    const satZoneDone =
+      isCleared || (isCurrentActive && Boolean(leoTransfer?.readyForSpaceTransition || (space && (space.shipX !== 0 || space.shipZ !== 0))));
+    const flybyDone =
       isCleared ||
-      carryover.relaySatelliteOnline ||
-      (isCurrentActive && Boolean(space?.inSatDeployZone || space?.orbitalSat.deployed));
-    const linkLocked =
-      isCleared ||
-      carryover.relaySatelliteOnline ||
-      (isCurrentActive && Boolean(space?.orbitalSat.linkLocked));
+      (isCurrentActive && Boolean(space && (space.targetId === 'moon' || space.targetId === 'gateway' || space.orbitalSat.linkLocked)));
 
     const routeNodes: MissionRouteNode[] = [
       { id: 'pad', label: 'LC-39B Pad', status: orbitDone ? 'done' : 'active' },
       {
         id: 'leo',
         label: '165 km Orbit',
-        status: orbitDone ? 'done' : tliDone ? 'done' : orbitDone ? 'active' : 'pending',
+        status: tliDone ? 'done' : orbitDone ? 'active' : 'pending',
       },
       {
-        id: 'hermes',
-        label: 'HERMES Deploy',
-        status: satZoneDone ? 'done' : orbitDone ? 'active' : 'pending',
+        id: 'tli',
+        label: 'TLI Burn',
+        status: flybyDone ? 'done' : tliDone ? 'active' : 'pending',
       },
       {
-        id: 'link',
-        label: 'Telemetry Lock',
-        status: linkLocked ? 'done' : satZoneDone ? 'active' : 'pending',
+        id: 'bypass',
+        label: 'Free-Return',
+        status: flybyDone ? 'done' : tliDone ? 'active' : 'pending',
       },
     ];
 
     const list: MissionBriefingObjective[] = [
       {
         id: 'a2-orbit',
-        label: 'Ascend to 165 km LEO & ignite TLI burn',
-        detail: orbitDone ? 'Orbit achieved' : 'Pad 39B launch',
+        label: 'Ascend from LC-39B to 165 km LEO insertion',
+        detail: orbitDone ? 'Orbit inserted' : 'Pad 39B launch',
         completed: orbitDone,
       },
       {
         id: 'a2-transit',
-        label: 'Fly Orion to HERMES relay orbit',
-        detail: satZoneDone ? 'In relay zone' : 'Cislunar transit',
-        completed: satZoneDone,
+        label: 'Execute Translunar Injection (TLI burn ~3,050 m/s)',
+        detail: tliDone ? 'TLI nominal' : 'Cislunar injection',
+        completed: tliDone,
       },
       {
         id: 'a2-lock',
-        label: 'Deploy HERMES solar wings & lock laser link',
-        detail: linkLocked ? 'Relay online' : 'Unlocks high-res Moon maps',
-        completed: linkLocked,
+        label: 'Fly Lunar Free-Return (~7,400 km perilune) & align Earth corridor (11.0 km/s at -5.9°)',
+        detail: flybyDone ? 'Trajectory locked' : 'Passive lunar bypass',
+        completed: flybyDone,
       },
     ];
 

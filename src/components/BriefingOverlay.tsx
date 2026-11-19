@@ -9,6 +9,7 @@ import {
   Database,
   Drill,
   Fuel,
+  Lock,
   Radio,
   Rocket,
   Shield,
@@ -16,7 +17,8 @@ import {
   Sun,
   Wind,
 } from 'lucide-react';
-import artemisHeroImg from '../assets/images/artemis_hero_banner_1794685527117.jpg';
+// In-engine 3D render of SLS Block 1 & LC-39B Mobile Launcher on pad
+const artemis2PadBanner = '/assets/banners/artemis2-sls-pad.jpg';
 import architectureImg from '../assets/images/mission_architecture_diagram_v2_1794685546954.jpg';
 import viperLanderImg from '../assets/images/viper_lander_showcase_1794685527556.jpg';
 import { NASAInsignia } from './NASAInsignia';
@@ -66,8 +68,8 @@ interface BriefingOverlayProps {
 
 const MISSION_PREVIEW_IMAGE: Record<CampaignMissionId, { src: string; alt: string; posClass: string }> = {
   'artemis-2': {
-    src: artemisHeroImg,
-    alt: 'SLS Launch and Orion Cislunar Transit Artwork',
+    src: artemis2PadBanner,
+    alt: 'In-engine 3D render: SLS Block 1 & LC-39B Mobile Launcher, Artemis Odyssey simulator',
     posClass: 'object-center',
   },
   'artemis-3': {
@@ -81,9 +83,9 @@ const MISSION_PREVIEW_IMAGE: Record<CampaignMissionId, { src: string; alt: strin
     posClass: 'object-[50%_42%]',
   },
   'mars-pathfinder': {
-    src: '/assets/aistudio/image_93ad272a.png',
-    alt: 'Mars Orbital Surface Mosaic of Cratered Terrain',
-    posClass: 'object-[50%_45%]',
+    src: '/assets/planets/mars.jpg',
+    alt: 'Mars Global Mosaic of Cratered Surface Terrain (NASA Public Domain)',
+    posClass: 'object-center',
   },
 };
 
@@ -340,23 +342,37 @@ export function BriefingOverlay({
                 const m = CAMPAIGN_MISSIONS[id];
                 const active = activeMissionId === id;
                 const done = carryover.completedMissions.includes(id);
+                const isLocked = id !== 'artemis-2' && !done;
                 return (
                   <button
                     key={id}
                     type="button"
                     role="tab"
                     aria-selected={active}
-                    onClick={() => onSelectCampaignMission(id)}
+                    disabled={isLocked}
+                    title={isLocked ? `${m.title} — In development (as of Nov 2026)` : m.title}
+                    onClick={() => !isLocked && onSelectCampaignMission(id)}
                     className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold whitespace-nowrap transition ${
                       active
                         ? 'bg-cyan-400 text-slate-950 shadow-[0_0_14px_rgba(34,211,238,0.3)]'
                         : done
                           ? 'border border-emerald-400/45 bg-emerald-500/15 text-emerald-200 hover:border-emerald-300'
-                          : 'border border-white/10 bg-slate-800/80 text-slate-200 hover:border-cyan-400/45 hover:text-white'
+                          : isLocked
+                            ? 'cursor-not-allowed border border-dashed border-slate-700/60 bg-slate-950/40 text-slate-500 opacity-70'
+                            : 'border border-white/10 bg-slate-800/80 text-slate-200 hover:border-cyan-400/45 hover:text-white'
                     }`}
                   >
-                    {done && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    {isLocked ? (
+                      <Lock className="h-3.5 w-3.5 shrink-0 text-amber-400/70" />
+                    ) : done ? (
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                    ) : null}
                     <span>{m.shortLabel}</span>
+                    {isLocked && (
+                      <span className="rounded bg-amber-500/15 px-1 py-0.5 font-mono-tech text-[9px] font-bold text-amber-300/85 uppercase">
+                        In Dev
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -373,6 +389,11 @@ export function BriefingOverlay({
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/35" />
 
               <div className="relative z-10 flex h-full flex-col justify-between p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-slate-950/80 px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wider text-sky-300 uppercase border border-sky-400/25">
+                    Distances compressed 24× (Educational Scale)
+                  </span>
+                </div>
                 <MissionRoutePreview
                   missionId={activeMissionId}
                   nodes={status.routeNodes}
@@ -452,16 +473,16 @@ export function BriefingOverlay({
                     : 'border-sky-400/15 bg-slate-950/75'
                 }`}
               >
-                <span className="block text-[11px] font-medium text-slate-400">HERMES Relay</span>
+                <span className="block text-[11px] font-medium text-slate-400">Cislunar Nav Link</span>
                 <span
                   className={`block text-sm font-bold ${
                     carryover.relaySatelliteOnline ? 'text-emerald-300' : 'text-slate-300'
                   }`}
                 >
-                  {carryover.relaySatelliteOnline ? 'Online' : 'Stowed'}
+                  {carryover.relaySatelliteOnline ? 'Online' : 'Pending'}
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  {carryover.relaySatelliteOnline ? 'Active flare lock' : 'Pending (Mission 1)'}
+                  {carryover.relaySatelliteOnline ? 'Optical nav locked' : 'Pending (Mission 1)'}
                 </span>
               </div>
 
@@ -582,9 +603,14 @@ export function BriefingOverlay({
         {/* ROW 3: SIMPLIFIED MISSION-SPECIFIC 2x2 EQUIPMENT GRID */}
         <section className="mt-3.5">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-hud text-xs font-bold tracking-wider text-cyan-300 uppercase">
-              Select Equipment · {mission.shortLabel}
-            </h3>
+            <div>
+              <h3 className="font-hud text-xs font-bold tracking-wider text-cyan-300 uppercase">
+                Select Equipment · {mission.shortLabel}
+              </h3>
+              <p className="font-mono-tech text-[10px] text-slate-400">
+                Simulation Equipment Package (Gameplay Balance Modifier — Not Real Vehicle Configuration)
+              </p>
+            </div>
             <span className="text-xs text-slate-400">
               Updates starting meters and live mission handling
             </span>
@@ -609,7 +635,10 @@ export function BriefingOverlay({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-display text-sm font-bold text-white">
+                      <span
+                        title={eq.name}
+                        className="font-display text-sm font-bold text-white break-words leading-tight"
+                      >
                         {eq.name}
                       </span>
                       {active ? (

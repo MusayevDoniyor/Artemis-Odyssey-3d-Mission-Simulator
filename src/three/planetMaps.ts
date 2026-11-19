@@ -3,15 +3,39 @@ import * as THREE from 'three';
 export interface RealPlanetMaps {
   earthMap: THREE.Texture;
   earthCloudsMap: THREE.Texture;
+  earthNightMap: THREE.Texture;
   moonMap: THREE.Texture;
   marsMap: THREE.Texture;
+  sunMap: THREE.Texture;
+  mercuryMap: THREE.Texture;
+  venusMap: THREE.Texture;
+  venusSurfaceMap: THREE.Texture;
+  jupiterMap: THREE.Texture;
+  saturnMap: THREE.Texture;
+  saturnRingMap: THREE.Texture;
+  uranusMap: THREE.Texture;
+  neptuneMap: THREE.Texture;
+  ceresMap: THREE.Texture;
+  plutoMap: THREE.Texture;
   dispose: () => void;
 }
 
 const EARTH_MAP_URL = '/assets/planets/earth.jpg';
 const EARTH_CLOUDS_MAP_URL = '/assets/planets/earth-clouds.png';
+const EARTH_NIGHT_MAP_URL = '/assets/planets/earth_night.jpg';
 const MOON_MAP_URL = '/assets/planets/moon.jpg';
 const MARS_MAP_URL = '/assets/planets/mars.jpg';
+const SUN_MAP_URL = '/assets/planets/sun.jpg';
+const MERCURY_MAP_URL = '/assets/planets/mercury.jpg';
+const VENUS_MAP_URL = '/assets/planets/venus.jpg';
+const VENUS_SURFACE_MAP_URL = '/assets/planets/venus_surface.jpg';
+const JUPITER_MAP_URL = '/assets/planets/jupiter.jpg';
+const SATURN_MAP_URL = '/assets/planets/saturn.jpg';
+const SATURN_RING_MAP_URL = '/assets/planets/saturn_ring.png';
+const URANUS_MAP_URL = '/assets/planets/uranus.jpg';
+const NEPTUNE_MAP_URL = '/assets/planets/neptune.jpg';
+const CERES_MAP_URL = '/assets/planets/ceres.jpg';
+const PLUTO_MAP_URL = '/assets/planets/pluto.jpg';
 
 function configureEquirectTexture(
   tex: THREE.Texture,
@@ -29,53 +53,127 @@ function configureEquirectTexture(
   return tex;
 }
 
+export function createPlanetaryRingGeometry(
+  innerRadius: number,
+  outerRadius: number,
+  thetaSegments = 96
+): THREE.RingGeometry {
+  const geo = new THREE.RingGeometry(innerRadius, outerRadius, thetaSegments, 1);
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const r = Math.hypot(x, y);
+    const u = Math.min(1, Math.max(0, (r - innerRadius) / Math.max(1e-5, outerRadius - innerRadius)));
+    uv.setXY(i, u, 0.5);
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
+
 export function createRealPlanetMaps(maxAnisotropy: number): RealPlanetMaps {
   const loader = new THREE.TextureLoader();
 
-  const earthMap = configureEquirectTexture(
-    loader.load(EARTH_MAP_URL, (loaded) => {
-      loaded.needsUpdate = true;
-    }),
-    maxAnisotropy,
-    true
-  );
+  const loadTex = (url: string, isColor = true) =>
+    configureEquirectTexture(
+      loader.load(url, (loaded) => {
+        loaded.needsUpdate = true;
+      }),
+      maxAnisotropy,
+      isColor
+    );
 
-  const earthCloudsMap = configureEquirectTexture(
-    loader.load(EARTH_CLOUDS_MAP_URL, (loaded) => {
-      loaded.needsUpdate = true;
-    }),
-    maxAnisotropy,
-    false
-  );
-
-  const moonMap = configureEquirectTexture(
-    loader.load(MOON_MAP_URL, (loaded) => {
-      loaded.needsUpdate = true;
-    }),
-    maxAnisotropy,
-    true
-  );
-
-  const marsMap = configureEquirectTexture(
-    loader.load(MARS_MAP_URL, (loaded) => {
-      loaded.needsUpdate = true;
-    }),
-    maxAnisotropy,
-    true
-  );
+  const earthMap = loadTex(EARTH_MAP_URL, true);
+  const earthCloudsMap = loadTex(EARTH_CLOUDS_MAP_URL, false);
+  const earthNightMap = loadTex(EARTH_NIGHT_MAP_URL, true);
+  const moonMap = loadTex(MOON_MAP_URL, true);
+  const marsMap = loadTex(MARS_MAP_URL, true);
+  const sunMap = loadTex(SUN_MAP_URL, true);
+  const mercuryMap = loadTex(MERCURY_MAP_URL, true);
+  const venusMap = loadTex(VENUS_MAP_URL, true);
+  const venusSurfaceMap = loadTex(VENUS_SURFACE_MAP_URL, true);
+  const jupiterMap = loadTex(JUPITER_MAP_URL, true);
+  const saturnMap = loadTex(SATURN_MAP_URL, true);
+  const saturnRingMap = loadTex(SATURN_RING_MAP_URL, true);
+  const uranusMap = loadTex(URANUS_MAP_URL, true);
+  const neptuneMap = loadTex(NEPTUNE_MAP_URL, true);
+  const ceresMap = loadTex(CERES_MAP_URL, true);
+  const plutoMap = loadTex(PLUTO_MAP_URL, true);
 
   return {
     earthMap,
     earthCloudsMap,
+    earthNightMap,
     moonMap,
     marsMap,
+    sunMap,
+    mercuryMap,
+    venusMap,
+    venusSurfaceMap,
+    jupiterMap,
+    saturnMap,
+    saturnRingMap,
+    uranusMap,
+    neptuneMap,
+    ceresMap,
+    plutoMap,
     dispose: () => {
       earthMap.dispose();
       earthCloudsMap.dispose();
+      earthNightMap.dispose();
       moonMap.dispose();
       marsMap.dispose();
+      sunMap.dispose();
+      mercuryMap.dispose();
+      venusMap.dispose();
+      venusSurfaceMap.dispose();
+      jupiterMap.dispose();
+      saturnMap.dispose();
+      saturnRingMap.dispose();
+      uranusMap.dispose();
+      neptuneMap.dispose();
+      ceresMap.dispose();
+      plutoMap.dispose();
     },
   };
+}
+
+export function createEarthNightMaterial(nightMap: THREE.Texture): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uNightMap: { value: nightMap },
+      uSunDir: { value: new THREE.Vector3(0.7, 0.35, 0.6).normalize() },
+      uIntensity: { value: 1.15 },
+    },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uNightMap;
+      uniform vec3 uSunDir;
+      uniform float uIntensity;
+      varying vec3 vWorldNormal;
+      varying vec2 vUv;
+      void main() {
+        float ndotl = dot(normalize(vWorldNormal), normalize(uSunDir));
+        float nightWeight = smoothstep(0.12, -0.22, ndotl);
+        vec4 nightCol = texture2D(uNightMap, vUv);
+        vec3 lights = nightCol.rgb * (nightWeight * uIntensity);
+        gl_FragColor = vec4(lights, nightWeight * nightCol.a);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  });
 }
 
 export interface PlanetAtmosphereOptions {

@@ -1,0 +1,21 @@
+{
+  "flrID": "2024-05-10T21:15:00-FLR-001",
+  "catalog": "M2M_CATALOG",
+  "instruments": [
+    {
+      "displayName": "GOES-P: EXIS 1.0-8.0"
+    }
+  ],
+  "beginTime": "2024-05-10T21:15Z",
+  "peakTime": "2024-05-10T21:25Z",
+  "endTime": "2024-05-10T22:07Z",
+  "classType": "M2.4",
+  "sourceLocation": "S20W52",
+  "activeRegionNum": 13664,
+  "note": "",
+  "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/FLR/30769/-1",
+  "linkedEvents": null,
+  "sentNotifications": null,
+  "submissionTime": "2024-05-12T17:57Z",
+  "versionId": 1
+}

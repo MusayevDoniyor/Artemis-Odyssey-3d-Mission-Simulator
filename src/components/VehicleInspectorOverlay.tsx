@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  Compass,
   Eye,
   HelpCircle,
   Layers,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { HARDWARE_CATALOG, HARDWARE_ORDER } from '../game/hardwareCatalog';
+import { getGuidedToursForCraft, getTourStep } from '../game/hardwareInspector';
 import type { InspectorLabelPoint, InspectorUiState, VehicleShowcaseId } from '../game/types';
 import { EngineeringLabWidget } from './EngineeringLabWidget';
 
@@ -54,6 +56,15 @@ export function VehicleInspectorOverlay({
     ? catalog.parts.find((p) => p.id === inspectorUi.quizTargetId) || null
     : null;
 
+  const craftTours = getGuidedToursForCraft(showcase);
+  const activeTour = inspectorUi.activeTourId
+    ? craftTours.find((t) => t.id === inspectorUi.activeTourId) || null
+    : null;
+  const currentTourStepIndex = inspectorUi.tourStepIndex ?? 0;
+  const currentTourStep = activeTour
+    ? getTourStep(activeTour.id, currentTourStepIndex)
+    : null;
+
   const [quizAnswerIdx, setQuizAnswerIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -66,7 +77,8 @@ export function VehicleInspectorOverlay({
     activePart ||
       inspectorUi.isolatePart ||
       inspectorUi.explodePct > 0 ||
-      (inspectorUi.stageSepStep ?? 0) > 0
+      (inspectorUi.stageSepStep ?? 0) > 0 ||
+      inspectorUi.activeTourId
   );
 
   const eduCopy = activePart
@@ -234,6 +246,108 @@ export function VehicleInspectorOverlay({
             </button>
           </div>
         )}
+        {/* Guided Systems Tour Controller */}
+        {activeTour && currentTourStep && (
+          <div
+            data-testid="inspector-guided-tour-banner"
+            className="pointer-events-auto mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-xl border border-cyan-400/60 bg-[#070D1B]/95 p-3.5 shadow-2xl backdrop-blur"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 font-hud text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
+                  Guided Tour · Step {currentTourStep.stepNumber} of {currentTourStep.totalSteps}
+                </span>
+                <span className="font-hud text-xs font-bold text-white uppercase">
+                  {activeTour.title}
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-label="Exit Guided Tour"
+                onClick={() => onUpdateInspectorUi({ activeTourId: null, tourStepIndex: 0 })}
+                className="rounded border border-slate-700/80 bg-slate-900/80 p-1 text-slate-400 transition hover:border-slate-500 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <h4 className="font-hud text-xs font-bold text-cyan-200">
+                  {currentTourStep.title}
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-slate-200">
+                  {currentTourStep.narration}
+                </p>
+                {currentTourStep.focusHint && (
+                  <p className="mt-1 font-mono-tech text-[10px] text-slate-400">
+                    Focus: {currentTourStep.focusHint}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
+              <button
+                type="button"
+                disabled={currentTourStepIndex === 0}
+                onClick={() => {
+                  const prevIdx = currentTourStepIndex - 1;
+                  const step = getTourStep(activeTour.id, prevIdx);
+                  if (step) {
+                    onUpdateInspectorUi({ tourStepIndex: prevIdx });
+                    onSelectPart(step.partId, { focusZoom: true });
+                  }
+                }}
+                className="rounded border border-slate-700/80 bg-slate-900/80 px-2.5 py-1 font-hud text-[11px] font-semibold text-slate-300 transition hover:border-cyan-400/50 disabled:opacity-30"
+              >
+                Previous Step
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {activeTour.steps.map((st, i) => (
+                  <div
+                    key={st.stepNumber}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === currentTourStepIndex ? 'w-5 bg-cyan-400' : 'w-1.5 bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {currentTourStepIndex < activeTour.steps.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextIdx = currentTourStepIndex + 1;
+                    const step = getTourStep(activeTour.id, nextIdx);
+                    if (step) {
+                      onUpdateInspectorUi({ tourStepIndex: nextIdx });
+                      onSelectPart(step.partId, { focusZoom: true });
+                    }
+                  }}
+                  className="rounded border border-cyan-400/60 bg-cyan-500/20 px-3 py-1 font-hud text-[11px] font-semibold text-cyan-100 transition hover:bg-cyan-500/30"
+                >
+                  Next Step
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateInspectorUi({
+                      activeTourId: null,
+                      tourStepIndex: 0,
+                      activeRightTab: 'quiz',
+                    });
+                  }}
+                  className="rounded border border-amber-400/60 bg-amber-500/20 px-3 py-1 font-hud text-[11px] font-semibold text-amber-200 transition hover:bg-amber-500/30"
+                >
+                  Complete Tour & Quiz
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AREA 2 & 3: Left Component Inspector + Right Contextual Info Panel */}
@@ -327,6 +441,48 @@ export function VehicleInspectorOverlay({
               Click any 3D component or choose a subsystem on the left to zoom, inspect, and run
               engineering tests.
             </div>
+
+            {craftTours.length > 0 && (
+              <div className="mt-3 border-t border-slate-800 pt-2.5">
+                <div className="font-hud text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
+                  Guided Systems Tours
+                </div>
+                <div className="mt-1.5 flex flex-col gap-1.5">
+                  {craftTours.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      data-testid={`start-tour-${t.id}`}
+                      onClick={() => {
+                        const firstStep = t.steps[0];
+                        onUpdateInspectorUi({ activeTourId: t.id, tourStepIndex: 0 });
+                        if (firstStep) onSelectPart(firstStep.partId, { focusZoom: true });
+                      }}
+                      className="flex items-center justify-between rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1.5 text-left transition hover:border-cyan-400 hover:bg-cyan-500/20"
+                    >
+                      <div className="min-w-0 pr-1">
+                        <div className="font-hud text-[11px] font-bold text-white">{t.title}</div>
+                        <div className="truncate text-[10px] text-slate-300">{t.subtitle}</div>
+                      </div>
+                      <Compass className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {catalog.sources && catalog.sources.length > 0 && (
+              <div className="mt-3 border-t border-slate-800 pt-2.5">
+                <div className="font-hud text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Aerospace Sources
+                </div>
+                <ul className="mt-1 space-y-0.5 font-mono-tech text-[10px] text-cyan-300">
+                  {catalog.sources.map((src) => (
+                    <li key={src}>• {src}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </aside>
         ) : (
           <aside
@@ -474,6 +630,13 @@ export function VehicleInspectorOverlay({
                   <div className="pt-1 font-mono-tech text-[10px] text-slate-500">
                     {activePart.honestyNote}
                   </div>
+
+                  {(activePart.sourceCitation || catalog.sources?.[0]) && (
+                    <div className="rounded border border-slate-800 bg-slate-950/70 p-2 font-mono-tech text-[10px] text-cyan-300">
+                      <span className="font-bold text-slate-400">Verified Source: </span>
+                      {activePart.sourceCitation || catalog.sources?.[0]}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -565,9 +728,26 @@ export function VehicleInspectorOverlay({
         </div>
 
         <div className="pointer-events-auto mx-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-700/75 bg-[#070D1B]/95 px-2.5 py-1.5 shadow-xl">
-          <label className="flex items-center gap-2 rounded-lg bg-slate-900/70 px-2.5 py-1">
+          <div className="flex items-center gap-1.5 rounded-lg bg-slate-900/70 px-2 py-1">
             <Layers className="h-3.5 w-3.5 text-cyan-300" />
             <span className="font-hud text-[11px] font-semibold text-slate-200">Explode</span>
+            <div className="flex items-center gap-1">
+              {[0, 35, 100].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  data-testid={`inspector-explode-preset-${pct}`}
+                  onClick={() => onUpdateInspectorUi({ explodePct: pct })}
+                  className={`rounded px-1.5 py-0.5 font-mono-tech text-[10px] font-bold transition ${
+                    inspectorUi.explodePct === pct
+                      ? 'border border-cyan-400/60 bg-cyan-500/30 text-cyan-200'
+                      : 'border border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
             <input
               type="range"
               aria-label="Exploded View Percentage"
@@ -576,12 +756,9 @@ export function VehicleInspectorOverlay({
               max={100}
               value={inspectorUi.explodePct}
               onChange={(e) => onUpdateInspectorUi({ explodePct: Number(e.target.value) })}
-              className="w-24 accent-cyan-400"
+              className="w-20 accent-cyan-400"
             />
-            <span className="w-8 text-right font-mono-tech text-[11px] font-bold text-cyan-300">
-              {inspectorUi.explodePct}%
-            </span>
-          </label>
+          </div>
 
           <button
             type="button"
@@ -636,6 +813,31 @@ export function VehicleInspectorOverlay({
             Quiz
           </button>
 
+          {craftTours.length > 0 && (
+            <button
+              type="button"
+              data-testid="inspector-tour-toggle-btn"
+              onClick={() => {
+                if (inspectorUi.activeTourId) {
+                  onUpdateInspectorUi({ activeTourId: null, tourStepIndex: 0 });
+                } else {
+                  const tour = craftTours[0];
+                  const firstStep = tour.steps[0];
+                  onUpdateInspectorUi({ activeTourId: tour.id, tourStepIndex: 0 });
+                  if (firstStep) onSelectPart(firstStep.partId, { focusZoom: true });
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-hud text-[11px] font-semibold whitespace-nowrap transition ${
+                inspectorUi.activeTourId
+                  ? 'border-cyan-400 bg-cyan-500/25 text-cyan-100 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                  : 'border-cyan-400/40 bg-slate-900/60 text-cyan-200 hover:border-cyan-400'
+              }`}
+            >
+              <Compass className="h-3.5 w-3.5 text-cyan-300" />
+              Guided Tour
+            </button>
+          )}
+
           {isModifiedView && (
             <button
               type="button"
@@ -647,6 +849,8 @@ export function VehicleInspectorOverlay({
                   stageSepStep: 0,
                   gimbalDeg: 0,
                   selectedSubEngine: null,
+                  activeTourId: null,
+                  tourStepIndex: 0,
                 });
                 onSelectPart(null);
                 onResetCamera();

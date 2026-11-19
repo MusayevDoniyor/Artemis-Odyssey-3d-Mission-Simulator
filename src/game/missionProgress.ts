@@ -106,6 +106,42 @@ export function getSpaceMissionProgress(
   const remDist = Math.max(0, rawDist - captureRadius);
   const totalLegSpan = Math.max(1, Math.hypot(liveTarget.x - startX, liveTarget.z - startZ) - captureRadius);
 
+  if (missionId === 'artemis-2') {
+    const transitRatio = clamp(1 - remDist / totalLegSpan, 0, 1);
+    const flybyComplete = Boolean(space.arrivedMoon || space.inSatDeployZone || remDist <= 0.2 || space.orbitalSat.linkLocked);
+    const progressPct = flybyComplete ? 100 : clamp(transitRatio * 100, 0, 99.5);
+    const remainingLabel = flybyComplete
+      ? 'Lunar Flyby Nominal · Align Earth Corridor'
+      : `${Math.round(remDist * 10)}k sim-km to Perilune`;
+
+    return {
+      phaseLabel: 'Cislunar Free-Return Flyby',
+      originLabel: 'Earth LEO',
+      destinationLabel: 'Moon (~7,400 km Perilune)',
+      progressPct,
+      remainingLabel,
+      detailLabel: flybyComplete ? 'Perilune Bypass (~7,400 km)' : `${Math.round(rawDist)}u range`,
+      accent: flybyComplete ? 'emerald' : 'cyan',
+      milestones: [
+        {
+          label: 'TLI Coast',
+          pct: 35,
+          reached: transitRatio >= 0.35,
+        },
+        {
+          label: 'Lunar SOI',
+          pct: 70,
+          reached: transitRatio >= 0.70 || flybyComplete,
+        },
+        {
+          label: 'Perilune Flyby',
+          pct: 100,
+          reached: flybyComplete,
+        },
+      ],
+    };
+  }
+
   if (space.targetId === 'relay-orbit') {
     const transitRatio = clamp(1 - remDist / totalLegSpan, 0, 1);
     const satCalibRatio = space.orbitalSat.linkLocked

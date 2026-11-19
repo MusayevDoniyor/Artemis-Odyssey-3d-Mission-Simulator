@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GLB Isolate Viewer</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #050b14; }
+    #canvas { width: 100%; height: 100%; display: block; }
+    #info { position: absolute; top: 10px; left: 10px; color: #38bdf8; font-family: monospace; font-size: 13px; background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 4px; border: 1px solid #1e293b; }
+  </style>
+</head>
+<body>
+  <div id="info">Loading model...</div>
+  <canvas id="canvas"></canvas>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "three/addons/": "/node_modules/three/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    const canvas = document.getElementById('canvas');
+    const info = document.getElementById('info');
+    const params = new URLSearchParams(window.location.search);
+    const modelUrl = params.get('model') || '/assets/rockets/sls_block1.glb';
+    const wireframe = params.get('wireframe') === '1';
+    const angle = params.get('angle') || 'iso';
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+    // Get WebGL debug renderer info
+    const gl = renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    window.__GPU_INFO__ = {
+      vendor: gl.getParameter(gl.VENDOR),
+      renderer: gl.getParameter(gl.RENDERER),
+      unmaskedVendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : 'N/A',
+      unmaskedRenderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'N/A',
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050b14);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 2.0);
+    dirLight1.position.set(50, 80, 50);
+    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 1.0);
+    dirLight2.position.set(-50, -20, -50);
+    scene.add(ambientLight, dirLight1, dirLight2);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 5000);
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('/node_modules/three/examples/jsm/libs/draco/');
+
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+
+    loader.load(
+      modelUrl,
+      (gltf) => {
+        const root = gltf.scene;
+
+        if (wireframe) {
+          root.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+              });
+            }
+          });
+        }
+
+        scene.add(root);
+
+        // Compute bounding box
+        const bbox = new THREE.Box3().setFromObject(root);
+        const center = bbox.getCenter(new THREE.Vector3());
+        const size = bbox.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const dist = maxDim * 1.8;
+
+        if (angle === 'front') {
+          camera.position.set(center.x, center.y, center.z + dist);
+        } else if (angle === 'side') {
+          camera.position.set(center.x + dist, center.y, center.z);
+        } else { // 'iso'
+          camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7);
+        }
+        camera.lookAt(center);
+
+        renderer.render(scene, camera);
+
+        window.__RENDER_DONE__ = true;
+        window.__MODEL_STATS__ = {
+          triangles: renderer.info.render.triangles,
+          calls: renderer.info.render.calls,
+          bboxMin: [bbox.min.x, bbox.min.y, bbox.min.z],
+          bboxMax: [bbox.max.x, bbox.max.y, bbox.max.z],
+          size: [size.x, size.y, size.z],
+          diagonal: size.length(),
+        };
+
+        info.innerHTML = `Model: ${modelUrl}<br>GPU: ${window.__GPU_INFO__.unmaskedRenderer}<br>Triangles: ${renderer.info.render.triangles} | Calls: ${renderer.info.render.calls}<br>Size: [${size.x.toFixed(1)}, ${size.y.toFixed(1)}, ${size.z.toFixed(1)}]`;
+      },
+      undefined,
+      (err) => {
+        info.innerText = `Error: ${err.message}`;
+        window.__RENDER_ERROR__ = err.message;
+      }
+    );
+  </script>
+</body>
+</html>

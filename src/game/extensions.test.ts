@@ -54,8 +54,8 @@ import {
   stepRoverPhysics,
 } from './physics';
 
-test('hardware catalog includes all 7 vehicles with parts, explode axes, and connections', () => {
-  assert.equal(HARDWARE_ORDER.length, 7);
+test('hardware catalog includes all vehicles with parts, explode axes, and connections', () => {
+  assert.equal(HARDWARE_ORDER.length, 9);
   for (const id of HARDWARE_ORDER) {
     const spec = HARDWARE_CATALOG[id];
     assert.ok(spec, `Missing hardware spec for ${id}`);
@@ -69,7 +69,7 @@ test('hardware catalog includes all 7 vehicles with parts, explode axes, and con
 });
 
 test('solar system catalog covers Sun through Eris/Halley with Moon orbiting Earth and increasing planetary order', () => {
-  assert.equal(SOLAR_SYSTEM_BODIES.length, 14);
+  assert.equal(SOLAR_SYSTEM_BODIES.length, 15);
   const saturn = SOLAR_SYSTEM_BODIES.find((b) => b.id === 'saturn');
   assert.ok(saturn);
   const expPos = computeKeplerBodyPosition(saturn, 0, 'exploration');

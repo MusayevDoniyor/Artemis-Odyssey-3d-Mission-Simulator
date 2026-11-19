@@ -172,7 +172,7 @@ _(Default, Hover, Focus-Visible, Active, Disabled, Loading, Error, Success)_ wit
 - **Legal Authority**: Title 14 Code of Federal Regulations (CFR) Part 1221 & [NASA Media Usage Guidelines](https://www.nasa.gov/multimedia/guidelines/index.html).
 - **Prohibition**: Third-party commercial or independent software may not use the official NASA blue "meatball" or red "worm" insignia in application headers as an identifying trademark without explicit written permission from NASA Office of Communications.
 - **Original Mark Implementation**:
-  - Replace `nasa-meatball.png` in [src/components/NASAInsignia.tsx](file:///C:/Users/doniy/Desktop/ArtemisOdyssey/src/components/NASAInsignia.tsx) with an original, vector SVG flight chevron mark: twin cyan ascent trajectories orbiting a stylized lunar crescent.
+  - Replace `nasa-meatball.png` in [src/components/NASAInsignia.tsx](./src/components/NASAInsignia.tsx) with an original, vector SVG flight chevron mark: twin cyan ascent trajectories orbiting a stylized lunar crescent.
   - Accompany all displays with an explicit disclaimer:
     _"Unofficial educational mission simulator. Not affiliated with, sponsored, or endorsed by NASA. NASA open data and public-domain mission manifests are utilized strictly for STEM educational purposes."_
 

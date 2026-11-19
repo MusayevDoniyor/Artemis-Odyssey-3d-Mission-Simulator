@@ -1,0 +1,60 @@
+[
+  {
+    "sceneId": "landing_touchdown_success",
+    "expected": "Nominal Soft Touchdown",
+    "dump": {
+      "phase": "landing",
+      "landingVerticalSpeedMs": -0.4,
+      "landingLanded": true,
+      "landingPitchDeg": 0,
+      "crashFxActive": false,
+      "crashFxKind": "landing",
+      "renderCalls": 650,
+      "renderTriangles": 344974,
+      "hudSummary": [
+        "1 m ALT"
+      ]
+    },
+    "screenshot": "landing_touchdown_success.png"
+  },
+  {
+    "sceneId": "landing_hard_touchdown",
+    "expected": "Hard Touchdown",
+    "dump": {
+      "phase": "landing",
+      "landingVerticalSpeedMs": -2.8,
+      "landingLanded": true,
+      "landingPitchDeg": 4.2,
+      "crashFxActive": false,
+      "crashFxKind": "landing",
+      "renderCalls": 650,
+      "renderTriangles": 344974,
+      "hudSummary": [
+        "1 m ALT"
+      ]
+    },
+    "screenshot": "landing_hard_touchdown.png"
+  },
+  {
+    "sceneId": "landing_crash_debrief",
+    "expected": "Crash Event & Post-Flight Debrief",
+    "dump": {
+      "phase": "gameover",
+      "landingVerticalSpeedMs": -2.8,
+      "landingLanded": true,
+      "landingPitchDeg": 4.2,
+      "crashFxActive": true,
+      "crashFxKind": "landing",
+      "renderCalls": 500,
+      "renderTriangles": 340134,
+      "hudSummary": [
+        "MISSION ABORT",
+        "3.0 m/s(MAX 4.8)",
+        "TOUCHDOWN TILT",
+        "FLIGHT DIRECTOR FIX: Hold sink under 4.5 m/s and level tilt within 12° at contact.",
+        "REPLAY MISSION"
+      ]
+    },
+    "screenshot": "landing_crash_debrief.png"
+  }
+]

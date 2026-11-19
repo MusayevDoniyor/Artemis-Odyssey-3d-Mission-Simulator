@@ -1,0 +1,947 @@
+[
+  {
+    "sceneName": "Launch Pad (Wide)",
+    "sceneId": "launch",
+    "rendererCalls": 408,
+    "rendererTriangles": 163230,
+    "geometries": 268,
+    "textures": 15,
+    "bySubsystem": {
+      "Environment & Scenery": {
+        "mainCalls": 72,
+        "shadowCalls": 58,
+        "totalCalls": 130,
+        "mainTris": 12607,
+        "shadowTris": 9948,
+        "totalTris": 22555,
+        "uniqueTris": 12607
+      },
+      "LC-39B Umbilical Tower": {
+        "mainCalls": 23,
+        "shadowCalls": 12,
+        "totalCalls": 35,
+        "mainTris": 2320,
+        "shadowTris": 2108,
+        "totalTris": 4428,
+        "uniqueTris": 2320
+      },
+      "SLS Core Stage": {
+        "mainCalls": 23,
+        "shadowCalls": 18,
+        "totalCalls": 41,
+        "mainTris": 20312,
+        "shadowTris": 19996,
+        "totalTris": 40308,
+        "uniqueTris": 20312
+      },
+      "SLS RS-25 Engines": {
+        "mainCalls": 16,
+        "shadowCalls": 4,
+        "totalCalls": 20,
+        "mainTris": 13076,
+        "shadowTris": 12620,
+        "totalTris": 25696,
+        "uniqueTris": 13076
+      },
+      "SLS Twin SRBs": {
+        "mainCalls": 62,
+        "shadowCalls": 44,
+        "totalCalls": 106,
+        "mainTris": 28064,
+        "shadowTris": 27048,
+        "totalTris": 55112,
+        "uniqueTris": 28064
+      },
+      "SLS ICPS": {
+        "mainCalls": 11,
+        "shadowCalls": 1,
+        "totalCalls": 12,
+        "mainTris": 2077,
+        "shadowTris": 899,
+        "totalTris": 2976,
+        "uniqueTris": 2077
+      },
+      "Orion Crew Module": {
+        "mainCalls": 10,
+        "shadowCalls": 6,
+        "totalCalls": 16,
+        "mainTris": 3657,
+        "shadowTris": 3441,
+        "totalTris": 7098,
+        "uniqueTris": 3657
+      },
+      "Launch Abort System": {
+        "mainCalls": 7,
+        "shadowCalls": 6,
+        "totalCalls": 13,
+        "mainTris": 260,
+        "shadowTris": 2896,
+        "totalTris": 3156,
+        "uniqueTris": 260
+      },
+      "Pad Ground Plane": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 56,
+        "shadowTris": 0,
+        "totalTris": 56,
+        "uniqueTris": 56
+      },
+      "European Service Module": {
+        "mainCalls": 15,
+        "shadowCalls": 0,
+        "totalCalls": 15,
+        "mainTris": 552,
+        "shadowTris": 0,
+        "totalTris": 552,
+        "uniqueTris": 552
+      },
+      "Atmospheric Cloud Deck": {
+        "mainCalls": 18,
+        "shadowCalls": 0,
+        "totalCalls": 18,
+        "mainTris": 36,
+        "shadowTris": 0,
+        "totalTris": 36,
+        "uniqueTris": 36
+      },
+      "Sky Dome & Horizon": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 1344,
+        "shadowTris": 0,
+        "totalTris": 1344,
+        "uniqueTris": 1344
+      }
+    }
+  },
+  {
+    "sceneName": "Title Screen (Hero)",
+    "sceneId": "title",
+    "rendererCalls": 403,
+    "rendererTriangles": 160408,
+    "geometries": 268,
+    "textures": 15,
+    "bySubsystem": {
+      "Environment & Scenery": {
+        "mainCalls": 69,
+        "shadowCalls": 58,
+        "totalCalls": 127,
+        "mainTris": 9799,
+        "shadowTris": 9948,
+        "totalTris": 19747,
+        "uniqueTris": 9799
+      },
+      "LC-39B Umbilical Tower": {
+        "mainCalls": 22,
+        "shadowCalls": 12,
+        "totalCalls": 34,
+        "mainTris": 2308,
+        "shadowTris": 2108,
+        "totalTris": 4416,
+        "uniqueTris": 2308
+      },
+      "SLS Core Stage": {
+        "mainCalls": 23,
+        "shadowCalls": 18,
+        "totalCalls": 41,
+        "mainTris": 20312,
+        "shadowTris": 19996,
+        "totalTris": 40308,
+        "uniqueTris": 20312
+      },
+      "SLS RS-25 Engines": {
+        "mainCalls": 16,
+        "shadowCalls": 4,
+        "totalCalls": 20,
+        "mainTris": 13076,
+        "shadowTris": 12620,
+        "totalTris": 25696,
+        "uniqueTris": 13076
+      },
+      "SLS Twin SRBs": {
+        "mainCalls": 62,
+        "shadowCalls": 44,
+        "totalCalls": 106,
+        "mainTris": 28064,
+        "shadowTris": 27048,
+        "totalTris": 55112,
+        "uniqueTris": 28064
+      },
+      "SLS ICPS": {
+        "mainCalls": 11,
+        "shadowCalls": 1,
+        "totalCalls": 12,
+        "mainTris": 2077,
+        "shadowTris": 899,
+        "totalTris": 2976,
+        "uniqueTris": 2077
+      },
+      "Orion Crew Module": {
+        "mainCalls": 10,
+        "shadowCalls": 6,
+        "totalCalls": 16,
+        "mainTris": 3657,
+        "shadowTris": 3441,
+        "totalTris": 7098,
+        "uniqueTris": 3657
+      },
+      "Launch Abort System": {
+        "mainCalls": 7,
+        "shadowCalls": 6,
+        "totalCalls": 13,
+        "mainTris": 260,
+        "shadowTris": 2896,
+        "totalTris": 3156,
+        "uniqueTris": 260
+      },
+      "Pad Ground Plane": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 56,
+        "shadowTris": 0,
+        "totalTris": 56,
+        "uniqueTris": 56
+      },
+      "European Service Module": {
+        "mainCalls": 15,
+        "shadowCalls": 0,
+        "totalCalls": 15,
+        "mainTris": 552,
+        "shadowTris": 0,
+        "totalTris": 552,
+        "uniqueTris": 552
+      },
+      "Atmospheric Cloud Deck": {
+        "mainCalls": 17,
+        "shadowCalls": 0,
+        "totalCalls": 17,
+        "mainTris": 34,
+        "shadowTris": 0,
+        "totalTris": 34,
+        "uniqueTris": 34
+      },
+      "Sky Dome & Horizon": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 1344,
+        "shadowTris": 0,
+        "totalTris": 1344,
+        "uniqueTris": 1344
+      }
+    }
+  },
+  {
+    "sceneName": "Mission Briefing",
+    "sceneId": "briefing",
+    "rendererCalls": 131,
+    "rendererTriangles": 173138,
+    "geometries": 366,
+    "textures": 19,
+    "bySubsystem": {
+      "Base Camp Outpost Hab": {
+        "mainCalls": 47,
+        "shadowCalls": 16,
+        "totalCalls": 63,
+        "mainTris": 3374,
+        "shadowTris": 564,
+        "totalTris": 3938,
+        "uniqueTris": 3374
+      },
+      "base-power": {
+        "mainCalls": 13,
+        "shadowCalls": 6,
+        "totalCalls": 19,
+        "mainTris": 412,
+        "shadowTris": 216,
+        "totalTris": 628,
+        "uniqueTris": 412
+      },
+      "Environment & Scenery": {
+        "mainCalls": 44,
+        "shadowCalls": 1,
+        "totalCalls": 45,
+        "mainTris": 141873,
+        "shadowTris": 24660,
+        "totalTris": 166533,
+        "uniqueTris": 141873
+      },
+      "base-comms": {
+        "mainCalls": 3,
+        "shadowCalls": 0,
+        "totalCalls": 3,
+        "mainTris": 486,
+        "shadowTris": 0,
+        "totalTris": 486,
+        "uniqueTris": 486
+      },
+      "Sky Dome & Horizon": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 2480,
+        "shadowTris": 0,
+        "totalTris": 2480,
+        "uniqueTris": 2480
+      }
+    }
+  },
+  {
+    "sceneName": "Settings Console",
+    "sceneId": "settings",
+    "rendererCalls": 131,
+    "rendererTriangles": 173138,
+    "geometries": 366,
+    "textures": 19,
+    "bySubsystem": {
+      "Base Camp Outpost Hab": {
+        "mainCalls": 47,
+        "shadowCalls": 16,
+        "totalCalls": 63,
+        "mainTris": 3374,
+        "shadowTris": 564,
+        "totalTris": 3938,
+        "uniqueTris": 3374
+      },
+      "base-power": {
+        "mainCalls": 13,
+        "shadowCalls": 6,
+        "totalCalls": 19,
+        "mainTris": 412,
+        "shadowTris": 216,
+        "totalTris": 628,
+        "uniqueTris": 412
+      },
+      "Environment & Scenery": {
+        "mainCalls": 44,
+        "shadowCalls": 1,
+        "totalCalls": 45,
+        "mainTris": 141873,
+        "shadowTris": 24660,
+        "totalTris": 166533,
+        "uniqueTris": 141873
+      },
+      "base-comms": {
+        "mainCalls": 3,
+        "shadowCalls": 0,
+        "totalCalls": 3,
+        "mainTris": 486,
+        "shadowTris": 0,
+        "totalTris": 486,
+        "uniqueTris": 486
+      },
+      "Sky Dome & Horizon": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 2480,
+        "shadowTris": 0,
+        "totalTris": 2480,
+        "uniqueTris": 2480
+      }
+    }
+  },
+  {
+    "sceneName": "Hardware Bay: SLS Block 1",
+    "sceneId": "hardware_bay",
+    "rendererCalls": 214,
+    "rendererTriangles": 136102,
+    "geometries": 369,
+    "textures": 19,
+    "bySubsystem": {
+      "SLS Core Stage": {
+        "mainCalls": 23,
+        "shadowCalls": 18,
+        "totalCalls": 41,
+        "mainTris": 20312,
+        "shadowTris": 19996,
+        "totalTris": 40308,
+        "uniqueTris": 20312
+      },
+      "SLS RS-25 Engines": {
+        "mainCalls": 16,
+        "shadowCalls": 4,
+        "totalCalls": 20,
+        "mainTris": 13076,
+        "shadowTris": 12620,
+        "totalTris": 25696,
+        "uniqueTris": 13076
+      },
+      "SLS Twin SRBs": {
+        "mainCalls": 62,
+        "shadowCalls": 44,
+        "totalCalls": 106,
+        "mainTris": 28064,
+        "shadowTris": 27048,
+        "totalTris": 55112,
+        "uniqueTris": 28064
+      },
+      "SLS ICPS": {
+        "mainCalls": 11,
+        "shadowCalls": 1,
+        "totalCalls": 12,
+        "mainTris": 2077,
+        "shadowTris": 899,
+        "totalTris": 2976,
+        "uniqueTris": 2077
+      },
+      "Orion Crew Module": {
+        "mainCalls": 6,
+        "shadowCalls": 6,
+        "totalCalls": 12,
+        "mainTris": 3441,
+        "shadowTris": 3441,
+        "totalTris": 6882,
+        "uniqueTris": 3441
+      },
+      "Launch Abort System": {
+        "mainCalls": 0,
+        "shadowCalls": 6,
+        "totalCalls": 6,
+        "mainTris": 0,
+        "shadowTris": 2896,
+        "totalTris": 2896,
+        "uniqueTris": 0
+      },
+      "Pad Ground Plane": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 48,
+        "shadowTris": 0,
+        "totalTris": 48,
+        "uniqueTris": 48
+      },
+      "European Service Module": {
+        "mainCalls": 10,
+        "shadowCalls": 0,
+        "totalCalls": 10,
+        "mainTris": 392,
+        "shadowTris": 0,
+        "totalTris": 392,
+        "uniqueTris": 392
+      },
+      "Sky Dome & Horizon": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 1344,
+        "shadowTris": 0,
+        "totalTris": 1344,
+        "uniqueTris": 1344
+      },
+      "Environment & Scenery": {
+        "mainCalls": 5,
+        "shadowCalls": 0,
+        "totalCalls": 5,
+        "mainTris": 535,
+        "shadowTris": 0,
+        "totalTris": 535,
+        "uniqueTris": 535
+      }
+    }
+  },
+  {
+    "sceneName": "Hardware Bay: LM-2 Lander",
+    "sceneId": "hardware_bay",
+    "rendererCalls": 442,
+    "rendererTriangles": 183866,
+    "geometries": 605,
+    "textures": 24,
+    "bySubsystem": {
+      "Apollo LM-2 Lander": {
+        "mainCalls": 91,
+        "shadowCalls": 35,
+        "totalCalls": 126,
+        "mainTris": 3744,
+        "shadowTris": 1384,
+        "totalTris": 5128,
+        "uniqueTris": 3744
+      },
+      "Lunar Terrain & Craters": {
+        "mainCalls": 157,
+        "shadowCalls": 157,
+        "totalCalls": 314,
+        "mainTris": 89369,
+        "shadowTris": 89369,
+        "totalTris": 178738,
+        "uniqueTris": 89369
+      },
+      "Environment & Scenery": {
+        "mainCalls": 2,
+        "shadowCalls": 0,
+        "totalCalls": 2,
+        "mainTris": 687,
+        "shadowTris": 0,
+        "totalTris": 687,
+        "uniqueTris": 687
+      }
+    }
+  },
+  {
+    "sceneName": "Hardware Bay: Lunar Rover",
+    "sceneId": "hardware_bay",
+    "rendererCalls": 153,
+    "rendererTriangles": 5176,
+    "geometries": 737,
+    "textures": 24,
+    "bySubsystem": {
+      "Lunar Rover / VIPER": {
+        "mainCalls": 135,
+        "shadowCalls": 16,
+        "totalCalls": 151,
+        "mainTris": 4424,
+        "shadowTris": 752,
+        "totalTris": 5176,
+        "uniqueTris": 4424
+      },
+      "Environment & Scenery": {
+        "mainCalls": 2,
+        "shadowCalls": 0,
+        "totalCalls": 2,
+        "mainTris": 687,
+        "shadowTris": 0,
+        "totalTris": 687,
+        "uniqueTris": 687
+      }
+    }
+  },
+  {
+    "sceneName": "Hardware Bay: ISS",
+    "sceneId": "hardware_bay",
+    "rendererCalls": 19,
+    "rendererTriangles": 13516,
+    "geometries": 743,
+    "textures": 24,
+    "bySubsystem": {
+      "Mesh": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 370,
+        "shadowTris": 370,
+        "totalTris": 740,
+        "uniqueTris": 370
+      },
+      "Mesh_1": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 816,
+        "shadowTris": 816,
+        "totalTris": 1632,
+        "uniqueTris": 816
+      },
+      "Mesh_2": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 4952,
+        "shadowTris": 4952,
+        "totalTris": 9904,
+        "uniqueTris": 4952
+      },
+      "Mesh_3": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 214,
+        "shadowTris": 214,
+        "totalTris": 428,
+        "uniqueTris": 214
+      },
+      "Mesh_4": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 100,
+        "shadowTris": 100,
+        "totalTris": 200,
+        "uniqueTris": 100
+      },
+      "Mesh_5": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 58,
+        "shadowTris": 58,
+        "totalTris": 116,
+        "uniqueTris": 58
+      },
+      "Pad Ground Plane": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 48,
+        "shadowTris": 0,
+        "totalTris": 48,
+        "uniqueTris": 48
+      },
+      "Environment & Scenery": {
+        "mainCalls": 6,
+        "shadowCalls": 0,
+        "totalCalls": 6,
+        "mainTris": 1135,
+        "shadowTris": 0,
+        "totalTris": 1135,
+        "uniqueTris": 1135
+      }
+    }
+  },
+  {
+    "sceneName": "Hardware Bay: JWST",
+    "sceneId": "hardware_bay",
+    "rendererCalls": 79,
+    "rendererTriangles": 198974,
+    "geometries": 779,
+    "textures": 24,
+    "bySubsystem": {
+      "Mesh_0": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 216,
+        "shadowTris": 216,
+        "totalTris": 432,
+        "uniqueTris": 216
+      },
+      "Mesh_0_1": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 2414,
+        "shadowTris": 2414,
+        "totalTris": 4828,
+        "uniqueTris": 2414
+      },
+      "Mesh_0_2": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 1102,
+        "shadowTris": 1102,
+        "totalTris": 2204,
+        "uniqueTris": 1102
+      },
+      "Mesh_0_3": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 7036,
+        "shadowTris": 7036,
+        "totalTris": 14072,
+        "uniqueTris": 7036
+      },
+      "Mesh_0_4": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 194,
+        "shadowTris": 194,
+        "totalTris": 388,
+        "uniqueTris": 194
+      },
+      "Mesh_0_5": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 12,
+        "shadowTris": 12,
+        "totalTris": 24,
+        "uniqueTris": 12
+      },
+      "Mesh_0_6": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 466,
+        "shadowTris": 466,
+        "totalTris": 932,
+        "uniqueTris": 466
+      },
+      "Mesh_0_7": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 12,
+        "shadowTris": 12,
+        "totalTris": 24,
+        "uniqueTris": 12
+      },
+      "Mesh_0_8": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 54166,
+        "shadowTris": 54166,
+        "totalTris": 108332,
+        "uniqueTris": 54166
+      },
+      "Mesh_0_9": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 387,
+        "shadowTris": 387,
+        "totalTris": 774,
+        "uniqueTris": 387
+      },
+      "Mesh_0_10": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 4185,
+        "shadowTris": 4185,
+        "totalTris": 8370,
+        "uniqueTris": 4185
+      },
+      "Mesh_0_11": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 3886,
+        "shadowTris": 3886,
+        "totalTris": 7772,
+        "uniqueTris": 3886
+      },
+      "Mesh_0_12": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 304,
+        "shadowTris": 304,
+        "totalTris": 608,
+        "uniqueTris": 304
+      },
+      "Mesh_0_13": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 64,
+        "shadowTris": 64,
+        "totalTris": 128,
+        "uniqueTris": 64
+      },
+      "Mesh_0_14": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 80,
+        "shadowTris": 80,
+        "totalTris": 160,
+        "uniqueTris": 80
+      },
+      "Mesh_0_15": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 120,
+        "shadowTris": 120,
+        "totalTris": 240,
+        "uniqueTris": 120
+      },
+      "Mesh_0_16": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 136,
+        "shadowTris": 136,
+        "totalTris": 272,
+        "uniqueTris": 136
+      },
+      "Mesh_0_17": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 850,
+        "shadowTris": 850,
+        "totalTris": 1700,
+        "uniqueTris": 850
+      },
+      "Mesh_0_18": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 60,
+        "shadowTris": 60,
+        "totalTris": 120,
+        "uniqueTris": 60
+      },
+      "Mesh_0_19": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 408,
+        "shadowTris": 408,
+        "totalTris": 816,
+        "uniqueTris": 408
+      },
+      "Mesh_0_20": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 72,
+        "shadowTris": 72,
+        "totalTris": 144,
+        "uniqueTris": 72
+      },
+      "Mesh_0_21": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 4435,
+        "shadowTris": 4435,
+        "totalTris": 8870,
+        "uniqueTris": 4435
+      },
+      "Mesh_0_22": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 3215,
+        "shadowTris": 3215,
+        "totalTris": 6430,
+        "uniqueTris": 3215
+      },
+      "Mesh_0_23": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 6536,
+        "shadowTris": 6536,
+        "totalTris": 13072,
+        "uniqueTris": 6536
+      },
+      "Mesh_0_24": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 896,
+        "shadowTris": 896,
+        "totalTris": 1792,
+        "uniqueTris": 896
+      },
+      "Mesh_0_25": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 10,
+        "shadowTris": 10,
+        "totalTris": 20,
+        "uniqueTris": 10
+      },
+      "Mesh_0_26": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 182,
+        "shadowTris": 182,
+        "totalTris": 364,
+        "uniqueTris": 182
+      },
+      "Mesh_0_27": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 702,
+        "shadowTris": 702,
+        "totalTris": 1404,
+        "uniqueTris": 702
+      },
+      "Mesh_0_28": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 24,
+        "shadowTris": 24,
+        "totalTris": 48,
+        "uniqueTris": 24
+      },
+      "Mesh_0_29": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 3979,
+        "shadowTris": 3979,
+        "totalTris": 7958,
+        "uniqueTris": 3979
+      },
+      "Mesh_0_30": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 757,
+        "shadowTris": 757,
+        "totalTris": 1514,
+        "uniqueTris": 757
+      },
+      "Mesh_0_31": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 181,
+        "shadowTris": 181,
+        "totalTris": 362,
+        "uniqueTris": 181
+      },
+      "Mesh_0_32": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 106,
+        "shadowTris": 106,
+        "totalTris": 212,
+        "uniqueTris": 106
+      },
+      "Mesh_0_33": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 88,
+        "shadowTris": 88,
+        "totalTris": 176,
+        "uniqueTris": 88
+      },
+      "Mesh_0_34": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 1374,
+        "shadowTris": 1374,
+        "totalTris": 2748,
+        "uniqueTris": 1374
+      },
+      "Mesh_0_35": {
+        "mainCalls": 1,
+        "shadowCalls": 1,
+        "totalCalls": 2,
+        "mainTris": 584,
+        "shadowTris": 584,
+        "totalTris": 1168,
+        "uniqueTris": 584
+      },
+      "Pad Ground Plane": {
+        "mainCalls": 1,
+        "shadowCalls": 0,
+        "totalCalls": 1,
+        "mainTris": 48,
+        "shadowTris": 0,
+        "totalTris": 48,
+        "uniqueTris": 48
+      },
+      "Environment & Scenery": {
+        "mainCalls": 6,
+        "shadowCalls": 0,
+        "totalCalls": 6,
+        "mainTris": 1135,
+        "shadowTris": 0,
+        "totalTris": 1135,
+        "uniqueTris": 1135
+      }
+    }
+  }
+]

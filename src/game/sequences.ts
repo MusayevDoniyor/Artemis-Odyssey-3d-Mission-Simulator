@@ -477,8 +477,9 @@ export function computeRoverDisplaySpeed(
 ): { displayMs: number; displayKmh: number; scaleLabel: string; badgeText: string } {
   const abs = Math.abs(simSpeedMs);
   if (scale === 'REAL_SPEED') {
-    // Normalize physics speed (0..13.2 m/s trainer units) to authentic 0..0.20 m/s VIPER drive rate
-    const realMs = Math.min(0.2, (abs / 13.2) * 0.18);
+    // If simSpeedMs is already simulated at real scientific rate (<= 1.0 m/s), display directly.
+    // If unscaled speed (> 1.0 m/s) is passed, normalize to authentic 0..0.20 m/s VIPER rate.
+    const realMs = abs <= 1.0 ? Math.min(0.2, abs) : Math.min(0.2, (abs / 13.2) * 0.18);
     return {
       displayMs: Number(realMs.toFixed(2)),
       displayKmh: Number((realMs * 3.6).toFixed(2)),

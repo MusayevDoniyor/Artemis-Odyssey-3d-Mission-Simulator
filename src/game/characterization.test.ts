@@ -7,6 +7,7 @@ import {
   createInitialLaunchState,
   createInitialRoverState,
   createInitialSpaceFlightState,
+  computeLaunchOrbitHandoffState,
   evaluateTouchdown,
   getSurfaceTerrainHeight,
   separateLaunchStage,
@@ -16,7 +17,7 @@ import {
   stepSpaceFlightPhysics,
 } from './physics';
 import { PHYSICS } from './constants';
-import { createInitialLeoTransferState, stepLeoTransfer } from './sequences';
+import { computeRoverDisplaySpeed, createInitialLeoTransferState, stepLeoTransfer } from './sequences';
 import type { InputState } from './types';
 
 const IDLE_INPUT: InputState = {
@@ -166,6 +167,35 @@ test('CHARACTERIZATION: Rover kinematics updates heading and position', () => {
   assert.ok(rover.headingRad !== 0, 'Rover heading should turn when right is held');
 });
 
+// KNOWN_DEFECT: Fixed in Milestone 7 / Phase 7 (Bug B3)
+// Choosing 'REAL_SPEED' in UI changes display telemetry label to ~0.18 m/s,
+// but stepRoverPhysics simulates at unscaled speed (~6.8 m/s), meaning physical displacement
+// in the simulation world is identical regardless of the speed scale setting.
+test('CHARACTERIZATION [KNOWN_DEFECT: B3]: Rover physics step displacement does not scale with telemetry speedScale', () => {
+  let rover1 = createInitialRoverState(6, 6, 'moon');
+  let rover2 = createInitialRoverState(6, 6, 'moon');
+  const DRIVE_FWD: InputState = { ...IDLE_INPUT, forward: true };
+
+  // Drive both rovers for 1.0 second (20 steps of 0.05s)
+  for (let i = 0; i < 20; i++) {
+    rover1 = stepRoverPhysics(rover1, DRIVE_FWD, [], 0.05);
+    rover2 = stepRoverPhysics(rover2, DRIVE_FWD, [], 0.05);
+  }
+
+  // Both rovers moved the exact same distance (~3.4m), reaching speed ~6.8 m/s
+  assert.equal(rover1.speed, rover2.speed);
+  assert.ok(rover1.speed > 5.0, 'Simulation runs at rapid game speed > 5 m/s');
+
+  // But computeRoverDisplaySpeed formats REAL_SPEED down to 0.18 m/s while KID_25X displays 6.8 m/s:
+  const displayReal = computeRoverDisplaySpeed(rover1.speed, 'REAL_SPEED');
+  const displayKid = computeRoverDisplaySpeed(rover2.speed, 'KID_25X');
+  assert.equal(displayReal.scaleLabel, 'REAL VIPER RATE (1×)');
+  assert.equal(displayKid.scaleLabel, 'KID EXPLORE (TIME ×25)');
+  assert.ok(displayReal.displayMs <= 0.20, 'Display claims 0.18 m/s');
+  assert.ok(displayKid.displayMs >= 5.0, 'Display claims >= 5.0 m/s');
+  // Proves the bug: physical motion in simulation is 100% disconnected from the REAL_SPEED selection!
+});
+
 // ---------------------------------------------------------------------------
 // 4. ORBIT & SPACE FLIGHT CHARACTERIZATION (WITH KNOWN DEFECT TAGS)
 // ---------------------------------------------------------------------------
@@ -175,7 +205,7 @@ test('CHARACTERIZATION: Rover kinematics updates heading and position', () => {
 // classify hyperbolic escape when speed exceeds local escape velocity.
 test('CHARACTERIZATION: Space flight state initialization and target navigation', () => {
   const space = createInitialSpaceFlightState('artemis-2');
-  assert.equal(space.targetId, 'relay-orbit');
+  assert.equal(space.targetId, 'moon');
   assert.equal(space.autoPilot, false);
   assert.ok(space.fuelPct > 0);
 });
@@ -194,6 +224,29 @@ test('CHARACTERIZATION [KNOWN_DEFECT: M4]: LEO parking TLI burn progression and 
   leo = stepLeoTransfer(leo, 0.1, true);
   assert.ok(leo.tliDeltaVAppliedMs > 0, 'TLI burn should apply Delta-V incrementally');
   assert.ok(leo.tliBurnProgressPct > 0, 'TLI progress should increase');
+});
+
+// RESOLVED IN PHASE 1 (Bug B2):
+// Launch orbit handoff generates continuous coordinates and preserves ~7.8 km/s orbital speed
+test('Launch to orbit phase transition handoff provides continuous orbital velocity and coordinates (Fixes B2)', () => {
+  // 1. In launch state at orbital insertion:
+  let L = createInitialLaunchState();
+  L.altitudeKm = 165;
+  L.horizontalSpeedMs = 7809;
+  L.downrangeKm = 1500;
+  L.orbitReached = true;
+
+  // 2. Compute continuous orbital handoff:
+  const handoff = computeLaunchOrbitHandoffState(L, 'artemis-2', 'exploration', 0, 'earth', false, 0);
+
+  // 3. Space flight state created with handoff:
+  const space = createInitialSpaceFlightState('artemis-2', undefined, handoff);
+
+  assert.equal(space.shipX, handoff.shipX);
+  assert.equal(space.shipZ, handoff.shipZ);
+  assert.equal(space.orbitalSpeedKmS, 7.81);
+  assert.ok(Math.hypot(space.vx, space.vz) >= 0.15, 'Space flight velocity is continuous with orbit');
+  assert.equal(space.trajectoryRegime, 'Circular Orbit');
 });
 
 test('CHARACTERIZATION: Campaign carryover state tracking', () => {

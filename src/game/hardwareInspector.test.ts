@@ -13,11 +13,32 @@ import {
 } from './hardwareInspector';
 import type { InspectorLabelPoint } from './types';
 
-test('SLS Block 1 defines all 7 required aerospace subsystems and all 7 vehicles have complete specs and quizzes', () => {
+test('SLS Block 1, Saturn V, and Falcon 9 define required aerospace subsystems and have complete specs and quizzes', () => {
   const sls = HARDWARE_CATALOG.rocket;
   assert.deepEqual(
     sls.parts.map((p) => p.id),
     ['sls-core', 'sls-rs25', 'sls-boosters', 'sls-icps', 'sls-orion', 'sls-esm', 'sls-las']
+  );
+
+  const saturn = HARDWARE_CATALOG['saturn-v'];
+  assert.ok(saturn);
+  assert.deepEqual(
+    saturn.parts.map((p) => p.id),
+    ['saturn-sic', 'saturn-sii', 'saturn-sivb', 'saturn-iu-sla', 'saturn-csm', 'saturn-les']
+  );
+
+  const falcon = HARDWARE_CATALOG['falcon-9'];
+  assert.ok(falcon);
+  assert.deepEqual(
+    falcon.parts.map((p) => p.id),
+    ['falcon-stage1', 'falcon-grid-fins', 'falcon-landing-legs', 'falcon-interstage', 'falcon-stage2', 'falcon-fairing']
+  );
+
+  const iss = HARDWARE_CATALOG.iss;
+  assert.ok(iss);
+  assert.deepEqual(
+    iss.parts.map((p) => p.id),
+    ['iss-truss', 'iss-modules', 'iss-solar-arrays', 'iss-radiators', 'iss-canadarm']
   );
 
   for (const craftId of HARDWARE_ORDER) {

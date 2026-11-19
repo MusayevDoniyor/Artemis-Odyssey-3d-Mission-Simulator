@@ -24,7 +24,10 @@ export type VehicleShowcaseId =
   | 'voyager'
   | 'lander'
   | 'rover'
-  | 'outpost';
+  | 'outpost'
+  | 'saturn-v'
+  | 'falcon-9'
+  | 'iss';
 
 export type PayloadId = 'heavy-shield' | 'oxygen-tanks' | 'solar-panels' | 'water-drill';
 
@@ -62,6 +65,10 @@ export interface DonkiStatus {
   sourceLocation: string;
   link: string;
   description: string;
+  flrID?: string;
+  peakTime?: string;
+  endTime?: string;
+  activeRegionNum?: number;
   totalEvents30d?: number | null;
   cmeCount30d?: number;
   gstCount30d?: number;
@@ -226,6 +233,9 @@ export type SpacecraftTrajectoryType =
   | 'Landing Trajectory'
   | 'Station-Keeping';
 
+export type SpaceTimeWarp = 1 | 2 | 5 | 10 | 50 | 100 | 500 | 1000;
+export type SpaceSasMode = 'MANUAL' | 'PROGRADE' | 'RETROGRADE' | 'TARGET';
+
 export interface SpaceFlightState {
   shipX: number;
   shipZ: number;
@@ -254,6 +264,13 @@ export interface SpaceFlightState {
   orbitalEccentricity?: number;
   distanceFromSunAu?: number;
   distanceToTargetKm?: number;
+  altitudeKm?: number;
+  commsDelaySec?: number;
+  radiationDoseRateUsvH?: number;
+  activeTrajectoryFrame?: 'earth_inertial' | 'earth_moon_rotating' | 'moon_centred';
+  timeWarp?: SpaceTimeWarp;
+  throttle?: number;
+  sasMode?: SpaceSasMode;
 }
 
 export interface LandingZone {
@@ -305,6 +322,9 @@ export interface LandingState {
   landed: boolean;
   result: LandingResult;
   score: number;
+  impactVy?: number;
+  impactSpeedMs?: number;
+  impactTiltDeg?: number;
 }
 
 export interface RoverCollider {
@@ -312,7 +332,7 @@ export interface RoverCollider {
   z: number;
   r: number;
   label: string;
-  type: 'rock' | 'habitat' | 'lander' | 'station';
+  type: 'rock' | 'habitat' | 'lander' | 'station' | 'structure';
 }
 
 export interface RoverObjective {
@@ -535,9 +555,24 @@ export interface AudioSettings {
   masterVolume: number;
   sfxVolume: number;
   ambienceVolume: number;
+  engineVolume: number;
 }
 
-export type QualityPreset = 'low' | 'med' | 'high';
+export type QualityPreset = 'low' | 'med' | 'high' | 'ultra';
+
+export type UnitsSystem = 'metric' | 'imperial';
+
+export interface UserPreferencesState {
+  audio: AudioSettings;
+  graphics: {
+    quality: QualityPreset;
+    reducedMotion: boolean;
+    highContrastBorders: boolean;
+    bloomEnabled: boolean;
+  };
+  units: UnitsSystem;
+  speedScale: TelemetrySpeedScale;
+}
 
 export interface InspectorLabelPoint {
   partId: string;
@@ -570,6 +605,8 @@ export interface InspectorUiState {
   propulsionThrottlePct?: number;
   focusNonce?: number;
   doubleClickZoom?: boolean;
+  activeTourId?: string | null;
+  tourStepIndex?: number;
 }
 
 export interface LandedPose {
@@ -627,7 +664,8 @@ export type GameMenuTab =
   | 'ledger'
   | 'achievements'
   | 'glossary'
-  | 'settings';
+  | 'settings'
+  | 'credits';
 
 
 

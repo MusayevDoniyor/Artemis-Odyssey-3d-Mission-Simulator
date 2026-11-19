@@ -144,6 +144,9 @@ function stepSingleFixedLaunchSubstep(
     L.periapsisKm = PHYSICS.SLS_ORBIT_TARGET_KM;
     L.orbitalEccentricity = 0;
     L.phaseStage = 'ORBIT_CONFIRMATION';
+    // Continuous parking orbit coasting around Earth
+    L.elapsed = (L.elapsed ?? 0) + dt;
+    L.downrangeKm = (L.downrangeKm ?? 0) + (vParkMs / 1000) * dt;
     return;
   }
 
@@ -416,6 +419,12 @@ export function stepLaunchPhysics(
   const dt = clamp(rawDt, 0, 0.1);
   let L: LaunchState = { ...state };
 
+  if (L.orbitReached) {
+    const warp = L.timeWarp ?? 1;
+    stepSingleFixedLaunchSubstep(L, input, dt * warp);
+    return L;
+  }
+
   if (L.launchSequence === 'PRE_SIM') {
     L.phaseStage = 'PRE_LAUNCH';
     return L;
@@ -453,11 +462,6 @@ export function stepLaunchPhysics(
 
   if (input.action) {
     L = separateLaunchStage(L);
-  }
-
-  if (L.orbitReached) {
-    stepSingleFixedLaunchSubstep(L, input, FIXED_LAUNCH_DT);
-    return L;
   }
 
   // Deterministic Fixed-Timestep Accumulator (120 Hz internal sub-step for 30/60/120 FPS invariance)

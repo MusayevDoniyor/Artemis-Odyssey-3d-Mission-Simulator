@@ -53,20 +53,21 @@ export const EXPLORATION_VISUAL_LAYOUT: Record<
   string,
   { orbitRadiusUnits: number; bodyRadiusUnits: number }
 > = {
-  sun: { orbitRadiusUnits: 0, bodyRadiusUnits: 8.8 },
-  mercury: { orbitRadiusUnits: 16.5, bodyRadiusUnits: 0.90 },
-  venus: { orbitRadiusUnits: 25.0, bodyRadiusUnits: 2.23 },
-  earth: { orbitRadiusUnits: 38.5, bodyRadiusUnits: 2.35 },
-  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.64 },
-  mars: { orbitRadiusUnits: 54.0, bodyRadiusUnits: 1.25 },
-  ceres: { orbitRadiusUnits: 67.0, bodyRadiusUnits: 0.52 },
-  jupiter: { orbitRadiusUnits: 86.0, bodyRadiusUnits: 4.5 },
-  saturn: { orbitRadiusUnits: 108.0, bodyRadiusUnits: 3.8 },
-  uranus: { orbitRadiusUnits: 128.0, bodyRadiusUnits: 2.6 },
-  neptune: { orbitRadiusUnits: 146.0, bodyRadiusUnits: 2.5 },
-  pluto: { orbitRadiusUnits: 164.0, bodyRadiusUnits: 0.58 },
-  eris: { orbitRadiusUnits: 184.0, bodyRadiusUnits: 0.57 },
-  halley: { orbitRadiusUnits: 74.0, bodyRadiusUnits: 0.45 },
+  sun: { orbitRadiusUnits: 0, bodyRadiusUnits: 256.6151 },
+  mercury: { orbitRadiusUnits: 820.0, bodyRadiusUnits: 0.8999 },
+  venus: { orbitRadiusUnits: 1100.0, bodyRadiusUnits: 2.2323 },
+  earth: { orbitRadiusUnits: 1450.0, bodyRadiusUnits: 2.35 },
+  moon: { orbitRadiusUnits: 5.8, bodyRadiusUnits: 0.6409 },
+  mars: { orbitRadiusUnits: 1950.0, bodyRadiusUnits: 1.2502 },
+  ceres: { orbitRadiusUnits: 2600.0, bodyRadiusUnits: 0.1733 },
+  jupiter: { orbitRadiusUnits: 3800.0, bodyRadiusUnits: 25.7873 },
+  saturn: { orbitRadiusUnits: 5200.0, bodyRadiusUnits: 21.478 },
+  uranus: { orbitRadiusUnits: 7000.0, bodyRadiusUnits: 9.354 },
+  neptune: { orbitRadiusUnits: 8800.0, bodyRadiusUnits: 9.081 },
+  pluto: { orbitRadiusUnits: 10500.0, bodyRadiusUnits: 0.438 },
+  eris: { orbitRadiusUnits: 13500.0, bodyRadiusUnits: 0.429 },
+  halley: { orbitRadiusUnits: 6500.0, bodyRadiusUnits: 0.45 },
+  bennu: { orbitRadiusUnits: 1550.0, bodyRadiusUnits: 0.12 },
 };
 
 /**
@@ -239,10 +240,11 @@ export function computeBodyCartesianSI(
   const dtSec = epochYearsFromJ2000 * SI.JULIAN_YEAR_S;
 
   // If Moon, solve geocentric orbit around Earth and add Earth's heliocentric vector
+  // Two-body Earth-Moon standard gravitational parameter GM_total = GM_Earth + GM_Moon (27.32166 day sidereal period)
   if (entry.parentBodyId === 'earth') {
     const earthRes = computeBodyCartesianSI('earth', epochYearsFromJ2000, horizonsVectors);
-    const earthMu = PLANETARY_CATALOG_SI.earth.muM3S2;
-    const moonRel = keplerianToCartesianSI(entry.orbitalElements, earthMu, dtSec);
+    const earthMoonMu = PLANETARY_CATALOG_SI.earth.muM3S2 + PLANETARY_CATALOG_SI.moon.muM3S2;
+    const moonRel = keplerianToCartesianSI(entry.orbitalElements, earthMoonMu, dtSec);
     return {
       state: {
         xM: earthRes.state.xM + moonRel.xM,
@@ -326,13 +328,19 @@ export function getBodyVisualRadiusUnits(bodyId: string, mode: SolarScaleMode): 
   const entry = PLANETARY_CATALOG_SI[bodyId];
   if (mode === 'scientific') {
     if (!entry) return SCIENTIFIC_EARTH_RADIUS_UNITS;
-    const ratio = entry.meanRadiusM / PLANETARY_CATALOG_SI.earth.meanRadiusM;
+    // Single Convention: Volumetric Mean Radius (NASA/JPL Solar System Dynamics)
+    const ratio = entry.volumetricMeanRadiusM / PLANETARY_CATALOG_SI.earth.volumetricMeanRadiusM;
     // Halley nucleus (5.5km) would be 0.00003u — floor to tiny visible comet coma marker in scientific overview
     return Math.max(0.004, ratio * SCIENTIFIC_EARTH_RADIUS_UNITS);
   }
   if (mode === 'local') {
     if (!entry) return 1.0;
-    return Math.max(0.015, entry.meanRadiusM * LOCAL_UNITS_PER_METER);
+    return Math.max(0.015, entry.volumetricMeanRadiusM * LOCAL_UNITS_PER_METER);
+  }
+  // Exploration / Educational mode: Single Convention: Volumetric Mean Radius (Earth base = 2.35 units)
+  if (entry) {
+    const ratio = entry.volumetricMeanRadiusM / PLANETARY_CATALOG_SI.earth.volumetricMeanRadiusM;
+    return Number((ratio * 2.35).toFixed(4));
   }
   return EXPLORATION_VISUAL_LAYOUT[bodyId]?.bodyRadiusUnits ?? 1.5;
 }
@@ -448,3 +456,20 @@ export function classifySpacecraftTrajectory(params: {
   }
   return ecc < 0.08 ? 'Circular Orbit' : 'Elliptical Orbit';
 }
+
+/**
+ * Computes exact circular orbital speed v = sqrt(mu / r) in SI m/s.
+ */
+export function computeCircularOrbitVelocity(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0) return 0;
+  return Math.sqrt(muM3S2 / radiusM);
+}
+
+/**
+ * Computes orbital period T = 2 * pi * sqrt(r^3 / mu) in SI seconds.
+ */
+export function computeOrbitPeriodSeconds(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0 || muM3S2 <= 0) return 0;
+  return 2 * Math.PI * Math.sqrt(Math.pow(radiusM, 3) / muM3S2);
+}
+

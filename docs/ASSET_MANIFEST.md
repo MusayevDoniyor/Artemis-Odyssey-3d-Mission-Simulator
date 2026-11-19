@@ -1,5 +1,5 @@
 # ARTEMIS ODYSSEY: 3D ASSET MANIFEST & SPECIFICATIONS
-**Document Version:** 2.0.0 · **Target Phase:** Post-Audit Rebuild  
+**Document Version:** 2.1.0 · **Target Phase:** Post-Audit Remediation R1-A  
 **Primary Source:** NASA 3D Resources (`https://science.nasa.gov/3d-resources/`) & GitHub Mirror (`https://github.com/nasa/NASA-3D-Resources`)  
 **Licensing & Usage Reference:** NASA Media Usage Guidelines (`https://www.nasa.gov/multimedia/guidelines/index.html`)  
 
@@ -11,25 +11,33 @@ Per official NASA Media Usage Guidelines (`nasa.gov/multimedia/guidelines/index.
 > *"NASA material is not protected by copyright unless noted. It may be used for educational or informational purposes without explicit permission. NASA's name and insignia (meatball) may not be used in any way that implies endorsement or sponsorship of a commercial product or service."*
 
 - All models sourced from NASA 3D Resources are free and open for public educational use.
-- Any model contributed by non-NASA institutional partners (e.g. SwRI, JHU-APL, ESA) will carry explicit individual attribution in `docs/CREDITS.md`.
+- Any model contributed by non-NASA institutional partners (e.g. SwRI, JHU-APL, ESA) carries explicit individual attribution in `docs/CREDITS.md`.
 
 ---
 
 ## 2. OFFICIAL NASA 3D ASSET AUDIT TABLE
 
-All candidate assets are classified as **[VERIFIED]** (exact link and presence confirmed in NASA archives) or **[UNVERIFIED]** (requires manual download, polygon measurement, and Blender inspection during Milestone 3):
+Assets are classified by implementation type:
+- **[WIRED IN SCENE]**: Downloaded NASA 3D asset actively loaded and rendered in Three.js via `GLTFLoader`.
+- **[DOWNLOADED, UNWIRED]**: NASA 3D asset downloaded to `public/assets/`, awaiting scene-graph wiring and decimation in Step 2 (procedural fallback currently rendered).
+- **[PROCEDURAL RECREATION]**: Procedurally generated 3D geometry based on public dimensional specifications (no official NASA GLB in repo).
 
-| Asset Name | Official NASA Source URL / GitHub Path | Contributor | Format | Status | Measured / Est. Polygons | Target Budget (Decimated) | Target Size (Draco / WebP) | Animation / Node Separation Requirements |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **SLS Block 1 Launch Vehicle** | `https://science.nasa.gov/resource/space-launch-system-block-1/`<br>GitHub: `3D Printing/Space Launch System (SLS)` | NASA / Marshall Space Flight Center (MSFC) | `.stl` / `.glb` | **[VERIFIED]** | $\sim 280,000$ [UNVERIFIED ESTIMATE] | $75,000$ tris | $< 3.0\text{ MB}$ | Split into 4 nodes:<br>1. Twin SRBs<br>2. Core Stage (4 RS-25)<br>3. Launch Abort System<br>4. Orion + ESM |
-| **Orion Spacecraft (MPCV & ESM)** | `https://science.nasa.gov/3d-resources/`<br>GitHub: `Models/Orion` | NASA / Johnson Space Center (JSC) | `.obj` + textures | **[VERIFIED]** | $\sim 140,000$ [UNVERIFIED ESTIMATE] | $40,000$ tris | $< 1.8\text{ MB}$ | Folded solar arrays with articulation pivot; crew module hatch window. |
-| **Mobile Launcher 1 (ML-1) & Pad 39B** | `https://science.nasa.gov/3d-resources/`<br>GitHub: `3D Printing/Launch Complex 39B` | NASA / Kennedy Space Center (KSC) | `.stl` / `.3ds` | **[VERIFIED]** | $\sim 420,000$ [UNVERIFIED ESTIMATE] | $60,000$ tris | $< 3.2\text{ MB}$ | Heavy truss decimation; flame trench exhaust opening. |
-| **Perseverance Mars Rover (2020)** | `https://science.nasa.gov/3d-resources/`<br>GitHub: `perseverance-GLB/` | NASA / Jet Propulsion Laboratory (JPL) | `.glb` | **[VERIFIED]** | $\sim 125,000$ [UNVERIFIED ESTIMATE] | $55,000$ tris | $< 2.2\text{ MB}$ | 6 steerable wheels; mast head pan/tilt; robotic arm core drill. |
-| **Curiosity Mars Rover (MSL)** | `https://github.com/nasa/NASA-3D-Resources/tree/master/3D%20Printing/Curiosity%20Rover` | NASA / JPL-Caltech | `.stl` / `.obj` | **[VERIFIED]** | $\sim 210,000$ [UNVERIFIED ESTIMATE] | $50,000$ tris | $< 2.0\text{ MB}$ | Alternative rover asset. |
-| **VIPER Lunar Rover** | NASA VIPER Media Kit / Ames Research Center | NASA / Ames Research Center (ARC) | `.glb` / `.obj` | **[VERIFIED]** | $\sim 95,000$ [UNVERIFIED ESTIMATE] | $38,000$ tris | $< 1.6\text{ MB}$ | 4 steerable wheels; vertical TRIDENT drill translation. |
-| **James Webb Space Telescope (JWST)** | `https://github.com/nasa/NASA-3D-Resources/tree/master/Models/JWST` | NASA / Goddard Space Flight Center (GSFC) | `.glb` / `.obj` | **[VERIFIED]** | $\sim 85,000$ [UNVERIFIED ESTIMATE] | $32,000$ tris | $< 1.4\text{ MB}$ | Static celestial showcase asset. |
-| **Voyager 1/2 Probe** | `https://github.com/nasa/NASA-3D-Resources/tree/master/Models/Voyager` | NASA / JPL | `.3ds` / `.obj` | **[VERIFIED]** | $\sim 65,000$ [UNVERIFIED ESTIMATE] | $24,000$ tris | $< 1.0\text{ MB}$ | Static deep space probe asset. |
-| **Apollo 11 Lunar Module (LM)** | `https://science.nasa.gov/3d-resources/` | NASA / JSC | `.glb` | **[VERIFIED]** | $\sim 115,000$ [UNVERIFIED ESTIMATE] | $35,000$ tris | $< 1.5\text{ MB}$ | Historical comparison asset in Vehicle Inspector. |
+| Asset Name | Official NASA Source URL / GitHub Path | Contributor | Format | Status | Measured Triangles | File Size | Scene Graph Status |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **SLS Block 1 Launch Vehicle** | Public NASA MSFC dimensions | NASA MSFC data | Procedural | **[PROCEDURAL]** | ~8,400 tris | In-code | **Active** (procedural model in `models.ts:2900`) |
+| **Orion Spacecraft (MPCV & ESM)**| Public NASA JSC dimensions | NASA JSC data | Procedural | **[PROCEDURAL]** | ~2,640 tris | In-code | **Active** (procedural model in `models.ts:3032`) |
+| **Mobile Launcher 1 (ML-1) & Pad 39B**| Public NASA KSC GSDP drawings | NASA KSC data | Procedural | **[PROCEDURAL]** | ~14,200 tris | In-code | **Active** (procedural model in `models.ts:2400`) |
+| **Falcon 9 Commercial Launcher**| Public SpaceX dimensions | Public dimensions | Procedural | **[PROCEDURAL]** | ~3,120 tris | In-code | **Active** (procedural model in `models.ts:3949`) |
+| **VIPER Lunar Rover** | NASA Ames Research Center data | NASA ARC data | Procedural | **[PROCEDURAL]** | ~1,420 tris | In-code | **Active** (procedural model in `models.ts:1511`) |
+| **Concept Lunar Lander** | Fictional educational architecture | Artemis Odyssey | Procedural | **[PROCEDURAL]** | ~1,850 tris | In-code | **Active** (procedural model in `models.ts:1330`) |
+| **James Webb Space Telescope (JWST)** | `github.com/nasa/NASA-3D-Resources/tree/master/Models/JWST` | NASA GSFC | `.glb` | **[WIRED IN SCENE]** | 99,239 tris | 980.7 KB | **Active** (`GLTFLoader` in `models.ts:3671`) |
+| **Voyager 1/2 Probe** | `github.com/nasa/NASA-3D-Resources/tree/master/Models/Voyager` | NASA JPL | `.glb` | **[WIRED IN SCENE]** | 29,911 tris | 279.2 KB | **Active** (`GLTFLoader` in `models.ts:3770`) |
+| **International Space Station (ISS)** | NASA 3D Resources / JSC | NASA JSC | `.glb` | **[WIRED IN SCENE]** | 174,440 tris | 465.8 KB | **Active** (`GLTFLoader` in `models.ts:4142`) |
+| **Asteroid 101955 Bennu** | NASA OSIRIS-REx / 3D Resources | NASA / OLA | `.glb` | **[WIRED IN SCENE]** | 18,240 tris | 321.9 KB | **Active** (`GLTFLoader` in `models.ts:5004`) |
+| **Apollo Saturn V** | `science.nasa.gov/3d-resources/` | NASA MSFC | `.glb` | **[DOWNLOADED, UNWIRED]** | 34,814 tris | 905.5 KB | **Pending Step 2** (scene uses procedural fallback) |
+| **Apollo 11 Lunar Module (LM)** | `science.nasa.gov/3d-resources/` | NASA JSC | `.glb` | **[DOWNLOADED, UNWIRED]** | 97,588 tris | 700.0 KB | **Pending Step 2** (scene uses procedural fallback) |
+| **Perseverance Mars Rover (2020)**| `science.nasa.gov/3d-resources/` | NASA JPL | `.glb` | **[DOWNLOADED, UNWIRED]** | 183,037 tris | 1,513.1 KB | **Pending Step 2** (scene uses procedural fallback) |
+| **TDRS Satellite** | `science.nasa.gov/3d-resources/` | NASA GSFC | `.glb` | **[DOWNLOADED, UNWIRED]** | 2,964 tris | 94.5 KB | **Pending Step 2** (scene uses procedural fallback) |
 
 ---
 
@@ -75,6 +83,44 @@ To guarantee consistent 60 fps rendering on mid-range laptops:
 | **Secondary Craft / Props (Pad, Satellite)** | $\le 45,000$ tris | $\le 1.8\text{ MB}$ | $\le 10$ |
 | **Terrain Elevation Mesh (LOLA / MOLA)** | $\le 65,000$ tris | $\le 1.5\text{ MB}$ | $\le 4$ |
 | **Total Active Scene Budget** | **$\le 185,000$ tris** | **$\le 6.5\text{ MB}$** | **$\le 45$ calls** |
+
+---
+
+## 5. IMPLEMENTED PRODUCTION ASSETS AUDIT TABLE (POST-OVERNIGHT RUN)
+
+| Category | File Path | Measured File Size | Format / Encoding | Source / License | Scene Integration Status |
+| :--- | :--- | :---: | :---: | :--- | :--- |
+| **Spacecraft** | `public/assets/crafts/jwst.glb` | 980.7 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **WIRED IN SCENE** (`GLTFLoader`) |
+| **Spacecraft** | `public/assets/crafts/voyager.glb` | 279.2 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **WIRED IN SCENE** (`GLTFLoader`) |
+| **Spacecraft** | `public/assets/crafts/iss.glb` | 465.8 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **WIRED IN SCENE** (`GLTFLoader`) |
+| **Asteroid** | `public/assets/asteroids/bennu.glb` | 321.9 KB | GLB / Draco | NASA OSIRIS-REx (Public Domain) | **WIRED IN SCENE** (`GLTFLoader`) |
+| **Launch Vehicle** | `public/assets/rockets/saturn_v.glb` | 905.5 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **Downloaded, UNWIRED** (uses procedural fallback) |
+| **Spacecraft** | `public/assets/crafts/apollo_lunar_module.glb` | 700.0 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **Downloaded, UNWIRED** (uses procedural fallback) |
+| **Spacecraft** | `public/assets/crafts/perseverance.glb` | 1,513.1 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **Downloaded, UNWIRED** (uses procedural fallback) |
+| **Spacecraft** | `public/assets/crafts/tdrs.glb` | 94.5 KB | GLB / Draco | NASA 3D Resources (Public Domain) | **Downloaded, UNWIRED** (uses procedural fallback) |
+| **Audio** | `public/audio/rocket-launch-distant.ogg` | 1,104.0 KB | OGG Vorbis | NASA Historical STS Launch (Public Domain) | **WIRED IN AUDIO ENGINE** (historical Space Shuttle audio) |
+| **Audio** | `public/audio/rocket-launch-roar.ogg` | 925.0 KB | OGG Vorbis | NASA Historical STS Launch (Public Domain) | **WIRED IN AUDIO ENGINE** (historical Space Shuttle audio) |
+| **Celestial Texture** | `public/assets/planets/ceres.jpg` | 1,101.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/venus_surface.jpg` | 864.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/mercury.jpg` | 852.1 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/sun.jpg` | 803.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/mars.jpg` | 512.9 KB | JPEG (2K) | NASA JPL / USGS (Public Domain) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/earth.jpg` | 500.6 KB | JPEG (2K) | NASA Visible Earth Blue Marble (Public Domain) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/jupiter.jpg` | 487.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/moon.jpg` | 394.2 KB | JPEG (2K) | NASA SVS / LROC (Public Domain) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/earth_night.jpg` | 249.3 KB | JPEG (2K) | NASA Black Marble / VIIRS (Public Domain) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/neptune.jpg` | 235.9 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/venus.jpg` | 224.3 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/earth-clouds.png` | 220.8 KB | PNG | NASA Visible Earth (Public Domain) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/saturn.jpg` | 195.2 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/saturn_ring.png` | 11.8 KB | PNG Alpha | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/uranus.jpg` | 75.9 KB | JPEG (2K) | Solar System Scope (CC-BY 4.0) | **WIRED IN SCENE** (`planetMaps`) |
+| **Celestial Texture** | `public/assets/planets/pluto.jpg` | — | — | — | **NOT DOWNLOADED** (uses procedural 256x128 canvas) |
+| **Draco Decoder** | `public/draco/draco_decoder.wasm` | 187.9 KB | WASM | Google Draco (Apache 2.0) | **WIRED** (used by DRACOLoader) |
+| **Draco Decoder** | `public/draco/draco_decoder.js` | 500.5 KB | JS | Google Draco (Apache 2.0) | **WIRED** (used by DRACOLoader) |
+| **Typography** | `public/fonts/jetbrains-mono-latin.woff2` | 30.7 KB | WOFF2 | JetBrains (OFL-1.1) | **WIRED** (Tailwind theme font) |
+| **Typography** | `public/fonts/plus-jakarta-sans-latin.woff2`| 26.7 KB | WOFF2 | Tokotype (OFL-1.1) | **WIRED** (Tailwind theme font) |
+| **Typography** | `public/fonts/orbitron-latin.woff2` | 11.5 KB | WOFF2 | Matt McInerney (OFL-1.1) | **WIRED** (Tailwind theme font) |
 
 ---
 *End of Asset Manifest.*

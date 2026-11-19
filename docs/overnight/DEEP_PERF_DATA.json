@@ -1,0 +1,184 @@
+{
+  "firstLoad": {
+    "ttiMs": 5292,
+    "transferredKB": 30853.5,
+    "resourceCount": 132,
+    "mainBundleMB": 1.64
+  },
+  "scenePerformance": [
+    {
+      "id": "title",
+      "name": "Title Screen",
+      "fps": 1,
+      "frameMs": 91.9,
+      "jsUpdateMs": 1.32,
+      "renderSubmitMs": 90.58,
+      "triangles": 90827,
+      "calls": 256,
+      "geometries": 334,
+      "textures": 14
+    },
+    {
+      "id": "launch",
+      "name": "Launch Pad",
+      "fps": 1,
+      "frameMs": 32.73,
+      "jsUpdateMs": 1.31,
+      "renderSubmitMs": 31.42,
+      "triangles": 91066,
+      "calls": 260,
+      "geometries": 336,
+      "textures": 15
+    },
+    {
+      "id": "orbit",
+      "name": "Orbit (LEO)",
+      "fps": 2,
+      "frameMs": 255.21,
+      "jsUpdateMs": 7.22,
+      "renderSubmitMs": 247.99,
+      "triangles": 46038,
+      "calls": 60,
+      "geometries": 405,
+      "textures": 28
+    },
+    {
+      "id": "solar",
+      "name": "Solar System View",
+      "fps": 3,
+      "frameMs": 87.75,
+      "jsUpdateMs": 3.24,
+      "renderSubmitMs": 84.51,
+      "triangles": 42646,
+      "calls": 56,
+      "geometries": 429,
+      "textures": 31
+    },
+    {
+      "id": "lander",
+      "name": "Lander Descent",
+      "fps": 3,
+      "frameMs": 328.8,
+      "jsUpdateMs": 2.83,
+      "renderSubmitMs": 325.97,
+      "triangles": 234229,
+      "calls": 261,
+      "geometries": 678,
+      "textures": 36
+    },
+    {
+      "id": "rover",
+      "name": "Rover Surface",
+      "fps": 1,
+      "frameMs": 377.83,
+      "jsUpdateMs": 3.29,
+      "renderSubmitMs": 374.54,
+      "triangles": 134908,
+      "calls": 162,
+      "geometries": 875,
+      "textures": 36
+    },
+    {
+      "id": "inspector",
+      "name": "Hardware Inspector",
+      "fps": 3,
+      "frameMs": 7.91,
+      "jsUpdateMs": 1.36,
+      "renderSubmitMs": 6.56,
+      "triangles": 63377,
+      "calls": 168,
+      "geometries": 879,
+      "textures": 36
+    }
+  ],
+  "leakRounds": [
+    {
+      "round": 1,
+      "usedHeapMB": 84.93,
+      "totalHeapMB": 98.54,
+      "geometries": 882,
+      "textures": 36
+    },
+    {
+      "round": 2,
+      "usedHeapMB": 87,
+      "totalHeapMB": 114.04,
+      "geometries": 882,
+      "textures": 36
+    },
+    {
+      "round": 3,
+      "usedHeapMB": 90.13,
+      "totalHeapMB": 118.3,
+      "geometries": 882,
+      "textures": 36
+    },
+    {
+      "round": 4,
+      "usedHeapMB": 94.24,
+      "totalHeapMB": 117.79,
+      "geometries": 882,
+      "textures": 36
+    },
+    {
+      "round": 5,
+      "usedHeapMB": 94.31,
+      "totalHeapMB": 129.55,
+      "geometries": 882,
+      "textures": 36
+    }
+  ],
+  "capturedLongTasksCount": 42,
+  "top10Textures": [
+    {
+      "file": "planets/ceres.jpg",
+      "diskMB": 1.08,
+      "estimatedVramMB": 33.55
+    },
+    {
+      "file": "planets/venus_surface.jpg",
+      "diskMB": 0.84,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/mercury.jpg",
+      "diskMB": 0.83,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/sun.jpg",
+      "diskMB": 0.78,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/mars.jpg",
+      "diskMB": 0.5,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/earth.jpg",
+      "diskMB": 0.49,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/jupiter.jpg",
+      "diskMB": 0.48,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/moon.jpg",
+      "diskMB": 0.38,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/pluto.jpg",
+      "diskMB": 0.34,
+      "estimatedVramMB": 8.39
+    },
+    {
+      "file": "planets/earth_night.jpg",
+      "diskMB": 0.24,
+      "estimatedVramMB": 8.39
+    }
+  ]
+}

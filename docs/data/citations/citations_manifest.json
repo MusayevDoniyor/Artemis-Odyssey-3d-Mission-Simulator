@@ -1,0 +1,155 @@
+[
+  {
+    "id": "sls_msfc",
+    "craftId": "rocket",
+    "title": "NASA Space Launch System Reference Guide",
+    "url": "https://www.nasa.gov/reference/space-launch-system/",
+    "status": 200,
+    "quote": "NASA’s SLS (Space Launch System) is a super heavy-lift rocket that provides the foundation for human exploration beyond Earth orbit.",
+    "match": true
+  },
+  {
+    "id": "sls_ntrs",
+    "craftId": "rocket",
+    "title": "NASA NTRS SLS Core Stage Technical Overview",
+    "url": "https://ntrs.nasa.gov/citations/20170005608",
+    "status": 200,
+    "quote": "The Core Stage serves as the structural backbone of the SLS rocket",
+    "match": false
+  },
+  {
+    "id": "tdrs_scan",
+    "craftId": "satellite",
+    "title": "NASA Space Communications and Navigation (SCaN) Program Overview",
+    "url": "https://www.nasa.gov/communicating-with-missions/",
+    "status": 200,
+    "quote": "SCaN serves as the program office for all of NASA’s space communications",
+    "match": false
+  },
+  {
+    "id": "tdrs_ntrs",
+    "craftId": "satellite",
+    "title": "NASA Tracking and Data Relay Satellite System (TDRSS) Users Guide (NTRS)",
+    "url": "https://ntrs.nasa.gov/citations/19840003001",
+    "status": 200,
+    "quote": "Tracking and Data Relay Satellite System (TDRSS) Users' Guide",
+    "match": false
+  },
+  {
+    "id": "jwst_facts",
+    "craftId": "jwst",
+    "title": "NASA Webb Space Telescope Facts and FAQ",
+    "url": "https://science.nasa.gov/mission/webb/fact-sheet/",
+    "status": 200,
+    "quote": "The James Webb Space Telescope is the world's premier space science observatory",
+    "match": false
+  },
+  {
+    "id": "jwst_esa",
+    "craftId": "jwst",
+    "title": "ESA Webb Mission Operations Overview",
+    "url": "https://www.cosmos.esa.int/web/jwst",
+    "status": 200,
+    "quote": "Webb is an international partnership between NASA, ESA and CSA",
+    "match": false
+  },
+  {
+    "id": "voyager_sp4225",
+    "craftId": "voyager",
+    "title": "NASA SP-4225: To The Outer Planets",
+    "url": "https://www.nasa.gov/history/SP-4225/sp4225.htm",
+    "status": 200,
+    "quote": "Voyager 1 and 2 were designed to explore the outer solar system",
+    "match": false
+  },
+  {
+    "id": "voyager_ntrs",
+    "craftId": "voyager",
+    "title": "NASA Voyager Spacecraft Technical Summary (NTRS)",
+    "url": "https://ntrs.nasa.gov/citations/19780004351",
+    "status": 200,
+    "quote": "Voyager Mission Description and Spacecraft Design",
+    "match": false
+  },
+  {
+    "id": "lm_sp4029",
+    "craftId": "lander",
+    "title": "NASA SP-4029: Apollo by the Numbers",
+    "url": "https://www.nasa.gov/wp-content/uploads/2023/04/sp-4029.pdf",
+    "status": 200,
+    "quote": "Apollo by the Numbers: A Statistical Reference",
+    "match": false
+  },
+  {
+    "id": "lm_nasm",
+    "craftId": "lander",
+    "title": "Smithsonian National Air and Space Museum Lunar Module LM-2 Spec Sheet",
+    "url": "https://airandspace.si.edu/collection-objects/lunar-module-2/nasm_A19711598000",
+    "status": 200,
+    "quote": "Lunar Module 2",
+    "match": true
+  },
+  {
+    "id": "viper_science",
+    "craftId": "rover",
+    "title": "NASA Science VIPER Lunar Rover Mission Overview",
+    "url": "https://science.nasa.gov/mission/viper/",
+    "status": 200,
+    "quote": "NASA's Artemis lunar rover, the Volatiles Investigating Polar Exploration Rover, or VIPER, was designed to explore the relatively nearby but extreme environment of the Moon in search of ice and other potential resources.",
+    "match": true
+  },
+  {
+    "id": "viper_instruments",
+    "craftId": "rover",
+    "title": "NASA Science VIPER Rover and Instruments",
+    "url": "https://science.nasa.gov/mission/viper/rover-and-instruments/",
+    "status": 200,
+    "quote": "VIPER will roam the Moon using its three instruments and a 1-meter drill to detect and analyze various lunar soil environments",
+    "match": false
+  },
+  {
+    "id": "saturn_sa503",
+    "craftId": "saturn-v",
+    "title": "NASA Saturn V Flight Manual SA-503",
+    "url": "https://www.nasa.gov/history/alsj-and-afj/",
+    "status": 200,
+    "quote": "Saturn V Launch Vehicle Flight Manual SA 503",
+    "match": false
+  },
+  {
+    "id": "saturn_sp4029",
+    "craftId": "saturn-v",
+    "title": "NASA SP-4029: Apollo by the Numbers",
+    "url": "https://www.nasa.gov/wp-content/uploads/2023/04/sp-4029.pdf",
+    "status": 200,
+    "quote": "Apollo by the Numbers: A Statistical Reference",
+    "match": false
+  },
+  {
+    "id": "falcon9_lsp",
+    "craftId": "falcon-9",
+    "title": "NASA Launch Services Program (LSP) Falcon 9 Advisory",
+    "url": "https://www.nasa.gov/kennedy/launch-services-program/",
+    "status": 200,
+    "quote": "Falcon 9 is a reusable, two-stage rocket designed and manufactured by SpaceX for the reliable and safe transport of people and payloads into Earth orbit and beyond.",
+    "match": true
+  },
+  {
+    "id": "iss_ref",
+    "craftId": "iss",
+    "title": "NASA International Space Station Reference Guide",
+    "url": "https://www.nasa.gov/reference/international-space-station/",
+    "status": 200,
+    "quote": "The International Space Station is a microgravity research laboratory",
+    "match": false
+  },
+  {
+    "id": "iss_overview",
+    "craftId": "iss",
+    "title": "NASA International Space Station Program Overview",
+    "url": "https://www.nasa.gov/international-space-station/",
+    "status": 200,
+    "quote": "International Space Station",
+    "match": true
+  }
+]

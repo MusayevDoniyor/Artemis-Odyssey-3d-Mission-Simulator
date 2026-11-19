@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/game/*.test.ts\" \"src/sim/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/game/*.test.ts\" \"src/sim/**/*.test.ts\" \"tools/glb-doctor/*.test.ts\" \"tests/**/*.test.ts\" \"qa/*.test.ts\" \"qa/selftest/*.test.ts\"",
+    "qa:fast": "tsc --noEmit && npm test",
+    "qa:full": "node --import tsx qa/runner.ts --suite=full",
+    "qa:gpu": "node --import tsx qa/runner.ts --suite=visual-perf",
+    "qa:update-baselines": "node --import tsx qa/runner.ts --update-baselines"
   },
   "dependencies": {
     "@google/genai": "^3.3.0",
@@ -27,14 +31,25 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
+    "draco3dgltf": "^1.5.9",
     "esbuild": "^0.28.0",
+    "meshoptimizer": "^1.3.0",
+    "pixelmatch": "^8.0.0",
+    "playwright": "^1.65.1",
+    "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "typescript": "^7.0.2"
   }
 }

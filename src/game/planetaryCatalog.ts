@@ -24,8 +24,10 @@ export interface PlanetaryPhysicalEntry {
   name: string;
   jplId: string;
   parentBodyId: 'sun' | 'earth' | null;
-  category: 'star' | 'planet' | 'moon' | 'dwarf' | 'comet';
-  /** Mean volumetric radius in SI meters (JPL Planetary Physical Parameters) */
+  category: 'star' | 'planet' | 'moon' | 'dwarf' | 'comet' | 'asteroid';
+  /** Single Convention: Volumetric mean radius in SI meters (NASA/JPL Solar System Dynamics Physical Parameters) */
+  volumetricMeanRadiusM: number;
+  /** Mean radius alias for backwards compatibility */
   meanRadiusM: number;
   /** Equatorial radius in SI meters */
   equatorialRadiusM: number;
@@ -45,6 +47,12 @@ export interface PlanetaryPhysicalEntry {
   siderealOrbitPeriodS: number;
   /** Geometric albedo (dimensionless 0..1) */
   geometricAlbedo: number;
+  /** Sphere of Influence radius in meters (Laplace SOI: r_soi = a * (m / M_parent)^(2/5)) */
+  soiRadiusM?: number;
+  /** Atmosphere flag indicating presence of gaseous envelope */
+  hasAtmosphere?: boolean;
+  /** Reference surface pressure in Pascals */
+  surfacePressurePa?: number;
   orbitalElements: KeplerianElementsSI | null;
   provenance: DataProvenance;
   sourceCitation: string;
@@ -81,6 +89,42 @@ export const SI = {
 const D2R = SI.DEG_TO_RAD;
 
 /**
+ * Computes circular orbit speed: v = sqrt(GM / r) in m/s.
+ */
+export function computeCircularOrbitSpeed(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0 || muM3S2 <= 0) return 0;
+  return Math.sqrt(muM3S2 / radiusM);
+}
+
+/**
+ * Computes Keplerian orbital period: T = 2 * pi * sqrt(a^3 / GM) in seconds.
+ */
+export function computeOrbitalPeriod(muM3S2: number, semiMajorAxisM: number): number {
+  if (semiMajorAxisM <= 0 || muM3S2 <= 0) return 0;
+  return 2 * Math.PI * Math.sqrt(Math.pow(semiMajorAxisM, 3) / muM3S2);
+}
+
+/**
+ * Computes escape velocity: v_esc = sqrt(2 * GM / r) in m/s.
+ */
+export function computeEscapeVelocity(muM3S2: number, radiusM: number): number {
+  if (radiusM <= 0 || muM3S2 <= 0) return 0;
+  return Math.sqrt((2 * muM3S2) / radiusM);
+}
+
+/**
+ * Computes Laplace Sphere of Influence radius: r_soi = a * (m / M_parent)^(2/5) in meters.
+ */
+export function computeLaplaceSoiRadius(
+  semiMajorAxisM: number,
+  bodyMassKg: number,
+  parentMassKg: number
+): number {
+  if (semiMajorAxisM <= 0 || bodyMassKg <= 0 || parentMassKg <= 0) return 0;
+  return semiMajorAxisM * Math.pow(bodyMassKg / parentMassKg, 0.4);
+}
+
+/**
  * Single source of truth for Solar System planetary physical & J2000 orbital constants in strict SI units.
  * Primary source: NASA/JPL Solar System Dynamics — Planetary Physical Parameters (ssd.jpl.nasa.gov/planets/phys_par.html)
  * and JPL Standish J2000 Keplerian Elements (1800 AD - 2050 AD).
@@ -92,6 +136,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '10',
     parentBodyId: null,
     category: 'star',
+    volumetricMeanRadiusM: 695_700_000,
     meanRadiusM: 695_700_000,
     equatorialRadiusM: 696_340_000,
     massKg: 1.98847e30,
@@ -102,6 +147,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 7.25 * D2R,
     siderealOrbitPeriodS: 0,
     geometricAlbedo: 0,
+    soiRadiusM: Infinity,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: null,
     provenance: 'REAL NASA/JPL DATA',
     sourceCitation: 'NASA/JPL Solar System Dynamics Physical Parameters',
@@ -112,6 +160,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '199',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 2_439_700,
     meanRadiusM: 2_439_700,
     equatorialRadiusM: 2_440_500,
     massKg: 3.3011e23,
@@ -122,6 +171,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 0.034 * D2R,
     siderealOrbitPeriodS: 87.9691 * SI.DAY_S,
     geometricAlbedo: 0.142,
+    soiRadiusM: 112_000_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: {
       semiMajorAxisM: 0.38709927 * SI.AU_M,
       eccentricity: 0.20563593,
@@ -139,6 +191,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '299',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 6_051_800,
     meanRadiusM: 6_051_800,
     equatorialRadiusM: 6_051_800,
     massKg: 4.8675e24,
@@ -149,6 +202,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 177.36 * D2R,
     siderealOrbitPeriodS: 224.701 * SI.DAY_S,
     geometricAlbedo: 0.689,
+    soiRadiusM: 616_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 9.2e6,
     orbitalElements: {
       semiMajorAxisM: 0.72333566 * SI.AU_M,
       eccentricity: 0.00677672,
@@ -166,6 +222,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '399',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 6_371_000,
     meanRadiusM: 6_371_000,
     equatorialRadiusM: 6_378_137,
     massKg: 5.97219e24,
@@ -176,6 +233,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 23.4392911 * D2R,
     siderealOrbitPeriodS: 365.256363 * SI.DAY_S,
     geometricAlbedo: 0.367,
+    soiRadiusM: 924_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 101_325,
     orbitalElements: {
       semiMajorAxisM: 1.00000261 * SI.AU_M,
       eccentricity: 0.01671123,
@@ -193,6 +253,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '301',
     parentBodyId: 'earth',
     category: 'moon',
+    volumetricMeanRadiusM: 1_737_400,
     meanRadiusM: 1_737_400,
     equatorialRadiusM: 1_738_100,
     massKg: 7.342e22,
@@ -203,6 +264,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 6.687 * D2R, // To lunar orbit plane (1.54 deg to ecliptic)
     siderealOrbitPeriodS: 27.321661 * SI.DAY_S,
     geometricAlbedo: 0.12,
+    soiRadiusM: 66_100_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: {
       semiMajorAxisM: 384_400_000,
       eccentricity: 0.0549,
@@ -220,6 +284,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '499',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 3_389_500,
     meanRadiusM: 3_389_500,
     equatorialRadiusM: 3_396_200,
     massKg: 6.4171e23,
@@ -230,6 +295,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 25.19 * D2R,
     siderealOrbitPeriodS: 686.98 * SI.DAY_S,
     geometricAlbedo: 0.17,
+    soiRadiusM: 576_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 610,
     orbitalElements: {
       semiMajorAxisM: 1.52371034 * SI.AU_M,
       eccentricity: 0.09339410,
@@ -247,6 +315,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '2000001',
     parentBodyId: 'sun',
     category: 'dwarf',
+    volumetricMeanRadiusM: 469_730,
     meanRadiusM: 469_730,
     equatorialRadiusM: 482_600,
     massKg: 9.3835e20,
@@ -257,6 +326,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 4.0 * D2R,
     siderealOrbitPeriodS: 1681.63 * SI.DAY_S,
     geometricAlbedo: 0.09,
+    soiRadiusM: 11_500_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: {
       semiMajorAxisM: 2.7675 * SI.AU_M,
       eccentricity: 0.0758,
@@ -274,6 +346,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '599',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 69_911_000,
     meanRadiusM: 69_911_000,
     equatorialRadiusM: 71_492_000,
     massKg: 1.8982e27,
@@ -284,6 +357,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 3.13 * D2R,
     siderealOrbitPeriodS: 4332.589 * SI.DAY_S,
     geometricAlbedo: 0.538,
+    soiRadiusM: 48_200_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 200_000,
     orbitalElements: {
       semiMajorAxisM: 5.20288700 * SI.AU_M,
       eccentricity: 0.04838624,
@@ -301,6 +377,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '699',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 58_232_000,
     meanRadiusM: 58_232_000,
     equatorialRadiusM: 60_268_000,
     massKg: 5.6834e26,
@@ -311,6 +388,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 26.73 * D2R,
     siderealOrbitPeriodS: 10759.22 * SI.DAY_S,
     geometricAlbedo: 0.499,
+    soiRadiusM: 54_600_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 140_000,
     orbitalElements: {
       semiMajorAxisM: 9.53667594 * SI.AU_M,
       eccentricity: 0.05386179,
@@ -328,6 +408,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '799',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 25_362_000,
     meanRadiusM: 25_362_000,
     equatorialRadiusM: 25_559_000,
     massKg: 8.6810e25,
@@ -338,6 +419,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 97.77 * D2R,
     siderealOrbitPeriodS: 30688.5 * SI.DAY_S,
     geometricAlbedo: 0.488,
+    soiRadiusM: 51_800_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 120_000,
     orbitalElements: {
       semiMajorAxisM: 19.18916464 * SI.AU_M,
       eccentricity: 0.04725744,
@@ -355,6 +439,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '899',
     parentBodyId: 'sun',
     category: 'planet',
+    volumetricMeanRadiusM: 24_622_000,
     meanRadiusM: 24_622_000,
     equatorialRadiusM: 24_764_000,
     massKg: 1.02413e26,
@@ -365,6 +450,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 28.32 * D2R,
     siderealOrbitPeriodS: 60195 * SI.DAY_S,
     geometricAlbedo: 0.442,
+    soiRadiusM: 86_800_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 100_000,
     orbitalElements: {
       semiMajorAxisM: 30.06992276 * SI.AU_M,
       eccentricity: 0.00859048,
@@ -382,6 +470,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '999',
     parentBodyId: 'sun',
     category: 'dwarf',
+    volumetricMeanRadiusM: 1_188_300,
     meanRadiusM: 1_188_300,
     equatorialRadiusM: 1_188_300,
     massKg: 1.303e22,
@@ -392,6 +481,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 122.53 * D2R,
     siderealOrbitPeriodS: 90560 * SI.DAY_S,
     geometricAlbedo: 0.52,
+    soiRadiusM: 3_200_000_000,
+    hasAtmosphere: true,
+    surfacePressurePa: 1.0,
     orbitalElements: {
       semiMajorAxisM: 39.48211675 * SI.AU_M,
       eccentricity: 0.24882730,
@@ -409,6 +501,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '136199',
     parentBodyId: 'sun',
     category: 'dwarf',
+    volumetricMeanRadiusM: 1_163_000,
     meanRadiusM: 1_163_000,
     equatorialRadiusM: 1_163_000,
     massKg: 1.6466e22,
@@ -419,6 +512,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 78.0 * D2R,
     siderealOrbitPeriodS: 203_830 * SI.DAY_S,
     geometricAlbedo: 0.96,
+    soiRadiusM: 8_900_000_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: {
       semiMajorAxisM: 67.864 * SI.AU_M,
       eccentricity: 0.43607,
@@ -436,6 +532,7 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     jplId: '90000030',
     parentBodyId: 'sun',
     category: 'comet',
+    volumetricMeanRadiusM: 5_500,
     meanRadiusM: 5_500, // 11 km mean nucleus diameter
     equatorialRadiusM: 7_500,
     massKg: 2.2e14,
@@ -446,6 +543,9 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     axialTiltRad: 35.0 * D2R,
     siderealOrbitPeriodS: 75.32 * SI.JULIAN_YEAR_S,
     geometricAlbedo: 0.04,
+    soiRadiusM: 220_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
     orbitalElements: {
       semiMajorAxisM: 17.834 * SI.AU_M,
       eccentricity: 0.96714,
@@ -456,6 +556,37 @@ export const PLANETARY_CATALOG_SI: Record<string, PlanetaryPhysicalEntry> = {
     },
     provenance: 'REAL NASA/JPL DATA',
     sourceCitation: 'JPL Small-Body Database (1P/Halley)',
+  },
+  bennu: {
+    id: 'bennu',
+    name: '101955 Bennu',
+    jplId: '2101955',
+    parentBodyId: 'sun',
+    category: 'asteroid',
+    volumetricMeanRadiusM: 245.03,
+    meanRadiusM: 245.03, // 490.06m volumetric mean diameter
+    equatorialRadiusM: 255.0,
+    massKg: 7.329e10,
+    densityKgM3: 1190,
+    muM3S2: 4.89,
+    surfaceGravityMs2: 0.00006,
+    siderealRotationPeriodS: 4.296 * 3600, // 4.296 hours
+    axialTiltRad: 177.6 * D2R, // Retrograde rotator
+    siderealOrbitPeriodS: 436.604 * SI.DAY_S, // 1.195 years
+    geometricAlbedo: 0.046, // B-type carbonaceous asteroid
+    soiRadiusM: 32_000,
+    hasAtmosphere: false,
+    surfacePressurePa: 0,
+    orbitalElements: {
+      semiMajorAxisM: 1.12639 * SI.AU_M,
+      eccentricity: 0.20374,
+      inclinationRad: 6.0349 * D2R,
+      ascendingNodeRad: 2.0609 * D2R,
+      argPeriapsisRad: 66.2231 * D2R,
+      meanAnomalyJ2000Rad: 101.7039 * D2R,
+    },
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA OSIRIS-REx Mission Archive & JPL Small-Body Database (101955 Bennu)',
   },
 };
 
@@ -501,8 +632,36 @@ export const SPACECRAFT_CATALOG_SI: Record<string, SpacecraftSpecSI> = {
     thrustN: 2.5, // Hall-effect electric propulsion (approximation)
     ispVacuumS: 2600,
     provenance: 'SCIENTIFIC MODEL',
-    approximationNote: 'Gateway dimensions/mass combine NASA PPE + HALO + i-HAB published baseline concepts.',
+    approximationNote: 'Gateway dimensions/mass combine NASA PPE + HALO + i-HAB published baseline concepts. Note: designated as a paused programme (March 2026 NASA architecture update).',
     sourceCitation: 'NASA Lunar Gateway Program Overview',
+  },
+  tdrs: {
+    id: 'tdrs',
+    name: 'Tracking and Data Relay Satellite (TDRS)',
+    heightM: 4.2,
+    diameterM: 2.8,
+    wingspanM: 14.8, // Across deployed dual 4.5m mesh reflectors and solar arrays
+    dryMassKg: 1_780,
+    propellantMassKg: 1_620,
+    wetMassKg: 3_400,
+    thrustN: 440,
+    ispVacuumS: 310,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA SCaN TDRS Spacecraft Fleet Reference',
+  },
+  iss: {
+    id: 'iss',
+    name: 'International Space Station (ISS)',
+    heightM: 72.8, // Pressurized module axis length
+    diameterM: 108.5, // Integrated Truss Structure span
+    wingspanM: 73.0, // Across Solar Array Wings
+    dryMassKg: 440_000,
+    propellantMassKg: 10_000,
+    wetMassKg: 450_000,
+    thrustN: 0,
+    ispVacuumS: 0,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA International Space Station Facts and Figures (NP-2022-02-001-JSC)',
   },
   'hermes-relay': {
     id: 'hermes-relay',
@@ -590,6 +749,36 @@ export const SPACECRAFT_CATALOG_SI: Record<string, SpacecraftSpecSI> = {
     ispVacuumS: 210,
     provenance: 'REAL NASA/JPL DATA',
     sourceCitation: 'NASA/JPL Voyager Spacecraft Specifications',
+  },
+  'saturn-v': {
+    id: 'saturn-v',
+    name: 'Saturn V (Apollo Lunar Stack)',
+    heightM: 110.6,
+    diameterM: 10.06,
+    wingspanM: 12.0,
+    dryMassKg: 185_300,
+    propellantMassKg: 2_713_000,
+    wetMassKg: 2_970_000,
+    thrustN: 34_500_000,
+    ispVacuumS: 421,
+    ispSeaLevelS: 263,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'NASA MSFC Saturn V Flight Manual (MSFC-MAN-507)',
+  },
+  'falcon-9': {
+    id: 'falcon-9',
+    name: 'Falcon 9 Full Thrust (Block 5)',
+    heightM: 70.0,
+    diameterM: 3.66,
+    wingspanM: 18.0,
+    dryMassKg: 26_200,
+    propellantMassKg: 518_500,
+    wetMassKg: 549_054,
+    thrustN: 7_607_000,
+    ispVacuumS: 348,
+    ispSeaLevelS: 282,
+    provenance: 'REAL NASA/JPL DATA',
+    sourceCitation: 'SpaceX Falcon 9 Launch Vehicle Payload User’s Guide',
   },
 };
 

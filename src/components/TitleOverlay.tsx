@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  Award,
   Battery,
   BookOpen,
   Box,
@@ -35,9 +36,8 @@ import type {
   QualityPreset,
   VehicleShowcaseId,
 } from '../game/types';
-import { AudioQualityPopover } from './AudioQualityPopover';
 import { NASAInsignia } from './NASAInsignia';
-import { GatewayStationThumb, PlanetThumb } from './PlanetThumb';
+import { PlanetThumb } from './PlanetThumb';
 import { Button, Panel, StatusPill } from './ui';
 
 interface TitleOverlayProps {
@@ -70,13 +70,15 @@ interface TitleOverlayProps {
 }
 
 const SHOWCASE_OPTIONS: Array<{ id: VehicleShowcaseId; label: string }> = [
-  { id: 'outpost', label: 'Moon Base' },
   { id: 'rocket', label: 'SLS Rocket' },
-  { id: 'satellite', label: 'HERMES Sat' },
+  { id: 'saturn-v', label: 'Saturn V' },
+  { id: 'falcon-9', label: 'Falcon 9' },
+  { id: 'satellite', label: 'TDRS Satellite' },
   { id: 'jwst', label: 'JWST' },
   { id: 'voyager', label: 'Voyager' },
   { id: 'lander', label: 'Lander' },
   { id: 'rover', label: 'Rover' },
+  { id: 'iss', label: 'Space Station' },
 ];
 
 const QUICK_STAGES: Array<{ phase: GamePhase; label: string }> = [
@@ -95,36 +97,37 @@ const CAMPAIGN_CARD_META: Record<
     destination: string;
     targetDate: string;
     status: 'ready' | 'in-development';
-    planetThumb?: string;
+    planetThumb: string;
   }
 > = {
   'artemis-2': {
     num: 1,
     name: 'Artemis II',
-    destination: 'Earth → LLO · HERMES Deploy',
-    targetDate: 'Flown Flyby Trajectory',
+    destination: 'Lunar Free-Return Trajectory',
+    targetDate: 'Flown Flyby (April 2026)',
     status: 'ready',
     planetThumb: 'earth',
   },
   'artemis-3': {
     num: 2,
     name: 'Artemis III',
-    destination: 'Moon South Pole · LEO Docking',
-    targetDate: 'Target 2026 (as of Nov 2026)',
+    destination: 'LEO HLS Docking Demo',
+    targetDate: 'Target Mid-2027 (as of Nov 2026)',
     status: 'in-development',
-    planetThumb: 'moon',
+    planetThumb: 'earth',
   },
   'artemis-4': {
     num: 3,
     name: 'Artemis IV',
-    destination: 'Lunar Gateway & Landing',
-    targetDate: 'Target 2028 (as of Nov 2026)',
+    destination: 'Lunar South Pole Landing',
+    targetDate: 'Target Early 2028 (as of Nov 2026)',
     status: 'in-development',
+    planetThumb: 'moon',
   },
   'mars-pathfinder': {
     num: 4,
     name: 'Mars Expedition',
-    destination: 'Jezero Crater · Surface Operations',
+    destination: 'Jezero Crater (Concept)',
     targetDate: 'Target 2030s (as of Nov 2026)',
     status: 'in-development',
     planetThumb: 'mars',
@@ -281,6 +284,18 @@ export function TitleOverlay({
               <Settings className="h-4 w-4 text-slate-300" />
               Settings
             </button>
+
+            <span className="hidden h-4 w-px bg-sky-400/20 xl:block" />
+
+            <button
+              type="button"
+              data-testid="title-credits-btn"
+              onClick={() => onOpenMenuTab('credits')}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap text-slate-200 transition hover:bg-white/5 hover:text-white lg:text-sm"
+            >
+              <Award className="h-4 w-4 text-cyan-300" />
+              Credits
+            </button>
           </nav>
 
           {/* Right: Live NASA Data Status + Ambient Music + Mute */}
@@ -365,10 +380,11 @@ export function TitleOverlay({
             </span>
             <span
               className="inline-flex items-center gap-1.5 pl-3"
-              title="Mean Earth–Moon Orbital Distance"
+              title="Mean Earth–Moon Orbital Distance (Distances compressed 24× in Educational Scale)"
             >
               <Orbit className="h-3.5 w-3.5 text-sky-300" />
               <span>384,400 km</span>
+              <span className="hidden font-mono text-[10px] font-normal text-slate-400 sm:inline">[24× Educational Scale]</span>
             </span>
           </div>
         </div>
@@ -472,38 +488,39 @@ export function TitleOverlay({
                           : 'border-sky-400/20 bg-slate-950/65 hover:border-cyan-400/55 hover:bg-slate-900/80'
                   }`}
                 >
-                  {meta.planetThumb ? (
-                    <PlanetThumb bodyId={meta.planetThumb} size="sm" />
-                  ) : (
-                    <GatewayStationThumb sizeClass="h-8 w-8" />
-                  )}
+                  <PlanetThumb bodyId={meta.planetThumb} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
                       <span
-                        className={`truncate font-hud text-xs font-bold ${
+                        title={`${meta.num}. ${meta.name}`}
+                        className={`font-hud text-xs font-bold leading-tight ${
                           active ? 'text-white' : 'text-slate-100'
                         }`}
                       >
                         {meta.num}. {meta.name}
                       </span>
                       {isLocked ? (
-                        <span className="rounded border border-amber-400/30 bg-amber-500/15 px-1 font-mono-tech text-[8px] font-bold text-amber-300 uppercase">
+                        <span className="shrink-0 rounded border border-amber-400/30 bg-amber-500/15 px-1 font-mono-tech text-[8px] font-bold text-amber-300 uppercase">
                           DEV
                         </span>
                       ) : done ? (
-                        <span className="rounded bg-emerald-500/25 px-1 font-mono-tech text-[9px] font-bold text-emerald-300">
+                        <span className="shrink-0 rounded bg-emerald-500/25 px-1 font-mono-tech text-[9px] font-bold text-emerald-300">
                           DONE
                         </span>
                       ) : null}
                     </div>
                     <div
-                      className={`truncate text-[11px] ${
+                      title={meta.destination}
+                      className={`mt-0.5 text-[11px] leading-tight break-words ${
                         active ? 'text-cyan-200' : 'text-slate-400'
                       }`}
                     >
                       {meta.destination}
                     </div>
-                    <div className="mt-0.5 truncate font-mono-tech text-[9px] text-slate-500">
+                    <div
+                      title={meta.targetDate}
+                      className="mt-0.5 font-mono-tech text-[9px] leading-tight text-slate-500 break-words"
+                    >
                       {meta.targetDate}
                     </div>
                   </div>
@@ -522,88 +539,58 @@ export function TitleOverlay({
           {/* Active Objective Readout */}
           <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-sky-400/15 bg-slate-950/75 px-3 py-1.5 text-[11px]">
             {CAMPAIGN_CARD_META[carryover.activeMission].status === 'in-development' ? (
-              <span className="truncate text-slate-300">
+              <p className="leading-snug text-slate-300">
                 <strong className="font-hud text-amber-300 uppercase">In Development: </strong>
                 {activeMission.title} simulation systems are in development (as of Nov 2026). Select Artemis II to launch.
-              </span>
+              </p>
             ) : (
-              <span className="truncate text-slate-200">
+              <p className="leading-snug text-slate-200">
                 <strong className="font-hud text-cyan-300 uppercase">{activeMission.code}: </strong>
                 {activeMission.objectiveSummary}
-              </span>
+              </p>
             )}
           </div>
         </Panel>
 
-        {/* Primary Action CTAs: BRIEF & LAUNCH / EXPLORE / HARDWARE BAY */}
+        {/* Primary Action CTA (Consolidated Single Primary) */}
         <div className="pointer-events-auto flex flex-col gap-2">
-          <div className="grid grid-cols-[1.28fr_1fr] gap-2.5">
-            {CAMPAIGN_CARD_META[carryover.activeMission].status === 'ready' ? (
-              <Button
-                variant="primary"
-                size="lg"
-                data-start="true"
-                onClick={onStartMission}
-                className="w-full justify-between font-display text-sm font-bold tracking-wider uppercase"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Play className="h-4 w-4 fill-slate-950" />
-                  Brief &amp; Launch
-                </span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="lg"
-                data-start="true"
-                disabled
-                title="Mission in development (as of Nov 2026). Select Artemis II to fly."
-                className="w-full text-xs text-amber-300/90"
-              >
-                In Development
-              </Button>
-            )}
-
+          {CAMPAIGN_CARD_META[carryover.activeMission].status === 'ready' ? (
+            <Button
+              variant="primary"
+              size="lg"
+              data-start="true"
+              onClick={onStartMission}
+              className="w-full justify-between font-display text-sm font-bold tracking-wider uppercase shadow-[0_0_24px_rgba(34,211,238,0.35)]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Play className="h-4 w-4 fill-slate-950" />
+                Brief &amp; Launch Artemis II
+              </span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
             <Button
               variant="secondary"
               size="lg"
-              data-testid="free-explore-btn"
-              onClick={onStartFreeExplore}
-              className="w-full font-hud text-sm font-bold tracking-wider uppercase"
+              data-start="true"
+              disabled
+              title="Mission in development (as of Nov 2026). Select Artemis II to fly."
+              className="w-full text-xs text-amber-300/90"
             >
-              <Compass className="h-4 w-4 text-cyan-300" />
-              Explore
+              Mission In Development (as of Nov 2026)
             </Button>
-          </div>
+          )}
 
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => onJumpToPhase('inspector')}
-            className="w-full border border-sky-400/20 bg-slate-900/60 font-hud text-sm font-bold tracking-wider uppercase"
-          >
-            <Wrench className="h-4 w-4 text-cyan-300" />
-            Hardware Bay
-          </Button>
-
-          {/* Compact Expandable Quick Jump & 3D Preview Drawer */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+          {/* Compact Secondary Popover for Direct Stage Jump & 3D Stage */}
+          <div className="flex items-center justify-between gap-2 pt-0.5">
             <button
               type="button"
               onClick={() => setQuickToolsOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-hud text-[11px] font-semibold text-cyan-300/90 transition hover:bg-cyan-500/10 hover:text-cyan-200"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-hud text-[11px] font-semibold text-cyan-300/80 transition hover:bg-cyan-500/10 hover:text-cyan-200"
             >
               <Sliders className="h-3.5 w-3.5" />
-              {quickToolsOpen ? 'Hide 3D Preview & Quick Jump' : '3D Preview & Quick Jump'}
+              {quickToolsOpen ? 'Hide 3D Stage & Quick Jump' : '3D Stage & Quick Jump'}
             </button>
-
-            <AudioQualityPopover
-              audio={audioSettings}
-              quality={qualityPreset}
-              onUpdateAudio={onUpdateAudio}
-              onChangeQuality={onChangeQuality}
-            />
           </div>
 
           {quickToolsOpen && (
@@ -751,6 +738,13 @@ export function TitleOverlay({
           </div>
         </aside>
       </div>
+
+      {/* Readable Educational Disclaimer in Footer */}
+      <footer className="pointer-events-auto relative z-10 border-t border-sky-400/15 bg-slate-950/85 px-4 py-1.5 text-center">
+        <p className="font-body text-xs font-medium text-slate-300">
+          Unofficial educational project · Not affiliated with or endorsed by NASA (14 CFR § 1221)
+        </p>
+      </footer>
     </div>
   );
 }

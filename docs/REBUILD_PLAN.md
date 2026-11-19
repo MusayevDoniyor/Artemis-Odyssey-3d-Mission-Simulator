@@ -171,4 +171,23 @@
 - **Verification**: Run `npm run build` and verify bundle chunk sizes; run `npm run test:smoke`; inspect Chrome DevTools Performance profiler to confirm 60 fps.
 
 ---
+
+## 3. OVERNIGHT COMPREHENSIVE OVERHAUL (PHASES 0 THROUGH 11 COMPLETED)
+
+All 11 phases of the comprehensive Aerospace World, 3D Models, Flight Physics, Real Acoustics, and Settings overhaul have been completed, verified green with 115 automated unit tests passing, and pushed to remote `origin`:
+
+- **Phase 0 (Baseline & Reproduction)**: Committed `3db24b9`, tagged `overnight-phase-0-green`.
+- **Phase 1 (Scale, Coordinates & Continuous Flight - Fixes B1, B2)**: Committed `09d549b`, tagged `overnight-phase-1-green`.
+- **Phase 2 (Celestial Bodies, Real Textures & J2000 Ephemerides - Fixes B4, B5)**: Committed `1097fe7`, tagged `overnight-phase-2-green`.
+- **Phase 3 (SLS Block 1, Saturn V, Falcon 9 & Hydrolox Plumes)**: Committed `2e78a67`, tagged `overnight-phase-3-green`.
+- **Phase 4 (Multi-Layer Rocket Acoustics & NASA STS Launch Audio)**: Committed `2c32847`, tagged `overnight-phase-4-green`.
+- **Phase 5 (Spacecraft Hardware: Apollo LM, ISS, JWST, Voyager, TDRS, Perseverance)**: Committed `4da8ab9`, tagged `overnight-phase-5-green`.
+- **Phase 6 (KSC LC-39B Pad, 180m Lightning Grid, IOP/SS Deluge, Crawlerway, VAB)**: Committed `50b0348`, tagged `overnight-phase-6-green`.
+- **Phase 7 (Surfaces, Touchdown Latch & Rover Kinematics - Fixes B3 & 0.0 m/s Crash)**: Committed `d790f07`, tagged `overnight-phase-7-green`.
+- **Phase 8 (Vehicle Inspector, Multi-Stage Exploded Views, Guided Tours & 100% Audit)**: Committed `c5649eb`, tagged `overnight-phase-8-green`.
+- **Phase 9 (Space Flight Views, Keplerian Conics, Free Return & Multi-Frame Telemetry)**: Committed `3cb4ffb`, tagged `overnight-phase-9-green`.
+- **Phase 10 (4-Bus Audio Console, Procedural Mood Music & Settings Overhaul)**: Committed `f56e81f`, tagged `overnight-phase-10-green`.
+- **Phase 11 (Performance Audit, Zero Memory Leaks, Manifest & Final Report)**: Tagged `overnight-phase-11-green`.
+
+---
 *End of Rebuild Plan.*

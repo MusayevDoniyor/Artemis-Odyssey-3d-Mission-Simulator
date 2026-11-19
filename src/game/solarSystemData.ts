@@ -18,7 +18,7 @@ import {
 import type { HorizonsBodyStateSI } from './jplHorizons';
 
 export type { SolarScaleMode };
-export type SolarBodyCategory = 'star' | 'planet' | 'moon' | 'dwarf' | 'station' | 'belt' | 'comet';
+export type SolarBodyCategory = 'star' | 'planet' | 'moon' | 'dwarf' | 'station' | 'belt' | 'comet' | 'asteroid';
 
 export interface SolarSystemBodySpec {
   id: string;
@@ -68,6 +68,25 @@ export const PRIMARY_SOLAR_BAR_IDS = [
   'neptune',
   'pluto',
 ] as const;
+
+export function getNasaFactSheetUrl(bodyId: string): string {
+  switch (bodyId) {
+    case 'sun':
+      return 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/sunfact.html';
+    case 'moon':
+      return 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html';
+    case 'bennu':
+      return 'https://science.nasa.gov/mission/osiris-rex/';
+    case 'halley':
+      return 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=1P';
+    case 'ceres':
+    case 'pluto':
+    case 'eris':
+      return 'https://nssdc.gsfc.nasa.gov/planetary/factsheet/dwarffact.html';
+    default:
+      return `https://nssdc.gsfc.nasa.gov/planetary/factsheet/${bodyId}fact.html`;
+  }
+}
 
 let activeHorizonsVectors: Record<string, HorizonsBodyStateSI> | null = null;
 export function setActiveHorizonsVectors(vectors: Record<string, HorizonsBodyStateSI> | null): void {
@@ -346,6 +365,20 @@ export const SOLAR_SYSTEM_BODIES: SolarSystemBodySpec[] = [
     tempRangeC: '-200°C to +77°C',
     moonsSummary: 'e = 0.967 · i = 162.26° (Retrograde)',
     fact: 'High eccentricity (0.967) plunges 1P/Halley inside Venus’s orbit at perihelion before swinging beyond Neptune.',
+  }),
+  buildBodySpec('bennu', {
+    shortName: 'Bennu',
+    subtitle: 'Carbonaceous Near-Earth Asteroid',
+    color: 0x94a3b8,
+    diameterDisplay: '490 m (0.49 km)',
+    massDisplay: '7.329 × 10¹⁰ kg',
+    gravityDisplay: '0.00006 m/s²',
+    orbitalPeriodDisplay: '1.20 years (436.6 d)',
+    avgDistanceDisplay: '1.126 AU (168.5M km)',
+    lightTimeOneWay: '8.3–18.2 min',
+    tempRangeC: '-73°C to +7°C',
+    moonsSummary: 'OSIRIS-REx Sample Return Target',
+    fact: 'B-type carbonaceous rubble-pile asteroid sampled by NASA OSIRIS-REx; samples delivered to Earth Sept 2023.',
   }),
 ];
 

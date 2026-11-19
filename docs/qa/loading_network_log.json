@@ -1,0 +1,179 @@
+{
+  "capturedAt": "2026-11-19T07:13:48.020Z",
+  "gpu": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "browser": "Chromium / Google Chrome",
+  "dracoWasmOrigin": {
+    "file": "public/draco/draco_decoder.wasm",
+    "builtFile": "dist/assets/draco_decoder-Z1_iN-Ht.wasm",
+    "exactBytes": 192420,
+    "kilobytes": "192.42 KB",
+    "description": "Official Google Draco 3D WebAssembly mesh decompressor loaded asynchronously by Three.js DRACOLoader on demand."
+  },
+  "bundleSizes": {
+    "entryJs": {
+      "name": "dist/assets/index-BJj18Jn2.js",
+      "rawBytes": 424690,
+      "sizeText": "424.69 KB"
+    },
+    "dracoWasm": {
+      "name": "dist/assets/draco_decoder-Z1_iN-Ht.wasm",
+      "rawBytes": 192420,
+      "sizeText": "192.42 KB"
+    },
+    "threeModelsChunk": {
+      "name": "dist/assets/three-models-BMlTwIP8.js",
+      "rawBytes": 831760,
+      "sizeText": "831.76 KB"
+    }
+  },
+  "unthrottled": {
+    "profile": "Unthrottled",
+    "runs": [
+      {
+        "run": 1,
+        "domInteractive": 742,
+        "firstPaint": 1992,
+        "firstContentfulPaint": 1992,
+        "first3DFrame": 2092,
+        "wireBytes": 10971876,
+        "requestCount": 42
+      },
+      {
+        "run": 2,
+        "domInteractive": 62,
+        "firstPaint": 136,
+        "firstContentfulPaint": 220,
+        "first3DFrame": 918,
+        "wireBytes": 10971876,
+        "requestCount": 42
+      },
+      {
+        "run": 3,
+        "domInteractive": 723,
+        "firstPaint": 732,
+        "firstContentfulPaint": 832,
+        "first3DFrame": 1694,
+        "wireBytes": 10971876,
+        "requestCount": 42
+      },
+      {
+        "run": 4,
+        "domInteractive": 82,
+        "firstPaint": 1192,
+        "firstContentfulPaint": 1192,
+        "first3DFrame": 1253,
+        "wireBytes": 11164572,
+        "requestCount": 42
+      },
+      {
+        "run": 5,
+        "domInteractive": 87,
+        "firstPaint": 100,
+        "firstContentfulPaint": 220,
+        "first3DFrame": 869,
+        "wireBytes": 10971876,
+        "requestCount": 42
+      }
+    ],
+    "medianDomInteractive": 87,
+    "spreadDomInteractive": [
+      62,
+      742
+    ],
+    "medianFP": 732,
+    "spreadFP": [
+      100,
+      1992
+    ],
+    "medianFCP": 832,
+    "spreadFCP": [
+      220,
+      1992
+    ],
+    "medianFirst3D": 1253,
+    "spreadFirst3D": [
+      869,
+      2092
+    ],
+    "medianWireBytes": 10971876,
+    "spreadWireBytes": [
+      10971876,
+      11164572
+    ]
+  },
+  "fast3G": {
+    "profile": "Fast 3G",
+    "runs": [
+      {
+        "run": 1,
+        "domInteractive": 238,
+        "firstPaint": 828,
+        "firstContentfulPaint": 2876,
+        "first3DFrame": 3473,
+        "wireBytes": 502093,
+        "requestCount": 18
+      },
+      {
+        "run": 2,
+        "domInteractive": 280,
+        "firstPaint": 1020,
+        "firstContentfulPaint": 2972,
+        "first3DFrame": 3705,
+        "wireBytes": 524637,
+        "requestCount": 20
+      },
+      {
+        "run": 3,
+        "domInteractive": 442,
+        "firstPaint": 1028,
+        "firstContentfulPaint": 3092,
+        "first3DFrame": 3706,
+        "wireBytes": 599605,
+        "requestCount": 22
+      },
+      {
+        "run": 4,
+        "domInteractive": 255,
+        "firstPaint": 996,
+        "firstContentfulPaint": 2996,
+        "first3DFrame": 3681,
+        "wireBytes": 544269,
+        "requestCount": 21
+      },
+      {
+        "run": 5,
+        "domInteractive": 451,
+        "firstPaint": 1208,
+        "firstContentfulPaint": 3124,
+        "first3DFrame": 3785,
+        "wireBytes": 571937,
+        "requestCount": 20
+      }
+    ],
+    "medianDomInteractive": 280,
+    "spreadDomInteractive": [
+      238,
+      451
+    ],
+    "medianFP": 1020,
+    "spreadFP": [
+      828,
+      1208
+    ],
+    "medianFCP": 2996,
+    "spreadFCP": [
+      2876,
+      3124
+    ],
+    "medianFirst3D": 3705,
+    "spreadFirst3D": [
+      3473,
+      3785
+    ],
+    "medianWireBytes": 544269,
+    "spreadWireBytes": [
+      502093,
+      599605
+    ]
+  }
+}

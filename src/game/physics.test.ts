@@ -67,12 +67,13 @@ test('SLS launch countdown waits at READY without auto-launch, ignites on player
 
 test('Orbital Satellite deploys, unfolds solar wings, and locks telemetry in space without landing', () => {
   let space = createInitialSpaceFlightState('artemis-2');
+  space.targetId = 'relay-orbit';
   assert.equal(space.targetId, 'relay-orbit');
   space.autoPilot = true;
   let resources = { power: 80, oxygen: 75, shield: 70 };
 
-  // Fly with Auto-Pilot to HERMES Relay Orbit
-  for (let i = 0; i < 400; i++) {
+  // Fly with Auto-Pilot to HERMES Relay Orbit (at calibrated 0.28 u/s speed, 7.0u transit takes ~500 steps)
+  for (let i = 0; i < 600; i++) {
     const out = stepSpaceFlightPhysics(
       space,
       resources,
