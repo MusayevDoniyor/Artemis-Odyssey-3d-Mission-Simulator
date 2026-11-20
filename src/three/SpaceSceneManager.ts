@@ -3140,12 +3140,13 @@ export class SpaceSceneManager {
     if (ss.extraBodies.mars) {
       ss.extraBodies.mars.position.set(marsPos.x, marsPos.y, marsPos.z);
     }
-    ss.relayStageRing.position.set(relayPos.x, relayPos.y, relayPos.z);
-    ss.relayStageRing.scale.setScalar(isSci ? 0.14 : isLocal ? 0.85 : 1.0);
     ss.gatewayGroup.position.set(gatewayPos.x, gatewayPos.y, gatewayPos.z);
     ss.gatewayGroup.scale.setScalar(isSci ? 0.06 : isLocal ? 0.42 : 0.45);
     const targetShipScale = isSci ? 0.012 : isLocal ? 0.032 : 0.048;
     ss.shipGroup.scale.setScalar(targetShipScale);
+    const targetSatScale = isSci ? 0.008 : isLocal ? 0.024 : 0.035;
+    ss.satellite.group.scale.setScalar(targetSatScale);
+    ss.relayStageRing.scale.setScalar(isSci ? 0.02 : isLocal ? 0.06 : 0.08);
 
     // Sync transfer arc curves without per-frame allocations
     const updateArcLine = (
@@ -3604,10 +3605,12 @@ export class SpaceSceneManager {
       );
       this.camLookTarget.set(ovTargetX, 0, ovTargetZ);
       activeDistForNear = ovDist;
+      ss.shipGroup.visible = true;
     } else if (
       (spaceCamMode === "focus" || (hasFocus && !s.userOrbitActive)) &&
       hasFocus
     ) {
+      ss.shipGroup.visible = true;
       const minSafeDist = Math.max(isSci ? 0.025 : 2.6, focusRadius * 2.35);
       const maxSafeDist = isSci ? Math.max(24, focusRadius * 48) : 220;
       const rawDist =
@@ -3622,11 +3625,38 @@ export class SpaceSceneManager {
       );
       this.camLookTarget.set(focusCamSpaceX, focusCamSpaceY, focusCamSpaceZ);
       activeDistForNear = dist;
+    } else if (spaceCamMode === "cockpit") {
+      // First-Person View (FPV / Cockpit View) inside Orion capsule forward command viewport
+      // Hide exterior capsule mesh to prevent polygon clipping and viewport occlusion
+      ss.shipGroup.visible = false;
+
+      const fwdX = Math.sin(sp.headingRad);
+      const fwdZ = Math.cos(sp.headingRad);
+      const cockpitUp = isSci ? 0.04 : isLocal ? 0.10 : 0.16;
+      const eyeX = shipCamSpaceX + fwdX * 0.02;
+      const eyeY = shipCamSpaceY + cockpitUp;
+      const eyeZ = shipCamSpaceZ + fwdZ * 0.02;
+
+      // Pilot free-look head orientation from mouse drag
+      const headYaw = sp.headingRad + (s.orbitYaw || 0);
+      const headPitch = (s.orbitPitch || 0) - 0.12; // Angled slightly down towards instrument panel & Earth horizon
+      const lookDirX = Math.sin(headYaw) * Math.cos(headPitch);
+      const lookDirY = Math.sin(headPitch);
+      const lookDirZ = Math.cos(headYaw) * Math.cos(headPitch);
+
+      this.camPosTarget.set(eyeX, eyeY, eyeZ);
+      this.camLookTarget.set(
+        eyeX + lookDirX * 100,
+        eyeY + lookDirY * 100,
+        eyeZ + lookDirZ * 100,
+      );
+      activeDistForNear = 0.005;
     } else if (
       spaceCamMode === "orbit" ||
       spaceCamMode === "free" ||
       s.userOrbitActive
     ) {
+      ss.shipGroup.visible = true;
       const anchorX = hasFocus ? focusCamSpaceX : shipCamSpaceX;
       const anchorY = hasFocus ? focusCamSpaceY : shipCamSpaceY;
       const anchorZ = hasFocus ? focusCamSpaceZ : shipCamSpaceZ;
@@ -3654,51 +3684,61 @@ export class SpaceSceneManager {
       );
       this.camLookTarget.set(anchorX, anchorY, anchorZ);
       activeDistForNear = dist;
-    } else if (spaceCamMode === "cockpit") {
-      // First-Person View (FPV / Cockpit View) inside Orion capsule forward command viewport
-      const fwdX = Math.sin(sp.headingRad);
-      const fwdZ = Math.cos(sp.headingRad);
-      const cockpitUp = isSci ? 0.04 : isLocal ? 0.10 : 0.16;
-      const cockpitFwd = isSci ? 0.06 : isLocal ? 0.14 : 0.22;
-      const eyeX = shipCamSpaceX + fwdX * cockpitFwd;
-      const eyeY = shipCamSpaceY + cockpitUp;
-      const eyeZ = shipCamSpaceZ + fwdZ * cockpitFwd;
-
-      // Pilot free-look head orientation from mouse drag
-      const lookYaw = sp.headingRad + (s.orbitYaw || 0);
-      const lookPitch = s.orbitPitch || 0;
-      const lookDirX = Math.sin(lookYaw) * Math.cos(lookPitch);
-      const lookDirY = Math.sin(lookPitch);
-      const lookDirZ = Math.cos(lookYaw) * Math.cos(lookPitch);
-
-      this.camPosTarget.set(eyeX, eyeY, eyeZ);
-      this.camLookTarget.set(
-        eyeX + lookDirX * 100,
-        eyeY + lookDirY * 100,
-        eyeZ + lookDirZ * 100,
-      );
-      activeDistForNear = 0.01;
     } else {
-      // Hero 3/4 aft-quarter Orion chase camera scaled naturally for Exploration, Scientific & Local
+      ss.shipGroup.visible = true;
+      // Hero 3/4 aft-quarter Orion chase camera scaled naturally with Earth horizon framing
       const fwdX = Math.sin(sp.headingRad);
       const fwdZ = Math.cos(sp.headingRad);
-      const rightX = Math.cos(sp.headingRad);
-      const rightZ = -Math.sin(sp.headingRad);
-      const chBack = isSci ? 0.32 : isLocal ? 0.65 : 0.85;
-      const chSide = isSci ? 0.08 : isLocal ? 0.16 : 0.2;
-      const chUp = isSci ? 0.12 : isLocal ? 0.24 : 0.3;
-      const chLook = isSci ? 0.18 : isLocal ? 0.36 : 0.45;
-      this.camPosTarget.set(
-        shipCamSpaceX - fwdX * chBack + rightX * chSide,
-        shipCamSpaceY + chUp,
-        shipCamSpaceZ - fwdZ * chBack + rightZ * chSide,
-      );
-      this.camLookTarget.set(
-        shipCamSpaceX + fwdX * chLook,
-        shipCamSpaceY + (isSci ? 0.02 : 0.25),
-        shipCamSpaceZ + fwdZ * chLook,
-      );
-      activeDistForNear = chBack;
+
+      // Check if spacecraft is orbiting Earth
+      const earthCamSpaceX = earthPos.x - originX;
+      const earthCamSpaceY = earthPos.y - originY;
+      const earthCamSpaceZ = earthPos.z - originZ;
+      const dxToEarth = earthCamSpaceX - shipCamSpaceX;
+      const dzToEarth = earthCamSpaceZ - shipCamSpaceZ;
+      const distToEarth = Math.hypot(dxToEarth, dzToEarth);
+      const earthVisR = getBodyVisualRadiusUnits("earth", scaleMode);
+      const inEarthOrbit = distToEarth < earthVisR * 3.5;
+
+      if (inEarthOrbit && distToEarth > 0.01) {
+        // High-three-quarter Earth orbital framing:
+        // Position camera radially offset and elevated so that BOTH Orion AND the glowing Earth curve are framed
+        const radOutX = -dxToEarth / distToEarth;
+        const radOutZ = -dzToEarth / distToEarth;
+        const chBack = isSci ? 0.28 : isLocal ? 0.65 : 0.85;
+        const chOut = isSci ? 0.14 : isLocal ? 0.28 : 0.38;
+        const chUp = isSci ? 0.18 : isLocal ? 0.38 : 0.52;
+
+        this.camPosTarget.set(
+          shipCamSpaceX - fwdX * chBack + radOutX * chOut,
+          shipCamSpaceY + chUp,
+          shipCamSpaceZ - fwdZ * chBack + radOutZ * chOut,
+        );
+        this.camLookTarget.set(
+          shipCamSpaceX + fwdX * 0.12 + dxToEarth * 0.15,
+          shipCamSpaceY + (isSci ? 0.02 : 0.12),
+          shipCamSpaceZ + fwdZ * 0.12 + dzToEarth * 0.15,
+        );
+        activeDistForNear = chBack;
+      } else {
+        const rightX = Math.cos(sp.headingRad);
+        const rightZ = -Math.sin(sp.headingRad);
+        const chBack = isSci ? 0.32 : isLocal ? 0.65 : 0.85;
+        const chSide = isSci ? 0.08 : isLocal ? 0.16 : 0.2;
+        const chUp = isSci ? 0.12 : isLocal ? 0.24 : 0.3;
+        const chLook = isSci ? 0.18 : isLocal ? 0.36 : 0.45;
+        this.camPosTarget.set(
+          shipCamSpaceX - fwdX * chBack + rightX * chSide,
+          shipCamSpaceY + chUp,
+          shipCamSpaceZ - fwdZ * chBack + rightZ * chSide,
+        );
+        this.camLookTarget.set(
+          shipCamSpaceX + fwdX * chLook,
+          shipCamSpaceY + (isSci ? 0.02 : 0.25),
+          shipCamSpaceZ + fwdZ * chLook,
+        );
+        activeDistForNear = chBack;
+      }
     }
 
     const desiredNear = Math.min(

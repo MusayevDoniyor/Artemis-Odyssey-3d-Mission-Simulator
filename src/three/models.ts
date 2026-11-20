@@ -5003,6 +5003,49 @@ export function createOrbitalSatellite(
   beaconMesh.rotation.x = Math.PI / 2;
   group.add(beaconMesh);
 
+  // Load authentic NASA 3D Model of Tracking and Data Relay Satellite (TDRS) asynchronously
+  if (typeof Image !== "undefined") {
+    const gltfLoader = getSharedGLTFLoader();
+    if (gltfLoader) {
+      gltfLoader.load(
+        "/assets/crafts/tdrs.glb",
+        (gltf) => {
+          const satScene = gltf.scene;
+          satScene.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              tagPart(child, "sat-bus");
+            }
+          });
+          const bbox = new THREE.Box3().setFromObject(satScene);
+          const sz = bbox.getSize(new THREE.Vector3());
+          const maxDim = Math.max(sz.x, sz.y, sz.z) || 1.0;
+          // Scale to 3.8 units envelope matching satellite mounting envelope
+          satScene.scale.setScalar(3.8 / maxDim);
+          satScene.position.set(0, 0, 0);
+
+          // Hide procedural bus and mesh geometries while preserving beaconMesh and linkBeam
+          busGroup.visible = false;
+          umbrellaLeft.visible = false;
+          umbrellaRight.visible = false;
+          solarLeftPivot.visible = false;
+          solarRightPivot.visible = false;
+          dishPivot.children.forEach((c) => {
+            if (c !== linkBeam) c.visible = false;
+          });
+
+          group.add(satScene);
+        },
+        undefined,
+        (err) => {
+          // Graceful fallback to procedural satellite mesh on load error
+          console.warn("NASA TDRS GLB asset fallback:", err);
+        },
+      );
+    }
+  }
+
   return {
     group,
     busGroup,

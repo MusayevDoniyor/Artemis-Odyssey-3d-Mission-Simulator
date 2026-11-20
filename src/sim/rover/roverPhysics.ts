@@ -127,8 +127,18 @@ export function stepRoverPhysics(
         vz -= dot * nz;
         const slideSpeed = Math.hypot(vx, vz);
         r.speed = slideSpeed;
-        if (slideSpeed > 0.05) {
-          r.headingRad = Math.atan2(vx, vz);
+        if (slideSpeed > 0.25) {
+          const slideHeading = Math.atan2(vx, vz);
+          let headingDiff = slideHeading - r.headingRad;
+          while (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
+          while (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
+          // Only allow alignment for glancing/diagonal sliding; never spinout on steep or head-on impacts
+          if (Math.abs(headingDiff) <= 1.45) {
+            r.headingRad += clamp(headingDiff, -14 * dt, 14 * dt);
+          }
+        } else if (slideSpeed < 0.08) {
+          // At near-zero tangential speed (head-on stall), stop cleanly without jitter spinout
+          r.speed = 0;
         }
       }
     } else {

@@ -1191,6 +1191,13 @@ export default function App() {
             : s.solarScaleMode === "local"
               ? 140
               : 62;
+      } else if (mode === "cockpit") {
+        s.userOrbitActive = false;
+        s.orbitYaw = 0;
+        s.orbitPitch = 0;
+        s.focusedSolarBodyId = null;
+        setFocusedSolarBodyId(null);
+        setSelectedBodyPin(null);
       } else if (mode === "track") {
         s.focusedSolarBodyId = null;
         setFocusedSolarBodyId(null);
@@ -2351,6 +2358,11 @@ export default function App() {
           const nextIdx = (camCycle.indexOf(curCam) + 1) % camCycle.length;
           const nextCam = camCycle[nextIdx];
           s.spaceCameraMode = nextCam;
+          if (nextCam === "cockpit") {
+            s.userOrbitActive = false;
+            s.orbitYaw = 0;
+            s.orbitPitch = 0;
+          }
           setSpaceCameraMode(nextCam);
           soundSynth.playClick();
           syncUiNow();
